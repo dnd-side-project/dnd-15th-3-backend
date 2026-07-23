@@ -1,0 +1,11 @@
+pre-commit:
+  jobs:
+    - name: biome lint
+      run: pnpm biome check --no-errors-on-unmatched --staged
+    - name: biome format
+      run: pnpm biome format --write --no-errors-on-unmatched --staged && git add --update
+
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: pnpm commitlint --edit {1}
