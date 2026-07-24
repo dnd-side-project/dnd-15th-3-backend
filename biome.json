@@ -64,7 +64,8 @@
         "useArrayLiterals": "error",
         "useAsConstAssertion": "error",
         "useBlockStatements": "off",
-        "useConsistentArrowReturn": "off"
+        "useConsistentArrowReturn": "off",
+        "useNamingConvention": "error"
       },
       "suspicious": {
         "noAsyncPromiseExecutor": "error",
