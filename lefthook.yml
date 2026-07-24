@@ -3,7 +3,8 @@ pre-commit:
     - name: biome lint
       run: pnpm biome check --no-errors-on-unmatched --staged
     - name: biome format
-      run: pnpm biome format --write --no-errors-on-unmatched --staged && git add --update
+      run: pnpm biome format --write --no-errors-on-unmatched --staged
+      stage_fixed: true
 
 commit-msg:
   jobs:
