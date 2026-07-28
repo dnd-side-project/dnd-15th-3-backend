@@ -1,3 +1,4 @@
 allowBuilds:
+  '@scarf/scarf': false
   lefthook: true
   unrs-resolver: true
