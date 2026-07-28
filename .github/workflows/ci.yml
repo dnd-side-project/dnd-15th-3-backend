@@ -1,10 +1,16 @@
 name: CI
 
 on:
-  push:
+  push: &ci-trigger
     branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+    paths:
+      - "src/**"
+      - "test/**"
+      - "*.json"                   # package, biome, tsconfig, nest-cli
+      - "*.toml"                   # mise
+      - "*.yaml"                   # pnpm-lock, pnpm-workspace
+      - ".github/workflows/ci.yml"
+  pull_request: *ci-trigger
 
 jobs:
   ci:
@@ -12,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup mise
         uses: jdx/mise-action@v4
