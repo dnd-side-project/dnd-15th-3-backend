@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { type Env, validateEnv } from './config/env'
@@ -21,6 +22,7 @@ import { type Env, validateEnv } from './config/env'
         password: config.get('DB_PASSWORD', { infer: true }),
         database: config.get('DB_DATABASE', { infer: true }),
         entities: [`${__dirname}/**/*.entity{.ts,.js}`],
+        namingStrategy: new SnakeNamingStrategy(),
         synchronize: config.get('NODE_ENV', { infer: true }) !== 'production',
       }),
     }),
