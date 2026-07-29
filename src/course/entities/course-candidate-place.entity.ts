@@ -17,6 +17,6 @@ export class CourseCandidatePlace extends BaseEntity {
   @Column()
   order: number
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, comment: 'Unit: seconds' })
   travelTimeToNext: number
 }
