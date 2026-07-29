@@ -6,7 +6,7 @@ import { Meeting } from './meeting.entity'
 @Entity()
 @Unique(['meeting', 'order'])
 export class CourseCategoryStep extends BaseEntity {
-  @ManyToOne(() => Meeting, { nullable: false })
+  @ManyToOne(() => Meeting, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'meeting_id' })
   meeting: Meeting
 

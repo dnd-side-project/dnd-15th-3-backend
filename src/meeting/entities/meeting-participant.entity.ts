@@ -7,7 +7,7 @@ import { Meeting } from './meeting.entity'
 @Entity()
 @Unique(['meeting', 'user'])
 export class MeetingParticipant extends BaseEntity {
-  @ManyToOne(() => Meeting, { nullable: false })
+  @ManyToOne(() => Meeting, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'meeting_id' })
   meeting: Meeting
 
