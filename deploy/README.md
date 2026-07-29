@@ -1,8 +1,9 @@
-# GitOps deployment
+# k3s GitOps deployment
 
-ArgoCD는 이 레포를 직접 감시한다. 팀원은 `atlas-infra`가 아니라 이 디렉터리만 수정한다.
+운영 대상은 OCI의 **k3s 클러스터**다. ArgoCD는 이 레포를 직접 감시해 표준 Kubernetes 매니페스트를
+k3s에 반영한다. 팀원은 `atlas-infra`가 아니라 이 디렉터리만 수정한다.
 
-| Branch | Kustomize overlay | Kubernetes namespace | Public hostname |
+| Branch | Kustomize overlay | k3s namespace | Public hostname |
 |---|---|---|---|
 | `develop` | `k8s/overlays/develop` | `dnd-15th-3-dev` | `momo-dev.jinmu.me` |
 | `main` | `k8s/overlays/main` | `dnd-15th-3` | `momo.jinmu.me` |
