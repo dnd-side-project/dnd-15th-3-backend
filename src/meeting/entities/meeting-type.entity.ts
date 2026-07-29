@@ -1,8 +1,9 @@
 import { BaseEntity } from 'src/common/entities/base.entity'
-import { Column, Entity } from 'typeorm'
+import { Check, Column, Entity } from 'typeorm'
 
 @Entity()
 export class MeetingType extends BaseEntity {
+  @Check(`length("name") >= 1`)
   @Column({ length: 10, unique: true })
   name: string
 
