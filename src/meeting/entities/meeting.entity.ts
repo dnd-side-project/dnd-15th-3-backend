@@ -27,8 +27,8 @@ export class Meeting extends BaseEntity {
   accessToken: string
 
   @Column({ nullable: true, unique: true })
-  routeImageKey: string
+  courseImageKey: string
 
   @Column({ nullable: true })
-  routeImageUploadedAt: Date
+  courseImageUploadedAt: Date
 }
