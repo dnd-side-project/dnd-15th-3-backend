@@ -1,7 +1,7 @@
 import { Category } from 'src/category/entities/category.entity'
 import { BaseEntity } from 'src/common/entities/base.entity'
+import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm'
-import { Meeting } from './meeting.entity'
 
 @Entity()
 @Unique(['meeting', 'order'])
