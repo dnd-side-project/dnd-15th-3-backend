@@ -85,7 +85,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # develop 환경은 Argo CD Image Updater가 태그를 자동 반영하므로
+      # main 브랜치만 git에 태그를 기록한다.
       - name: Update the environment image tag
+        if: github.ref_name == 'main'
         env:
           BRANCH: ${{ github.ref_name }}
           IMAGE_TAG: ${{ github.ref_name }}-${{ github.sha }}
