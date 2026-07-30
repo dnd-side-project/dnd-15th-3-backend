@@ -1,0 +1,24 @@
+# develop 환경 이미지 자동 업데이트.
+# GitHub Actions가 ghcr.io에 develop-<sha> 태그를 push하면
+# Image Updater가 가장 최근 빌드 태그를 감지해 dnd-15th-3-dev Application의
+# kustomize 파라미터를 갱신한다 (argocd write-back, git commit 없음).
+# main(prod) 환경은 대상이 아니다. CI가 git에 태그를 직접 기록한다.
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: dnd-15th-3-dev
+  namespace: argocd
+spec:
+  writeBackConfig:
+    method: argocd
+  applicationRefs:
+    - namePattern: dnd-15th-3-dev
+      images:
+        - alias: momo-api
+          imageName: ghcr.io/dnd-side-project/dnd-15th-3-backend
+          manifestTargets:
+            kustomize:
+              name: ghcr.io/dnd-side-project/dnd-15th-3-backend
+          commonUpdateSettings:
+            updateStrategy: newest-build
+            allowTags: regexp:^develop-[0-9a-f]{40}$
