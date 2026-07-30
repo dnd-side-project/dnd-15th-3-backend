@@ -4,6 +4,7 @@ import { Check, Column, Entity, JoinColumn, ManyToOne } from 'typeorm'
 import { MeetingType } from './meeting-type.entity'
 
 @Entity()
+@Check(`length("name") >= 1`)
 export class Meeting extends BaseEntity {
   @ManyToOne(() => MeetingType, { nullable: false })
   @JoinColumn({ name: 'meeting_type_id' })
@@ -13,7 +14,6 @@ export class Meeting extends BaseEntity {
   @JoinColumn({ name: 'first_location_place_id' })
   firstLocationPlace: Place
 
-  @Check(`length("name") >= 1`)
   @Column({ length: 10 })
   name: string
 

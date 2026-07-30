@@ -4,6 +4,7 @@ import { Check, Column, Entity, JoinColumn, ManyToOne } from 'typeorm'
 import { CourseCandidate } from './course-candidate.entity'
 
 @Entity()
+@Check(`length("content") >= 1`)
 export class CourseCandidateComment extends BaseEntity {
   @ManyToOne(() => CourseCandidate, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'course_candidate_id' })
@@ -13,7 +14,6 @@ export class CourseCandidateComment extends BaseEntity {
   @JoinColumn({ name: 'participant_id' })
   participant: MeetingParticipant
 
-  @Check(`length("content") >= 1`)
   @Column('text')
   content: string
 }

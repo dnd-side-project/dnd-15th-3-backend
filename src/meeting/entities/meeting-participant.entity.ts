@@ -6,6 +6,7 @@ import { Meeting } from './meeting.entity'
 
 @Entity()
 @Unique(['meeting', 'user'])
+@Check(`length("nickname") >= 1`)
 export class MeetingParticipant extends BaseEntity {
   @ManyToOne(() => Meeting, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'meeting_id' })
@@ -18,7 +19,6 @@ export class MeetingParticipant extends BaseEntity {
   @Column({ type: 'enum', enum: ParticipantRole })
   role: ParticipantRole
 
-  @Check(`length("nickname") >= 1`)
   @Column({ length: 10 })
   nickname: string
 }
