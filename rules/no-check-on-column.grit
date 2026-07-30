@@ -1,0 +1,8 @@
+engine biome(1.0)
+language js(typescript)
+
+JsPropertyClassMember() as $member where {
+  $member <: contains `@Check($args)` as $decorator where {
+    register_diagnostic(span=$decorator, message="@Check는 클래스 레벨에 작성하세요.", severity="error")
+  }
+}
