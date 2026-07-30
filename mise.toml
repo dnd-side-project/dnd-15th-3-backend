@@ -6,7 +6,7 @@ redis = "7"
 terraform = "latest"
 
 [env]
-_.file = ".env"
+_.file = ".env.development"
 PGDATA = ".mise/data/postgres"
 
 [tasks.setup]
