@@ -22,3 +22,4 @@ spec:
           commonUpdateSettings:
             updateStrategy: newest-build
             allowTags: regexp:^develop-[0-9a-f]{40}$
+            pullSecret: secret:argocd/ghcr-credentials
