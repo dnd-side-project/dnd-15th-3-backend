@@ -1,4 +1,10 @@
-import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { Env } from '../config/env'
@@ -23,6 +29,43 @@ export class StorageService {
 
   getClient(): S3Client {
     return this.s3Client
+  }
+
+  async getPresignedUploadUrl(
+    key: string,
+    contentType?: string,
+    expiresIn = 300,
+  ): Promise<string> {
+    const command = new PutObjectCommand({
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Bucket: this.bucketName,
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Key: key,
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      ContentType: contentType,
+    })
+    return await getSignedUrl(this.s3Client, command, { expiresIn })
+  }
+
+  async getPresignedDownloadUrl(
+    key: string,
+    expiresIn = 3600,
+  ): Promise<string> {
+    const command = new GetObjectCommand({
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Bucket: this.bucketName,
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Key: key,
+    })
+    return await getSignedUrl(this.s3Client, command, { expiresIn })
+  }
+
+  getPublicUrl(key: string): string {
+    const endpoint = this.s3Client.config.endpoint
+    if (typeof endpoint === 'function') {
+      return `${endpoint().toString()}/${this.bucketName}/${key}`
+    }
+    return `${endpoint}/${this.bucketName}/${key}`
   }
 
   async checkHealth(): Promise<boolean> {

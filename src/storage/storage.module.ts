@@ -2,6 +2,7 @@ import { S3Client } from '@aws-sdk/client-s3'
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import type { Env } from '../config/env'
+import { StorageController } from './storage.controller'
 import { StorageService } from './storage.service'
 
 function buildOciS3Endpoint(
@@ -43,6 +44,7 @@ function buildOciS3Endpoint(
     },
     StorageService,
   ],
+  controllers: [StorageController],
   exports: [StorageService],
 })
 export class StorageModule {}
