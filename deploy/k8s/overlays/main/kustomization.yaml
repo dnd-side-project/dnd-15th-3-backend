@@ -5,7 +5,7 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/dnd-side-project/dnd-15th-3-backend
-    newTag: main-bootstrap
+    newTag: main-fa15479ccefadbbeee240b382b9e8438dba452fd
 patches:
   - path: ingress.yaml
   - path: resources.yaml
