@@ -31,11 +31,13 @@
     "ci": "mise run ci"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1097.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.6",
+    "@nestjs/terminus": "^11.1.1",
     "@nestjs/typeorm": "^11.0.3",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",

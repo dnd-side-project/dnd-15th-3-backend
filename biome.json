@@ -110,6 +110,9 @@
     "includes": ["**", "!eslint.config.mjs"]
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "jsxQuoteStyle": "double",
       "quoteProperties": "asNeeded",

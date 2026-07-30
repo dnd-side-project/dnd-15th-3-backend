@@ -5,6 +5,8 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { type Env, validateEnv } from './config/env'
+import { HealthModule } from './health/health.module'
+import { StorageModule } from './storage/storage.module'
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { type Env, validateEnv } from './config/env'
         synchronize: config.get('NODE_ENV', { infer: true }) !== 'production',
       }),
     }),
+    StorageModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
