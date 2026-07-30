@@ -1,5 +1,17 @@
 import { z } from 'zod'
 
+const coerceBoolean = z
+  .union([z.boolean(), z.string()])
+  .transform((val) => {
+    if (typeof val === 'boolean') return val
+    if (typeof val === 'string') {
+      const lower = val.toLowerCase().trim()
+      return lower === 'true' || lower === '1'
+    }
+    return false
+  })
+  .default(false)
+
 function requiredInProduction<T extends z.ZodTypeAny>(schema: T) {
   return z.union([
     schema,
@@ -32,6 +44,12 @@ const envSchema = z.object({
   DB_PASSWORD: z.string().default(''),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   DB_DATABASE: z.string().default('postgres'),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  DB_SSL: coerceBoolean,
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  DB_SSL_CA: z.string().optional(),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  DB_SYNCHRONIZE: coerceBoolean,
 
   // OCI Object Storage
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
