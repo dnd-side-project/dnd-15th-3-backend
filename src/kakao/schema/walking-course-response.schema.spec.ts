@@ -25,7 +25,7 @@ describe('kakaoWalkingCourseResponseSchema', () => {
 
   it('status가 OK가 아니고 route도 없으면 통과한다', () => {
     const result = kakaoWalkingCourseResponseSchema.safeParse({
-      status: 'TEST',
+      status: 'ROUTE_NOT_FOUND',
     })
 
     expect(result.success).toBe(true)
