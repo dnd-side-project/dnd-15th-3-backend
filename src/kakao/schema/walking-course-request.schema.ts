@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 const coordinateSystemSchema = z.enum(['WGS84', 'WTM', 'TM', 'WCONGNAMUL'])
 
-//카카오 도보 경로 API의 경유지(via_x/via_y/v_name)는 최대 5개까지 쉼표로 구분해 전달
+// 카카오 도보 경로 API의 경유지(via_x/via_y/v_name)는 최대 5개까지 쉼표로 구분해 전달
 const isValidCommaSeparatedList = (value: string) => {
   const parts = value.split(',')
   return parts.length <= 5 && parts.every((part) => part.length > 0)
