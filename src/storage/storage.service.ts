@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
@@ -60,12 +61,26 @@ export class StorageService {
     return await getSignedUrl(this.s3Client, command, { expiresIn })
   }
 
-  getPublicUrl(key: string): string {
+  async getPublicUrl(key: string): Promise<string> {
     const endpoint = this.s3Client.config.endpoint
-    if (typeof endpoint === 'function') {
-      return `${endpoint().toString()}/${this.bucketName}/${key}`
+    if (!endpoint) {
+      throw new Error('S3 endpoint is not configured')
     }
-    return `${endpoint}/${this.bucketName}/${key}`
+    const resolved = await endpoint()
+    const baseUrl = `${resolved.protocol}//${resolved.hostname}${
+      resolved.port ? `:${resolved.port}` : ''
+    }${resolved.path}`.replace(/\/+$/, '')
+    return `${baseUrl}/${this.bucketName}/${key}`
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    const command = new DeleteObjectCommand({
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Bucket: this.bucketName,
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Key: key,
+    })
+    await this.s3Client.send(command)
   }
 
   async checkHealth(): Promise<boolean> {
