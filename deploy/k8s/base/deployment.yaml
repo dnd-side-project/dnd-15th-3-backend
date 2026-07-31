@@ -16,8 +16,12 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-credentials
       containers:
         - name: api
           image: ghcr.io/dnd-side-project/dnd-15th-3-backend:bootstrap
@@ -25,9 +29,10 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: momo-api-env
           env:
-            - name: NODE_ENV
-              value: production
             - name: PORT
               value: "3000"
           startupProbe:

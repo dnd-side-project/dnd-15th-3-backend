@@ -27,17 +27,41 @@ on:
       - ".github/workflows/image.yml"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  packages: write
-
 concurrency:
   group: image-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  build-and-publish:
+  build:
+    name: Build and validate (PR)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/arm64
+          tags: ghcr.io/dnd-side-project/dnd-15th-3-backend:ci-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-and-publish:
+    name: Build, publish and update manifests (push)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v6
 
@@ -52,17 +76,19 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           platforms: linux/arm64
-          tags: ghcr.io/dnd-side-project/dnd-15th-3-backend:${{ github.event_name == 'pull_request' && format('ci-{0}', github.sha) || format('{0}-{1}', github.ref_name, github.sha) }}
+          tags: ghcr.io/dnd-side-project/dnd-15th-3-backend:${{ github.ref_name }}-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # develop 환경은 Argo CD Image Updater가 태그를 자동 반영하므로
+      # main 브랜치만 git에 태그를 기록한다.
       - name: Update the environment image tag
-        if: github.event_name != 'pull_request'
+        if: github.ref_name == 'main'
         env:
           BRANCH: ${{ github.ref_name }}
           IMAGE_TAG: ${{ github.ref_name }}-${{ github.sha }}

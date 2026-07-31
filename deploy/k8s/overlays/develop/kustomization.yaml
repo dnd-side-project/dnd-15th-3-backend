@@ -4,7 +4,10 @@ namespace: dnd-15th-3-dev
 resources:
   - ../../base
 images:
+  # develop 환경의 실제 태그는 Argo CD Image Updater가 Application 파라미터로
+  # 자동 관리한다 (deploy/argocd/image-updater.yaml 참고).
+  # 여기 값은 최초 부트스트랩용 placeholder이며 git에는 갱신하지 않는다.
   - name: ghcr.io/dnd-side-project/dnd-15th-3-backend
-    newTag: develop-bootstrap
+    newTag: develop-63a7d1be1574f815071f86dbff0ede6561d3c4a2
 patches:
   - path: ingress.yaml
