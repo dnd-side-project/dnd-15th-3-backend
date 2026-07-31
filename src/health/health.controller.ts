@@ -1,5 +1,10 @@
 import { Controller, Get, Logger } from '@nestjs/common'
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  ApiExcludeEndpoint,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 import {
   HealthCheck,
   HealthCheckService,
@@ -47,34 +52,8 @@ export class HealthController {
   }
 
   @Get('live')
-  @ApiOperation({ summary: 'k3s liveness probe' })
-  @ApiResponse({ status: 200, description: 'Application process is alive' })
+  @ApiExcludeEndpoint()
   checkLiveness() {
-    return { status: 'ok', timestamp: new Date().toISOString() }
-  }
-
-  @Get('ready')
-  @HealthCheck()
-  @ApiOperation({ summary: 'k3s readiness probe (DB + S3)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Application is ready to receive traffic',
-  })
-  @ApiResponse({ status: 503, description: 'Application is not ready' })
-  checkReadiness() {
-    return this.health.check([
-      () => this.db.pingCheck('database', { timeout: 5000 }),
-      () => this.storage.isHealthy('storage'),
-    ])
-  }
-
-  @Get('startup')
-  @ApiOperation({ summary: 'k3s startup probe' })
-  @ApiResponse({
-    status: 200,
-    description: 'Application has started successfully',
-  })
-  checkStartup() {
-    return { status: 'ok', timestamp: new Date().toISOString() }
+    return { status: 'ok' }
   }
 }
