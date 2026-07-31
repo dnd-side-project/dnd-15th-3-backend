@@ -1,0 +1,20 @@
+name: Check PR Source Branch
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR is coming from develop
+        run: |
+          echo "PR Head Branch: ${{ github.head_ref }}"
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "❌ ERROR: main 브랜치는 develop 브랜치에서만 PR을 올릴 수 있습니다!"
+            echo "현재 올린 브랜치: ${{ github.head_ref }}"
+            exit 1
+          fi
+          echo "✅ PASS: develop 브랜치에서 올린 PR입니다."

@@ -1,0 +1,31 @@
+{
+  "routes": [
+    {
+      "routeId": 1,
+      "strategy": "선호도우선",
+      "places": [
+        { "placeId": 1, "order": 1, "category": "식당" },
+        { "placeId": 3, "order": 2, "category": "카페" },
+        { "placeId": 6, "order": 3, "category": "술/바" }
+      ]
+    },
+    {
+      "routeId": 2,
+      "strategy": "이동거리최소화",
+      "places": [
+        { "placeId": 2, "order": 1, "category": "식당" },
+        { "placeId": 3, "order": 2, "category": "카페" },
+        { "placeId": 5, "order": 3, "category": "술/바" }
+      ]
+    },
+    {
+      "routeId": 3,
+      "strategy": "균형",
+      "places": [
+        { "placeId": 1, "order": 1, "category": "식당" },
+        { "placeId": 4, "order": 2, "category": "카페" },
+        { "placeId": 5, "order": 3, "category": "술/바" }
+      ]
+    }
+  ]
+}

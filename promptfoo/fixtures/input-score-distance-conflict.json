@@ -1,0 +1,68 @@
+{
+  "startLocation": { "latitude": 35.8688, "longitude": 128.6013 },
+  "visitOrder": ["식당", "카페", "술/바"],
+  "places": [
+    {
+      "id": 1,
+      "name": "멀지만 인기 맛집",
+      "category": "식당",
+      "latitude": 35.8823,
+      "longitude": 128.6152,
+      "likeCount": 10,
+      "dislikeCount": 0,
+      "score": 10.0
+    },
+    {
+      "id": 2,
+      "name": "가깝지만 무난한 맛집",
+      "category": "식당",
+      "latitude": 35.869,
+      "longitude": 128.6016,
+      "likeCount": 2,
+      "dislikeCount": 2,
+      "score": 0.1
+    },
+    {
+      "id": 3,
+      "name": "가까운 카페",
+      "category": "카페",
+      "latitude": 35.8693,
+      "longitude": 128.6021,
+      "likeCount": 4,
+      "dislikeCount": 1,
+      "score": 3.0
+    },
+    {
+      "id": 4,
+      "name": "먼 카페",
+      "category": "카페",
+      "latitude": 35.8809,
+      "longitude": 128.6091,
+      "likeCount": 3,
+      "dislikeCount": 1,
+      "score": 1.0
+    },
+    {
+      "id": 5,
+      "name": "가까운 술집",
+      "category": "술/바",
+      "latitude": 35.8697,
+      "longitude": 128.6009,
+      "likeCount": 3,
+      "dislikeCount": 0,
+      "score": 2.0
+    },
+    {
+      "id": 6,
+      "name": "먼 술집",
+      "category": "술/바",
+      "latitude": 35.8851,
+      "longitude": 128.6112,
+      "likeCount": 5,
+      "dislikeCount": 0,
+      "score": 4.0
+    }
+  ],
+  "meetingStartTime": "18:00",
+  "travelMode": "walking"
+}
