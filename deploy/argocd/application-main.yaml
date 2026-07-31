@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dnd-15th-3
+  name: dnd-15th-3-prod
   namespace: argocd
 spec:
   project: dnd-15th-3
