@@ -64,8 +64,6 @@ const envSchema = z.object({
   OCI_BUCKET_NAME_DEV: z.string().default('momo-bucket-dev'),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OCI_BUCKET_NAME_PROD: z.string().default('momo-bucket-prod'),
-  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  OCI_S3_ENDPOINT: z.string().url().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>
