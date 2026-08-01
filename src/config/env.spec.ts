@@ -4,8 +4,6 @@ const baseConfig = {
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   NODE_ENV: 'test',
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  CORS_ORIGINS: 'http://localhost:5173',
-  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OCI_NAMESPACE: 'namespace',
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OCI_S3_ACCESS_KEY: 'access-key',
@@ -86,11 +84,6 @@ describe('validateEnv', () => {
   })
 
   describe('validation errors', () => {
-    it('rejects missing CORS_ORIGINS', () => {
-      const { CORS_ORIGINS, ...config } = baseConfig
-      expect(() => validateEnv(config)).toThrow('Invalid environment variables')
-    })
-
     it('throws when PORT is out of range', () => {
       // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
       expect(() => validateEnv({ ...baseConfig, PORT: 70000 })).toThrow(
