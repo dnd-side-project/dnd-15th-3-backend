@@ -1,108 +1,32 @@
 {
-  "startLocation": { "latitude": 35.8688, "longitude": 128.6013 },
+  "startNodeId": "start",
   "visitOrder": ["식당", "카페", "액티비티", "액티비티", "술/바"],
   "places": [
-    {
-      "id": 1,
-      "name": "장소A",
-      "category": "식당",
-      "latitude": 35.8714,
-      "longitude": 128.6014,
-      "likeCount": 8,
-      "dislikeCount": 3,
-      "score": 2.0
-    },
-    {
-      "id": 2,
-      "name": "장소B",
-      "category": "식당",
-      "latitude": 35.8697,
-      "longitude": 128.5936,
-      "likeCount": 4,
-      "dislikeCount": 1,
-      "score": 2.5
-    },
-    {
-      "id": 3,
-      "name": "장소C",
-      "category": "카페",
-      "latitude": 35.8681,
-      "longitude": 128.6055,
-      "likeCount": 5,
-      "dislikeCount": 0,
-      "score": 5.0
-    },
-    {
-      "id": 4,
-      "name": "장소D",
-      "category": "카페",
-      "latitude": 35.873,
-      "longitude": 128.598,
-      "likeCount": 3,
-      "dislikeCount": 2,
-      "score": 0.5
-    },
-    {
-      "id": 5,
-      "name": "장소E",
-      "category": "액티비티",
-      "latitude": 35.8659,
-      "longitude": 128.5941,
-      "likeCount": 7,
-      "dislikeCount": 1,
-      "score": 5.5
-    },
-    {
-      "id": 6,
-      "name": "장소F",
-      "category": "액티비티",
-      "latitude": 35.8745,
-      "longitude": 128.6072,
-      "likeCount": 6,
-      "dislikeCount": 2,
-      "score": 3.0
-    },
-    {
-      "id": 7,
-      "name": "장소G",
-      "category": "액티비티",
-      "latitude": 35.8703,
-      "longitude": 128.6009,
-      "likeCount": 2,
-      "dislikeCount": 0,
-      "score": 2.0
-    },
-    {
-      "id": 8,
-      "name": "장소H",
-      "category": "액티비티",
-      "latitude": 35.8676,
-      "longitude": 128.5967,
-      "likeCount": 9,
-      "dislikeCount": 4,
-      "score": 2.5
-    },
-    {
-      "id": 9,
-      "name": "장소I",
-      "category": "술/바",
-      "latitude": 35.8721,
-      "longitude": 128.6031,
-      "likeCount": 5,
-      "dislikeCount": 1,
-      "score": 3.5
-    },
-    {
-      "id": 10,
-      "name": "장소J",
-      "category": "술/바",
-      "latitude": 35.8692,
-      "longitude": 128.5998,
-      "likeCount": 4,
-      "dislikeCount": 3,
-      "score": -0.5
-    }
+    { "id": "1", "name": "장소A", "category": "식당", "score": 2.0 },
+    { "id": "2", "name": "장소B", "category": "식당", "score": 2.5 },
+    { "id": "3", "name": "장소C", "category": "카페", "score": 5.0 },
+    { "id": "4", "name": "장소D", "category": "카페", "score": 0.5 },
+    { "id": "5", "name": "장소E", "category": "액티비티", "score": 5.5 },
+    { "id": "6", "name": "장소F", "category": "액티비티", "score": 3.0 },
+    { "id": "7", "name": "장소G", "category": "액티비티", "score": 2.0 },
+    { "id": "8", "name": "장소H", "category": "액티비티", "score": 2.5 },
+    { "id": "9", "name": "장소I", "category": "술/바", "score": 3.5 },
+    { "id": "10", "name": "장소J", "category": "술/바", "score": -0.5 }
   ],
-  "meetingStartTime": "18:00",
-  "travelMode": "walking"
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": { "1": 1, "2": 20 },
+      "1": { "3": 20, "4": 1 },
+      "2": { "3": 20, "4": 20 },
+      "3": { "5": 20, "6": 20, "7": 20, "8": 20 },
+      "4": { "5": 2, "6": 20, "7": 20, "8": 1 },
+      "5": { "6": 1, "7": 20, "8": 20, "9": 1, "10": 20 },
+      "6": { "5": 20, "7": 20, "8": 20, "9": 1, "10": 20 },
+      "7": { "5": 20, "6": 20, "8": 20, "9": 20, "10": 1 },
+      "8": { "5": 20, "6": 20, "7": 1, "9": 20, "10": 1 }
+    }
+  }
 }

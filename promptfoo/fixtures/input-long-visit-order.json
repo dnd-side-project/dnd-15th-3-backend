@@ -1,108 +1,34 @@
 {
-  "startLocation": { "latitude": 35.8688, "longitude": 128.6013 },
+  "startNodeId": "start",
   "visitOrder": ["식당", "카페", "액티비티", "술/바", "카페", "식당", "술/바"],
   "places": [
-    {
-      "id": 1,
-      "name": "저녁식당1",
-      "category": "식당",
-      "latitude": 35.8714,
-      "longitude": 128.6014,
-      "likeCount": 8,
-      "dislikeCount": 1,
-      "score": 6.0
-    },
-    {
-      "id": 2,
-      "name": "카페1",
-      "category": "카페",
-      "latitude": 35.8693,
-      "longitude": 128.6021,
-      "likeCount": 5,
-      "dislikeCount": 1,
-      "score": 3.5
-    },
-    {
-      "id": 3,
-      "name": "액티비티1",
-      "category": "액티비티",
-      "latitude": 35.8701,
-      "longitude": 128.6022,
-      "likeCount": 6,
-      "dislikeCount": 1,
-      "score": 4.5
-    },
-    {
-      "id": 4,
-      "name": "술집1",
-      "category": "술/바",
-      "latitude": 35.8704,
-      "longitude": 128.603,
-      "likeCount": 7,
-      "dislikeCount": 1,
-      "score": 5.5
-    },
-    {
-      "id": 5,
-      "name": "카페2",
-      "category": "카페",
-      "latitude": 35.8681,
-      "longitude": 128.6055,
-      "likeCount": 4,
-      "dislikeCount": 0,
-      "score": 4.0
-    },
-    {
-      "id": 6,
-      "name": "저녁식당2",
-      "category": "식당",
-      "latitude": 35.8676,
-      "longitude": 128.5967,
-      "likeCount": 6,
-      "dislikeCount": 2,
-      "score": 2.5
-    },
-    {
-      "id": 7,
-      "name": "액티비티2",
-      "category": "액티비티",
-      "latitude": 35.8659,
-      "longitude": 128.5941,
-      "likeCount": 5,
-      "dislikeCount": 1,
-      "score": 3.0
-    },
-    {
-      "id": 8,
-      "name": "술집2",
-      "category": "술/바",
-      "latitude": 35.8721,
-      "longitude": 128.6031,
-      "likeCount": 4,
-      "dislikeCount": 0,
-      "score": 4.0
-    },
-    {
-      "id": 9,
-      "name": "저녁식당3",
-      "category": "식당",
-      "latitude": 35.8702,
-      "longitude": 128.6041,
-      "likeCount": 6,
-      "dislikeCount": 1,
-      "score": 4.0
-    },
-    {
-      "id": 10,
-      "name": "카페3",
-      "category": "카페",
-      "latitude": 35.8683,
-      "longitude": 128.6002,
-      "likeCount": 3,
-      "dislikeCount": 2,
-      "score": 1.0
-    }
+    { "id": "1", "name": "저녁식당1", "category": "식당", "score": 6.0 },
+    { "id": "2", "name": "카페1", "category": "카페", "score": 3.5 },
+    { "id": "3", "name": "액티비티1", "category": "액티비티", "score": 4.5 },
+    { "id": "4", "name": "술집1", "category": "술/바", "score": 5.5 },
+    { "id": "5", "name": "카페2", "category": "카페", "score": 4.0 },
+    { "id": "6", "name": "저녁식당2", "category": "식당", "score": 2.5 },
+    { "id": "7", "name": "액티비티2", "category": "액티비티", "score": 3.0 },
+    { "id": "8", "name": "술집2", "category": "술/바", "score": 4.0 },
+    { "id": "9", "name": "저녁식당3", "category": "식당", "score": 4.0 },
+    { "id": "10", "name": "카페3", "category": "카페", "score": 1.0 }
   ],
-  "meetingStartTime": "18:00",
-  "travelMode": "walking"
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": { "1": 1, "6": 1, "9": 1 },
+      "1": { "2": 100, "5": 100, "10": 100, "4": 100, "8": 1 },
+      "6": { "2": 100, "5": 100, "10": 1, "4": 1, "8": 100 },
+      "9": { "2": 1, "5": 100, "10": 100, "4": 100, "8": 100 },
+      "2": { "3": 1, "7": 100, "1": 100, "6": 100, "9": 1 },
+      "5": { "3": 100, "7": 100, "1": 1, "6": 100, "9": 100 },
+      "10": { "3": 100, "7": 1, "1": 100, "6": 1, "9": 100 },
+      "3": { "4": 100, "8": 1 },
+      "7": { "4": 1, "8": 100 },
+      "4": { "2": 1, "5": 1, "10": 100 },
+      "8": { "2": 100, "5": 100, "10": 2 }
+    }
+  }
 }

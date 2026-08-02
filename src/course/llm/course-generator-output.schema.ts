@@ -1,15 +1,23 @@
 import { z } from 'zod'
+import {
+  buildCourseRoutePlan,
+  COURSE_STRATEGIES,
+  type CourseRoutePlan,
+  calculateRouteMetrics,
+  getRouteSequenceKey,
+  validateStrategySelection,
+} from './course-generator.planner'
 import type { CourseGeneratorInput } from './course-generator-input.schema'
 
 const coursePlaceSchema = z.strictObject({
-  placeId: z.number().int().positive(),
+  placeId: z.string().min(1),
   order: z.number().int().positive(),
   category: z.string().min(1),
 })
 
 const courseRouteSchema = z.strictObject({
   routeId: z.number().int().positive(),
-  strategy: z.string().min(1),
+  strategy: z.enum(COURSE_STRATEGIES),
   places: z.array(coursePlaceSchema).refine(
     (places) => {
       const ids = places.map((place) => place.placeId)
@@ -24,7 +32,7 @@ export type CourseGeneratorOutput = {
     routeId: number
     strategy: string
     places: {
-      placeId: number
+      placeId: string
       order: number
       category: string
     }[]
@@ -33,8 +41,16 @@ export type CourseGeneratorOutput = {
 
 export function createCourseGeneratorOutputSchema(
   input: CourseGeneratorInput,
+  plan: CourseRoutePlan = buildCourseRoutePlan(input),
+  options: { expectedRouteCount?: number } = {},
 ): z.ZodType<CourseGeneratorOutput> {
   const candidateIds = new Set(input.places.map((place) => place.id))
+  const candidatePlaces = new Map(
+    input.places.map((place) => [place.id, place]),
+  )
+  const routeCandidateKeys = new Set(
+    plan.routeCandidates.map((route) => getRouteSequenceKey(route.placeIds)),
+  )
   const visitOrder = input.visitOrder
 
   return z
@@ -44,10 +60,19 @@ export function createCourseGeneratorOutputSchema(
     .superRefine((value, ctx) => {
       const { routes } = value
 
-      if (routes.length < 1 || routes.length > 3) {
+      const expectedRouteCount = options.expectedRouteCount
+      if (
+        (expectedRouteCount !== undefined &&
+          routes.length !== expectedRouteCount) ||
+        (expectedRouteCount === undefined &&
+          (routes.length < 1 || routes.length > COURSE_STRATEGIES.length))
+      ) {
         ctx.addIssue({
           code: 'custom',
-          message: 'routes는 1개 이상 3개 이하여야 합니다.',
+          message:
+            expectedRouteCount === undefined
+              ? `routes는 1개 이상 ${COURSE_STRATEGIES.length}개 이하여야 합니다.`
+              : `routes는 ${expectedRouteCount}개여야 합니다.`,
         })
         return
       }
@@ -73,6 +98,13 @@ export function createCourseGeneratorOutputSchema(
               code: 'custom',
               message: `placeId ${place.placeId}는 후보 목록에 존재하지 않습니다.`,
             })
+          } else if (
+            candidatePlaces.get(place.placeId)?.category !== place.category
+          ) {
+            ctx.addIssue({
+              code: 'custom',
+              message: `placeId ${place.placeId}의 카테고리와 출력 category가 일치하지 않습니다.`,
+            })
           }
           if (place.order !== placeIndex + 1) {
             ctx.addIssue({
@@ -80,6 +112,36 @@ export function createCourseGeneratorOutputSchema(
               message: `${routeIndex + 1}번째 코스의 order가 순차적이지 않습니다. ${placeIndex + 1}번째 위치에 ${place.order}.`,
             })
           }
+        }
+      }
+
+      for (const [routeIndex, route] of routes.entries()) {
+        const placeIds = route.places.map((place) => place.placeId)
+        const sequenceKey = getRouteSequenceKey(placeIds)
+        const candidate = plan.routeCandidates.find(
+          (routeCandidate) =>
+            getRouteSequenceKey(routeCandidate.placeIds) === sequenceKey,
+        )
+        const verified = calculateRouteMetrics(placeIds, input)
+
+        if (!routeCandidateKeys.has(sequenceKey) || !candidate || !verified) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `${routeIndex + 1}번째 코스가 서버가 계산한 유효 코스 후보에 없습니다.`,
+          })
+          continue
+        }
+
+        if (
+          Math.abs(
+            candidate.totalDistanceMeters - verified.totalDistanceMeters,
+          ) > 1e-9 ||
+          Math.abs(candidate.totalScore - verified.totalScore) > 1e-9
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `${routeIndex + 1}번째 코스의 서버 계산 거리 또는 점수가 일치하지 않습니다.`,
+          })
         }
       }
 
@@ -116,6 +178,17 @@ export function createCourseGeneratorOutputSchema(
           code: 'custom',
           message: '전략(strategy)은 서로 달라야 합니다.',
         })
+      }
+
+      const strategyIssues = validateStrategySelection(
+        routes.map((route) => ({
+          strategy: route.strategy,
+          placeIds: route.places.map((place) => place.placeId),
+        })),
+        plan,
+      )
+      for (const message of strategyIssues) {
+        ctx.addIssue({ code: 'custom', message })
       }
     })
 }

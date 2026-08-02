@@ -83,7 +83,7 @@ describe('parseCourseGeneratorOutput', () => {
 
   it('후보 목록에 없는 placeId(환각)가 있으면 실패한다', () => {
     const output = JSON.parse(loadExpectedOutput('input-normal'))
-    output.routes[0].places[0].placeId = 999
+    output.routes[0].places[0].placeId = '999'
 
     expectValidationError(
       () => parseCourseGeneratorOutput(JSON.stringify(output), input),

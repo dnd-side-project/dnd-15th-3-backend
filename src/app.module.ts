@@ -5,6 +5,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { type Env, validateEnv } from './config/env'
+import { CourseModule } from './course/course.module'
 import { HealthModule } from './health/health.module'
 import { StorageModule } from './storage/storage.module'
 
@@ -41,6 +42,7 @@ import { StorageModule } from './storage/storage.module'
     }),
     StorageModule,
     HealthModule,
+    CourseModule,
   ],
   controllers: [AppController],
   providers: [AppService],
