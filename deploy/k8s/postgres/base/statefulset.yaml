@@ -73,7 +73,10 @@ spec:
                 - ALL
               add:
                 - CHOWN
+                - DAC_READ_SEARCH
                 - FOWNER
+                - SETGID
+                - SETUID
           resources:
             requests:
               cpu: 100m
