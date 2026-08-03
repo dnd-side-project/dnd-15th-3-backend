@@ -1,22 +1,71 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common'
 import {
   ApiBody,
   ApiOperation,
-  ApiParam,
+  ApiProperty,
+  ApiPropertyOptional,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
 import { StorageService } from './storage.service'
 
 class GetUploadUrlDto {
+  @ApiProperty({
+    description: 'Object key (path) in the bucket',
+    example: 'uploads/profile-avatar.png',
+  })
   key!: string
+
+  @ApiPropertyOptional({
+    description: 'MIME type of the file to upload',
+    example: 'image/png',
+  })
   contentType?: string
+
+  @ApiPropertyOptional({
+    description: 'URL expiry in seconds (default: 300)',
+    example: 300,
+    default: 300,
+  })
   expiresIn?: number
 }
 
 class GetDownloadUrlDto {
+  @ApiProperty({
+    description: 'Object key (path) in the bucket',
+    example: 'uploads/profile-avatar.png',
+  })
   key!: string
+
+  @ApiPropertyOptional({
+    description: 'URL expiry in seconds (default: 3600)',
+    example: 3600,
+    default: 3600,
+  })
   expiresIn?: number
+}
+
+class GetPublicUrlDto {
+  @ApiProperty({
+    description: 'Object key (path) in the bucket',
+    example: 'uploads/profile-avatar.png',
+  })
+  key!: string
+}
+
+class DeleteObjectDto {
+  @ApiProperty({
+    description: 'Object key (path) in the bucket',
+    example: 'uploads/profile-avatar.png',
+  })
+  key!: string
 }
 
 @ApiTags('Storage')
@@ -68,18 +117,31 @@ export class StorageController {
     }
   }
 
-  @Get('public-url/:key')
+  @Post('public-url')
   @ApiOperation({
     summary: 'Get public URL for an object',
     description: 'Returns a direct (non-signed) URL for public objects.',
   })
-  @ApiParam({ name: 'key', description: 'Object key in the bucket' })
-  @ApiResponse({ status: 200, description: 'Public URL generated' })
-  getPublicUrl(@Param('key') key: string) {
+  @ApiBody({ type: GetPublicUrlDto })
+  @ApiResponse({ status: 201, description: 'Public URL generated' })
+  async getPublicUrl(@Body() dto: GetPublicUrlDto) {
     return {
-      publicUrl: this.storageService.getPublicUrl(key),
+      publicUrl: await this.storageService.getPublicUrl(dto.key),
       bucket: this.storageService.getBucketName(),
-      key,
+      key: dto.key,
     }
+  }
+
+  @Delete('objects')
+  @ApiOperation({
+    summary: 'Delete an object',
+    description:
+      'Permanently deletes the object from the bucket. Executed server-side with the configured credentials.',
+  })
+  @ApiBody({ type: DeleteObjectDto })
+  @ApiResponse({ status: 204, description: 'Object deleted' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteObject(@Body() dto: DeleteObjectDto) {
+    await this.storageService.deleteObject(dto.key)
   }
 }

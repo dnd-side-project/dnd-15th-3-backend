@@ -32,6 +32,8 @@ const envSchema = z.object({
     .default('development'),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  CORS_ORIGINS: z.string().trim().min(1),
 
   // Database
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
@@ -64,8 +66,6 @@ const envSchema = z.object({
   OCI_BUCKET_NAME_DEV: z.string().default('momo-bucket-dev'),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OCI_BUCKET_NAME_PROD: z.string().default('momo-bucket-prod'),
-  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  OCI_S3_ENDPOINT: z.string().url().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>
