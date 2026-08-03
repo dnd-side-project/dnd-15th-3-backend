@@ -8,4 +8,5 @@ images:
     newTag: main-adb5db01b39d5238dd6b3e13dd038c4ff11c14b8
 patches:
   - path: ingress.yaml
+  - path: environment.yaml
   - path: resources.yaml

@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: momo-api
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: NODE_ENV
+              value: development
+            - name: CORS_ORIGINS
+              value: "https://dnd-15th-3-frontend.pages.dev,http://localhost:5173,http://localhost:6006"
