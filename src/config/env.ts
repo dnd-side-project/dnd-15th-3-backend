@@ -32,6 +32,8 @@ const envSchema = z.object({
     .default('development'),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  CORS_ORIGINS: z.string().trim().min(1),
 
   // Database
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
