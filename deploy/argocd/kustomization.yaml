@@ -3,4 +3,6 @@ kind: Kustomization
 resources:
   - application-develop.yaml
   - application-main.yaml
+  - application-postgres-develop.yaml
+  - application-postgres-main.yaml
   - image-updater.yaml
