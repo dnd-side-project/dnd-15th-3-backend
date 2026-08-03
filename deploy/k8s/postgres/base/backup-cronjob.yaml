@@ -1,0 +1,127 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: momo-postgres-backup
+  labels:
+    app.kubernetes.io/name: momo-postgres-backup
+spec:
+  schedule: "0 4 * * *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 1800
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: momo-postgres-backup
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          initContainers:
+            - name: dump
+              image: postgres:17-alpine
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PGHOST
+                  value: momo-postgres
+                - name: PGPORT
+                  value: "5432"
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-postgres-auth
+                      key: POSTGRES_DB
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-postgres-auth
+                      key: POSTGRES_USER
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-postgres-auth
+                      key: POSTGRES_PASSWORD
+              command:
+                - sh
+                - -c
+              args:
+                - >-
+                  set -eu;
+                  pg_dump --format=custom --no-owner --no-privileges
+                  --file="/backup/momo-$(date -u +%Y%m%dT%H%M%SZ).dump"
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+          containers:
+            - name: upload
+              image: rclone/rclone:1.70.2
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: OCI_NAMESPACE
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-api-env
+                      key: OCI_NAMESPACE
+                - name: OCI_REGION
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-api-env
+                      key: OCI_REGION
+                - name: OCI_S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-api-env
+                      key: OCI_S3_ACCESS_KEY
+                - name: OCI_S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-api-env
+                      key: OCI_S3_SECRET_KEY
+                - name: OCI_BUCKET_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: momo-api-env
+                      key: OCI_BUCKET_NAME_PROD
+                - name: BACKUP_ENV
+                  value: prod
+              command:
+                - sh
+                - -c
+              args:
+                - |
+                  set -eu
+                  export RCLONE_CONFIG_OCI_TYPE=s3
+                  export RCLONE_CONFIG_OCI_PROVIDER=Other
+                  export RCLONE_CONFIG_OCI_ENV_AUTH=false
+                  export RCLONE_CONFIG_OCI_ACCESS_KEY_ID="$OCI_S3_ACCESS_KEY"
+                  export RCLONE_CONFIG_OCI_SECRET_ACCESS_KEY="$OCI_S3_SECRET_KEY"
+                  export RCLONE_CONFIG_OCI_ENDPOINT="https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oraclecloud.com"
+                  export RCLONE_CONFIG_OCI_REGION="$OCI_REGION"
+                  remote="oci:${OCI_BUCKET_NAME}/postgresql/${BACKUP_ENV}"
+                  rclone copy /backup "$remote"
+                  rclone delete --min-age 336h "$remote"
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 64Mi
+                limits:
+                  cpu: 300m
+                  memory: 256Mi
+          volumes:
+            - name: backup
+              emptyDir:
+                sizeLimit: 12Gi
