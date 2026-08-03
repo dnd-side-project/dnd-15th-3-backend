@@ -11,7 +11,7 @@ spec:
     path: deploy/k8s/postgres/overlays/main
   destination:
     server: https://kubernetes.default.svc
-    namespace: dnd-15th-3
+    namespace: dnd-15th-3-prod
   syncPolicy:
     automated:
       prune: true
