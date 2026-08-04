@@ -1,5 +1,16 @@
 import { z } from 'zod'
 
+// 카카오 도보 경로 API 문서에 정의된 status 값
+const kakaoWalkingCourseStatusSchema = z.enum([
+  'OK',
+  'SAME_POINT',
+  'START_LINK_NOT_FOUND',
+  'END_LINK_NOT_FOUND',
+  'TOO_MANY_SEARCH_LINK',
+  'TOO_FAR_AWAY',
+  'ROUTE_RESULT_NOT_FOUND',
+])
+
 // Leg: 경로를 구성하는 개별 구간
 const legPropertiesSchema = z.object({
   distance: z.number(), // Unit: meters
@@ -24,12 +35,14 @@ const routeSchema = z.object({
 // Response(status가 OK일 때만 route 포함)
 export const kakaoWalkingCourseResponseSchema = z
   .object({
-    status: z.string(),
+    status: kakaoWalkingCourseStatusSchema,
     route: routeSchema.optional(),
   })
-  .refine((data) => !(data.status === 'OK' && data.route === undefined), {
-    message: 'status가 OK인데 route 정보가 없습니다',
-  })
+  .refine((data) => {
+    const isOk = data.status === 'OK'
+    const hasRoute = data.route !== undefined
+    return isOk === hasRoute
+  }, 'status가 OK일 때만 route 정보가 있어야 합니다1')
 
 export type KakaoWalkingCourseResponse = z.infer<
   typeof kakaoWalkingCourseResponseSchema
