@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // 카카오 도보 경로 API 문서에 정의된 status 값
-const kakaoWalkingCourseStatusSchema = z.enum([
+export const kakaoWalkingCourseStatusSchema = z.enum([
   'OK',
   'SAME_POINT',
   'START_LINK_NOT_FOUND',
