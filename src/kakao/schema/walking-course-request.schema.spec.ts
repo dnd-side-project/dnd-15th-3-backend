@@ -21,6 +21,24 @@ describe('kakaoWalkingCourseHeaderSchema', () => {
 
     expect(result.success).toBe(false)
   })
+
+  it('KakaoAK 접두사 뒤에 REST API 키가 없으면 실패한다', () => {
+    const result = kakaoWalkingCourseHeaderSchema.safeParse({
+      // biome-ignore lint/style/useNamingConvention: HTTP 헤더 이름과 동일하게 유지
+      Authorization: 'KakaoAK ',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('KakaoAK 접두사 뒤에 공백만 있으면 실패한다', () => {
+    const result = kakaoWalkingCourseHeaderSchema.safeParse({
+      // biome-ignore lint/style/useNamingConvention: HTTP 헤더 이름과 동일하게 유지
+      Authorization: 'KakaoAK    ',
+    })
+
+    expect(result.success).toBe(false)
+  })
 })
 
 describe('kakaoWalkingCourseRequestSchema', () => {
@@ -92,5 +110,105 @@ describe('kakaoWalkingCourseRequestSchema', () => {
     })
 
     expect(result.success).toBe(false)
+  })
+
+  it('좌표가 숫자 형식이 아니면 실패한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      start_x: 'TEST',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('좌표가 빈 문자열이면 실패한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      start_x: '',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('좌표가 음수여도 통과한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      start_x: '-127.1',
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      start_y: '-37.5',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('via_x에 공백만 있는 값이 있으면 실패한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_x: '127.1, ',
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_y: '37.1,37.2',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('via_y에 공백만 있는 값이 있으면 실패한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_x: '127.1,127.2',
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_y: '37.1, ',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('v_name에 공백만 있는 값이 있으면 실패한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      v_name: '서울역, ',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('via_x에 숫자가 아닌 값이 있으면 실패한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_x: '127.1,TEST',
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_y: '37.1,37.2',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('via_y에 숫자가 아닌 값이 있으면 실패한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_x: '127.1,127.2',
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      via_y: '37.1,TEST',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('v_name은 숫자가 아니어도 통과한다', () => {
+    const result = kakaoWalkingCourseRequestSchema.safeParse({
+      ...baseParams,
+      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+      v_name: '서울역,강남역',
+    })
+
+    expect(result.success).toBe(true)
   })
 })
