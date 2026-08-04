@@ -42,7 +42,7 @@ export const kakaoWalkingCourseResponseSchema = z
     const isOk = data.status === 'OK'
     const hasRoute = data.route !== undefined
     return isOk === hasRoute
-  }, 'status가 OK일 때만 route 정보가 있어야 합니다1')
+  }, 'status가 OK일 때만 route 정보가 있어야 합니다')
 
 export type KakaoWalkingCourseResponse = z.infer<
   typeof kakaoWalkingCourseResponseSchema
