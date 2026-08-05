@@ -2,6 +2,7 @@ import { Controller, Get, Param } from '@nestjs/common'
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingErrorCode } from './exception/meeting-error-code'
@@ -42,7 +43,7 @@ export class MeetingController {
     '예상하지 못한 서버 오류',
   )
   getMeetingStatus(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
   ): MeetingStatusResponseDto {
     return { status: MeetingStatus.RecommendationCollecting }
   }
