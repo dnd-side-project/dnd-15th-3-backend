@@ -48,6 +48,11 @@ run = "redis-cli shutdown"
 description = "Redis CLI 접속"
 run = "redis-cli"
 
+[tasks.mock-api]
+description = "프론트엔드 화면 개발용 Mock API 서버 실행"
+env = { MOCK_API_ENABLED = "true" }
+run = "pnpm start:dev"
+
 [tasks.ci]
 description = "로컬에서 CI와 동일한 검증 실행"
 run = [
