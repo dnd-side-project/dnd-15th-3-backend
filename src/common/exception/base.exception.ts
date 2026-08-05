@@ -4,7 +4,7 @@ import { ErrorCode, ValidationErrorDetail } from './error-code.type'
 export abstract class BaseException extends Error {
   protected constructor(
     readonly errorCode: ErrorCode,
-    readonly errors?: ValidationErrorDetail[],
+    readonly fieldErrors?: ValidationErrorDetail[],
   ) {
     super(errorCode.message)
   }

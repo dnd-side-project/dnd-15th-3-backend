@@ -10,5 +10,5 @@ export class ErrorResponseDto {
   message: string
 
   @ApiProperty({ required: false, type: [ValidationErrorDetailDto] })
-  errors?: ValidationErrorDetailDto[]
+  fieldErrors?: ValidationErrorDetailDto[]
 }
