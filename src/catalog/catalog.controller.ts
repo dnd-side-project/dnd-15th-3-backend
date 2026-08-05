@@ -15,6 +15,8 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { MockApiService } from 'src/mock/mock-api.service'
 
 class MeetingTypeResponseDto {
@@ -22,8 +24,16 @@ class MeetingTypeResponseDto {
   id!: string
 
   @ApiProperty({
+    description: '모임 유형 코드',
+    enum: MeetingTypeCode,
+    enumName: 'MeetingTypeCode',
+    example: MeetingTypeCode.Social,
+  })
+  code!: MeetingTypeCode
+
+  @ApiProperty({
     description: '화면에 표시할 모임 유형명',
-    example: '친구 모임',
+    example: '친목',
   })
   name!: string
 }
@@ -35,8 +45,13 @@ class CategoryResponseDto {
   @ApiProperty({ description: '카테고리명', example: '카페' })
   name!: string
 
-  @ApiProperty({ description: 'URL·식별자에 사용할 슬러그', example: 'cafe' })
-  slug!: string
+  @ApiProperty({
+    description: 'URL·식별자에 사용할 카테고리 슬러그',
+    enum: CategorySlug,
+    enumName: 'CategorySlug',
+    example: CategorySlug.Cafe,
+  })
+  slug!: CategorySlug
 }
 
 class PlaceSearchResponseDto {

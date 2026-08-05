@@ -6,4 +6,12 @@ import { Check, Column, Entity } from 'typeorm'
 export class User extends BaseEntity {
   @Column({ length: 255, unique: true })
   userKey: string
+
+  @Column({
+    type: 'varchar',
+    nullable: true,
+    length: 255,
+    comment: 'Selected profile image asset key',
+  })
+  profileImageKey: string | null
 }

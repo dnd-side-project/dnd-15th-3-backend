@@ -6,6 +6,7 @@ import { Meeting } from './meeting.entity'
 
 @Entity()
 @Unique(['meeting', 'user'])
+@Check(`length("access_token") >= 1`)
 @Check(`length("nickname") >= 1`)
 export class MeetingParticipant extends BaseEntity {
   @ManyToOne(() => Meeting, { nullable: false, onDelete: 'CASCADE' })
@@ -18,6 +19,13 @@ export class MeetingParticipant extends BaseEntity {
 
   @Column({ type: 'enum', enum: ParticipantRole })
   role: ParticipantRole
+
+  @Column({
+    length: 255,
+    unique: true,
+    comment: 'Participant-scoped session token',
+  })
+  accessToken: string
 
   @Column({ length: 10 })
   nickname: string

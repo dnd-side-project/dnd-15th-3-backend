@@ -1,10 +1,14 @@
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
   Post,
+  Put,
   Query,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -12,6 +16,7 @@ import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -23,7 +28,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
+import { MAX_COURSE_STEPS } from 'src/category/category.constants'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { MockApiService } from 'src/mock/mock-api.service'
+import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 
 class ParticipantProfileDto {
   @ApiProperty({
@@ -43,8 +51,13 @@ class ParticipantProfileDto {
 }
 
 class CreateMeetingDto {
-  @ApiProperty({ description: '모임 유형 ID', example: '1' })
-  meetingTypeId!: string
+  @ApiProperty({
+    description: '모임 유형 코드',
+    enum: MeetingTypeCode,
+    enumName: 'MeetingTypeCode',
+    example: MeetingTypeCode.Social,
+  })
+  meetingTypeCode!: MeetingTypeCode
 
   @ApiProperty({ description: '모임 이름', example: '성수 브런치 모임' })
   name!: string
@@ -59,10 +72,16 @@ class CreateMeetingDto {
   firstLocationPlaceId!: string
 
   @ApiProperty({
-    description: '코스 카테고리 ID 목록. 배열 순서가 코스 진행 순서입니다.',
-    example: ['1', '2', '3'],
+    description: '코스 카테고리 슬러그 목록. 배열 순서가 코스 진행 순서입니다.',
+    enum: CategorySlug,
+    enumName: 'CategorySlug',
+    isArray: true,
+    minItems: 1,
+    maxItems: MAX_COURSE_STEPS,
+    uniqueItems: true,
+    example: [CategorySlug.Restaurant, CategorySlug.Cafe, CategorySlug.Bar],
   })
-  categoryIds!: string[]
+  categorySlugs!: CategorySlug[]
 
   @ApiProperty({ description: '방장 프로필', type: ParticipantProfileDto })
   host!: ParticipantProfileDto
@@ -145,7 +164,15 @@ class MeetingTypeSummaryDto {
   @ApiProperty({ description: '모임 유형 ID', example: '1' })
   id!: string
 
-  @ApiProperty({ description: '모임 유형명', example: '친구 모임' })
+  @ApiProperty({
+    description: '모임 유형 코드',
+    enum: MeetingTypeCode,
+    enumName: 'MeetingTypeCode',
+    example: MeetingTypeCode.Social,
+  })
+  code!: MeetingTypeCode
+
+  @ApiProperty({ description: '모임 유형명', example: '친목' })
   name!: string
 }
 
@@ -194,11 +221,59 @@ class CourseCategoryStepResponseDto {
   @ApiProperty({ description: '카테고리명', example: '카페' })
   name!: string
 
-  @ApiProperty({ description: '카테고리 슬러그', example: 'cafe' })
-  slug!: string
+  @ApiProperty({
+    description: '카테고리 슬러그',
+    enum: CategorySlug,
+    enumName: 'CategorySlug',
+    example: CategorySlug.Cafe,
+  })
+  slug!: CategorySlug
 
   @ApiProperty({ description: '코스 순서', example: 1 })
   order!: number
+}
+
+class UpdateCoursePlanDto {
+  @ApiProperty({
+    description:
+      '저장할 코스 카테고리 슬러그 목록. 배열 순서가 코스 진행 순서입니다. 비우면 코스를 모두 삭제합니다.',
+    enum: CategorySlug,
+    enumName: 'CategorySlug',
+    isArray: true,
+    minItems: 0,
+    maxItems: MAX_COURSE_STEPS,
+    uniqueItems: true,
+    example: [CategorySlug.Restaurant, CategorySlug.Cafe, CategorySlug.Bar],
+  })
+  categorySlugs!: CategorySlug[]
+
+  @ApiProperty({
+    description: '조회한 코스 버전. 다른 변경이 먼저 저장되면 충돌 처리합니다.',
+    example: 1,
+    minimum: 1,
+  })
+  version!: number
+}
+
+class CoursePlanResponseDto {
+  @ApiProperty({ description: '모임 ID', example: '1' })
+  meetingId!: string
+
+  @ApiProperty({
+    description: '허용되는 최대 코스 수',
+    example: MAX_COURSE_STEPS,
+  })
+  maxSteps!: number
+
+  @ApiProperty({ description: '현재 코스 버전', example: 1 })
+  version!: number
+
+  @ApiProperty({
+    description: '현재 선택된 코스 카테고리와 순서',
+    type: CourseCategoryStepResponseDto,
+    isArray: true,
+  })
+  categorySteps!: CourseCategoryStepResponseDto[]
 }
 
 class RecommendationPreviewDto {
@@ -344,9 +419,116 @@ export class MeetingController {
   @ApiBadRequestResponse({
     description: '필수 입력값 또는 날짜/시간 형식이 올바르지 않습니다.',
   })
-  createMeeting(@Body() _dto: CreateMeetingDto) {
+  createMeeting(@Body() dto: CreateMeetingDto) {
     this.mockApi.requireEnabled()
-    return this.mockApi.createMeeting()
+    const meeting = this.mockApi.createMeeting(dto.categorySlugs)
+    if (meeting === 'BAD_REQUEST') {
+      throw new BadRequestException(
+        `코스는 중복 없이 최대 ${MAX_COURSE_STEPS}개까지 선택할 수 있습니다.`,
+      )
+    }
+    return meeting
+  }
+
+  @Get(':meetingId/course-plan')
+  @ApiOperation({
+    summary: '코스 계획 조회',
+    description:
+      '현재 선택된 카테고리와 순서를 조회합니다. 코스 순서는 categorySteps 배열 순서와 order로 표현됩니다.',
+  })
+  @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
+  @ApiOkResponse({
+    description: '코스 계획 조회 성공',
+    type: CoursePlanResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'accessToken이 없거나 유효하지 않습니다.',
+  })
+  @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
+  getCoursePlan(
+    @Param('meetingId') meetingId: string,
+    @Query('accessToken') accessToken: string,
+  ) {
+    this.mockApi.requireEnabled()
+    const coursePlan = this.mockApi.getCoursePlan(meetingId, accessToken)
+    if (coursePlan === 'NOT_FOUND') {
+      throw new NotFoundException('모임을 찾을 수 없습니다.')
+    }
+    if (!coursePlan) {
+      throw new UnauthorizedException('유효하지 않은 참여자 accessToken입니다.')
+    }
+    return coursePlan
+  }
+
+  @Put(':meetingId/course-plan')
+  @ApiOperation({
+    summary: '코스 계획 전체 저장',
+    description:
+      '추가·삭제·순서 변경 결과를 현재 전체 배열로 교체합니다. Drag & drop 중간 이벤트가 아니라 저장 시점에 호출합니다.',
+  })
+  @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '코스를 수정할 방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
+  @ApiOkResponse({
+    description: '코스 계획 저장 성공',
+    type: CoursePlanResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: `카테고리가 중복되었거나 ${MAX_COURSE_STEPS}개를 초과했습니다.`,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'accessToken이 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({
+    description: '방장만 코스 계획을 수정할 수 있습니다.',
+  })
+  @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
+  @ApiConflictResponse({
+    description:
+      '오래된 version으로 저장을 시도했습니다. 최신 계획을 다시 조회하세요.',
+  })
+  updateCoursePlan(
+    @Param('meetingId') meetingId: string,
+    @Query('accessToken') accessToken: string,
+    @Body() dto: UpdateCoursePlanDto,
+  ) {
+    this.mockApi.requireEnabled()
+    const coursePlan = this.mockApi.updateCoursePlan(
+      meetingId,
+      accessToken,
+      dto.categorySlugs,
+      dto.version,
+    )
+    if (coursePlan === 'NOT_FOUND') {
+      throw new NotFoundException('모임을 찾을 수 없습니다.')
+    }
+    if (coursePlan === 'UNAUTHORIZED') {
+      throw new UnauthorizedException('유효하지 않은 참여자 accessToken입니다.')
+    }
+    if (coursePlan === 'FORBIDDEN') {
+      throw new ForbiddenException('방장만 코스 계획을 수정할 수 있습니다.')
+    }
+    if (coursePlan === 'CONFLICT') {
+      throw new ConflictException(
+        '최신 코스 계획을 조회한 뒤 다시 저장해주세요.',
+      )
+    }
+    if (coursePlan === 'BAD_REQUEST') {
+      throw new BadRequestException(
+        `코스는 중복 없이 최대 ${MAX_COURSE_STEPS}개까지 선택할 수 있습니다.`,
+      )
+    }
+    return coursePlan
   }
 
   @Post('invitation/preview')
