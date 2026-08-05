@@ -8,6 +8,11 @@ export const CommonErrorCode = {
     status: HttpStatus.BAD_REQUEST,
     message: '입력값을 확인해주세요.',
   },
+  authenticationFailed: {
+    code: 'AUTHENTICATION_FAILED',
+    status: HttpStatus.UNAUTHORIZED,
+    message: '인증에 실패했습니다.',
+  },
   internalServerError: {
     code: 'INTERNAL_SERVER_ERROR',
     status: HttpStatus.INTERNAL_SERVER_ERROR,
