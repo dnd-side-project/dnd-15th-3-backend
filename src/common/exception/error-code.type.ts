@@ -6,9 +6,3 @@ export interface ErrorCode {
   status: HttpStatus
   message: string
 }
-
-//검증 실패 . 어떤 필드가 왜 잘못됐는지 나타내는 값
-export interface ValidationErrorDetail {
-  field: string
-  reason: string
-}
