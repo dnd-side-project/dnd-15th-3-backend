@@ -47,6 +47,11 @@ import {
   updateCoursePlanRequestSchema,
 } from './schemas/meeting-request.schema'
 
+const PARTICIPANT_UNAUTHORIZED_DESCRIPTION =
+  'Authorization Bearer 참여자 토큰이 없거나 유효하지 않습니다. MOCK_API_ENABLED=true에서는 deprecated query accessToken을 임시 호환 경로로 사용할 수 있습니다. 세션·쿠키 만료의 구체적인 정책은 별도 확정 후 반영합니다.'
+const HOST_FORBIDDEN_DESCRIPTION =
+  '참여자 인증은 성공했지만 방장 역할이 아니어서 요청을 수행할 수 없습니다.'
+
 class ParticipantProfileDto {
   @ApiProperty({
     description: '클라이언트가 보관하는 익명 사용자 키',
@@ -479,7 +484,7 @@ export class MeetingController {
     type: CoursePlanResponseDto,
   })
   @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
+    description: PARTICIPANT_UNAUTHORIZED_DESCRIPTION,
   })
   @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
   getCoursePlan(
@@ -531,10 +536,10 @@ export class MeetingController {
     description: `카테고리가 중복되었거나 ${MAX_COURSE_STEPS}개를 초과했습니다.`,
   })
   @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
+    description: PARTICIPANT_UNAUTHORIZED_DESCRIPTION,
   })
   @ApiForbiddenResponse({
-    description: '방장만 코스 계획을 수정할 수 있습니다.',
+    description: HOST_FORBIDDEN_DESCRIPTION,
   })
   @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
   @ApiConflictResponse({
@@ -590,6 +595,9 @@ export class MeetingController {
   @ApiOkResponse({
     description: '초대 코드 검증 및 모임 미리보기 성공',
     type: MeetingInvitationResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '초대 코드가 비어 있거나 6자리 형식이 아닙니다.',
   })
   @ApiNotFoundResponse({
     description:
@@ -665,8 +673,7 @@ export class MeetingDetailController {
     type: MeetingScreenResponseDto,
   })
   @ApiUnauthorizedResponse({
-    description:
-      'accessToken이 없거나 유효하지 않아 초대 코드 화면으로 이동해야 합니다.',
+    description: PARTICIPANT_UNAUTHORIZED_DESCRIPTION,
   })
   @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
   getMeetingDetail(

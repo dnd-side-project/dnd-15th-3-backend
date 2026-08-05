@@ -95,6 +95,9 @@ describe('MeetingController', () => {
         }),
       ]),
     )
+    expect(
+      document.paths?.['/meetings/invitation/preview']?.post?.responses,
+    ).toHaveProperty('400')
 
     await app.close()
   })

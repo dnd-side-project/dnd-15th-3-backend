@@ -39,7 +39,7 @@ class GetUploadUrlDto {
   contentType?: string
 
   @ApiPropertyOptional({
-    description: 'URL 만료 시간(초, 기본값: 300)',
+    description: 'URL 만료 시간(초, 기본값: 300, 최댓값: 3600)',
     example: 300,
     default: 300,
   })
@@ -54,7 +54,7 @@ class GetDownloadUrlDto {
   key!: string
 
   @ApiPropertyOptional({
-    description: 'URL 만료 시간(초, 기본값: 3600)',
+    description: 'URL 만료 시간(초, 기본값: 3600, 최댓값: 3600)',
     example: 3600,
     default: 3600,
   })
