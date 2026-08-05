@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common'
+import { Controller, Get, HttpStatus, Param } from '@nestjs/common'
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
@@ -24,7 +24,7 @@ export class MeetingController {
       '코스 생성 완료(COURSE_GENERATED) 또는 생성 실패(COURSE_GENERATION_FAILED) → ' +
       '코스 확정(COURSE_CONFIRMED) 순서로 진행됩니다.',
   })
-  @ApiResponse({ status: 200, type: MeetingStatusResponseDto })
+  @ApiResponse({ status: HttpStatus.OK, type: MeetingStatusResponseDto })
   @ApiErrorResponse(
     CommonErrorCode.validationError,
     'meetingId 형식이 올바르지 않음',
