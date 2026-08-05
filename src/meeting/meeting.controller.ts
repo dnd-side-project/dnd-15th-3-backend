@@ -1,5 +1,5 @@
 import { Controller, Get, Param } from '@nestjs/common'
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
@@ -10,6 +10,11 @@ import { MeetingErrorCode } from './exception/meeting-error-code'
 @Controller('api/v1/meetings')
 export class MeetingController {
   @Get(':meetingId')
+  @ApiParam({
+    name: 'meetingId',
+    description: '조회할 모임의 ID',
+    example: '1',
+  })
   @ApiOperation({
     summary: '모임 상태 조회',
     description:
