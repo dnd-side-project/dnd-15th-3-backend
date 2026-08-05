@@ -1,8 +1,10 @@
 import { Controller, Get, Param } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import { ErrorResponseDto } from 'src/common/exception/error-response.dto'
+import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
+import { MeetingErrorCode } from './exception/meeting-error-code'
 
 @ApiTags('Meeting')
 @Controller('api/v1/meetings')
@@ -17,31 +19,23 @@ export class MeetingController {
       '코스 확정(COURSE_CONFIRMED) 순서로 진행됩니다.',
   })
   @ApiResponse({ status: 200, type: MeetingStatusResponseDto })
-  @ApiResponse({
-    status: 400,
-    type: ErrorResponseDto,
-    description: 'meetingId 형식이 올바르지 않음',
-  })
-  @ApiResponse({
-    status: 401,
-    type: ErrorResponseDto,
-    description: '인증 정보가 없거나 유효하지 않음',
-  })
-  @ApiResponse({
-    status: 403,
-    type: ErrorResponseDto,
-    description: '해당 모임의 참여자가 아님',
-  })
-  @ApiResponse({
-    status: 404,
-    type: ErrorResponseDto,
-    description: '모임을 찾을 수 없음',
-  })
-  @ApiResponse({
-    status: 500,
-    type: ErrorResponseDto,
-    description: '예상하지 못한 서버 오류',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    'meetingId 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '인증 정보가 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.notParticipant,
+    '해당 모임의 참여자가 아님',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임을 찾을 수 없음')
+  @ApiErrorResponse(
+    CommonErrorCode.internalServerError,
+    '예상하지 못한 서버 오류',
+  )
   getMeetingStatus(
     @Param('meetingId') meetingId: string,
   ): MeetingStatusResponseDto {
