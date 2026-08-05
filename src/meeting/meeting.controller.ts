@@ -10,10 +10,14 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UnauthorizedException,
+  UseGuards,
+  UsePipes,
 } from '@nestjs/common'
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -30,8 +34,18 @@ import {
 } from '@nestjs/swagger'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import type { ParticipantRequest } from 'src/common/auth/participant-context'
+import { HostGuard } from 'src/common/guards/host.guard'
+import { ParticipantAccessTokenGuard } from 'src/common/guards/participant-access-token.guard'
+import { ZodValidationPipe } from 'src/common/pipes/zod-validation.pipe'
 import { MockApiService } from 'src/mock/mock-api.service'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
+import {
+  createMeetingRequestSchema,
+  invitationPreviewRequestSchema,
+  joinMeetingRequestSchema,
+  updateCoursePlanRequestSchema,
+} from './schemas/meeting-request.schema'
 
 class ParticipantProfileDto {
   @ApiProperty({
@@ -397,6 +411,18 @@ class MeetingScreenResponseDto extends MeetingResponseDto {
   selectedCourse!: SelectedCourseResponseDto | null
 }
 
+function getParticipantAccessToken(
+  request: ParticipantRequest | undefined,
+  deprecatedQueryToken: string | undefined,
+): string {
+  const accessToken = request?.participant?.accessToken ?? deprecatedQueryToken
+  if (!accessToken) {
+    throw new UnauthorizedException('유효한 참여자 토큰이 필요합니다.')
+  }
+
+  return accessToken
+}
+
 @ApiTags('모임')
 @ApiResponse({
   status: 501,
@@ -407,6 +433,7 @@ export class MeetingController {
   constructor(private readonly mockApi: MockApiService) {}
 
   @Post()
+  @UsePipes(new ZodValidationPipe(createMeetingRequestSchema))
   @ApiOperation({
     summary: '모임 생성',
     description:
@@ -431,6 +458,8 @@ export class MeetingController {
   }
 
   @Get(':meetingId/course-plan')
+  @ApiBearerAuth()
+  @UseGuards(ParticipantAccessTokenGuard)
   @ApiOperation({
     summary: '코스 계획 조회',
     description:
@@ -439,9 +468,11 @@ export class MeetingController {
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({
     name: 'accessToken',
-    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    description:
+      'Deprecated: MOCK_API_ENABLED=true에서만 지원하는 query 토큰 호환 경로입니다. Authorization Bearer를 우선 사용하세요.',
     example: 'host-session-token',
-    required: true,
+    required: false,
+    deprecated: true,
   })
   @ApiOkResponse({
     description: '코스 계획 조회 성공',
@@ -453,10 +484,18 @@ export class MeetingController {
   @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
   getCoursePlan(
     @Param('meetingId') meetingId: string,
-    @Query('accessToken') accessToken: string,
+    @Query('accessToken') accessToken: string | undefined,
+    @Req() request?: ParticipantRequest,
   ) {
     this.mockApi.requireEnabled()
-    const coursePlan = this.mockApi.getCoursePlan(meetingId, accessToken)
+    const participantAccessToken = getParticipantAccessToken(
+      request,
+      accessToken,
+    )
+    const coursePlan = this.mockApi.getCoursePlan(
+      meetingId,
+      participantAccessToken,
+    )
     if (coursePlan === 'NOT_FOUND') {
       throw new NotFoundException('모임을 찾을 수 없습니다.')
     }
@@ -467,6 +506,9 @@ export class MeetingController {
   }
 
   @Put(':meetingId/course-plan')
+  @ApiBearerAuth()
+  @UseGuards(ParticipantAccessTokenGuard, HostGuard)
+  @UsePipes(new ZodValidationPipe(updateCoursePlanRequestSchema))
   @ApiOperation({
     summary: '코스 계획 전체 저장',
     description:
@@ -475,9 +517,11 @@ export class MeetingController {
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({
     name: 'accessToken',
-    description: '코스를 수정할 방장의 참여자 전용 재접속 토큰',
+    description:
+      'Deprecated: MOCK_API_ENABLED=true에서만 지원하는 query 토큰 호환 경로입니다. Authorization Bearer를 우선 사용하세요.',
     example: 'host-session-token',
-    required: true,
+    required: false,
+    deprecated: true,
   })
   @ApiOkResponse({
     description: '코스 계획 저장 성공',
@@ -499,13 +543,18 @@ export class MeetingController {
   })
   updateCoursePlan(
     @Param('meetingId') meetingId: string,
-    @Query('accessToken') accessToken: string,
+    @Query('accessToken') accessToken: string | undefined,
     @Body() dto: UpdateCoursePlanDto,
+    @Req() request?: ParticipantRequest,
   ) {
     this.mockApi.requireEnabled()
+    const participantAccessToken = getParticipantAccessToken(
+      request,
+      accessToken,
+    )
     const coursePlan = this.mockApi.updateCoursePlan(
       meetingId,
-      accessToken,
+      participantAccessToken,
       dto.categorySlugs,
       dto.version,
     )
@@ -532,6 +581,7 @@ export class MeetingController {
   }
 
   @Post('invitation/preview')
+  @UsePipes(new ZodValidationPipe(invitationPreviewRequestSchema))
   @ApiOperation({
     summary: '초대 코드 검증 및 모임 미리보기',
     description:
@@ -555,6 +605,7 @@ export class MeetingController {
   }
 
   @Post('join')
+  @UsePipes(new ZodValidationPipe(joinMeetingRequestSchema))
   @ApiOperation({
     summary: '모임 참여',
     description:
@@ -593,6 +644,8 @@ export class MeetingDetailController {
   constructor(private readonly mockApi: MockApiService) {}
 
   @Get(':meetingId')
+  @ApiBearerAuth()
+  @UseGuards(ParticipantAccessTokenGuard)
   @ApiOperation({
     summary: '참여자 전용 모임 상세 조회',
     description:
@@ -601,9 +654,11 @@ export class MeetingDetailController {
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({
     name: 'accessToken',
-    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    description:
+      'Deprecated: MOCK_API_ENABLED=true에서만 지원하는 query 토큰 호환 경로입니다. Authorization Bearer를 우선 사용하세요.',
     example: 'host-session-token',
-    required: true,
+    required: false,
+    deprecated: true,
   })
   @ApiOkResponse({
     description: '역할별 모임 상세 조회 성공',
@@ -616,10 +671,18 @@ export class MeetingDetailController {
   @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
   getMeetingDetail(
     @Param('meetingId') meetingId: string,
-    @Query('accessToken') accessToken: string,
+    @Query('accessToken') accessToken: string | undefined,
+    @Req() request?: ParticipantRequest,
   ) {
     this.mockApi.requireEnabled()
-    const detail = this.mockApi.getMeetingDetail(meetingId, accessToken)
+    const participantAccessToken = getParticipantAccessToken(
+      request,
+      accessToken,
+    )
+    const detail = this.mockApi.getMeetingDetail(
+      meetingId,
+      participantAccessToken,
+    )
     if (detail === 'NOT_FOUND') {
       throw new NotFoundException('모임을 찾을 수 없습니다.')
     }

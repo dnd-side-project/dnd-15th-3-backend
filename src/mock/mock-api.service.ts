@@ -15,7 +15,7 @@ type CoursePlan = {
   categorySlugs: CategorySlug[]
 }
 
-type ParticipantSession = {
+export type ParticipantSession = {
   participantId: string
   role: 'HOST' | 'MEMBER'
 }
@@ -131,7 +131,7 @@ export class MockApiService {
     }))
   }
 
-  private getParticipantSession(
+  getParticipantSession(
     participantAccessToken: string,
   ): ParticipantSession | undefined {
     if (participantAccessToken === 'host-session-token') {

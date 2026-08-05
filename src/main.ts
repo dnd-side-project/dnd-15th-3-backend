@@ -22,6 +22,12 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('모모(momo) API')
     .setVersion('0.0.1')
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'ParticipantAccessToken',
+      description: '참여자 전용 재접속 토큰',
+    })
     .build()
   const document = SwaggerModule.createDocument(app, swaggerConfig)
   SwaggerModule.setup('docs', app, document, { useGlobalPrefix: true })

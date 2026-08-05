@@ -5,8 +5,10 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  UsePipes,
 } from '@nestjs/common'
 import {
+  ApiBadRequestResponse,
   ApiBody,
   ApiOperation,
   ApiProperty,
@@ -14,6 +16,13 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe'
+import {
+  deleteObjectRequestSchema,
+  getDownloadUrlRequestSchema,
+  getPublicUrlRequestSchema,
+  getUploadUrlRequestSchema,
+} from './schemas/storage-request.schema'
 import { StorageService } from './storage.service'
 
 class GetUploadUrlDto {
@@ -74,6 +83,10 @@ export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post('upload-url')
+  @UsePipes(new ZodValidationPipe(getUploadUrlRequestSchema))
+  @ApiBadRequestResponse({
+    description: '객체 키, MIME 타입 또는 만료 시간이 올바르지 않습니다.',
+  })
   @ApiOperation({
     summary: '업로드용 사전 서명 URL 조회',
     description:
@@ -95,6 +108,10 @@ export class StorageController {
   }
 
   @Post('download-url')
+  @UsePipes(new ZodValidationPipe(getDownloadUrlRequestSchema))
+  @ApiBadRequestResponse({
+    description: '객체 키 또는 만료 시간이 올바르지 않습니다.',
+  })
   @ApiOperation({
     summary: '다운로드용 사전 서명 URL 조회',
     description:
@@ -118,6 +135,10 @@ export class StorageController {
   }
 
   @Post('public-url')
+  @UsePipes(new ZodValidationPipe(getPublicUrlRequestSchema))
+  @ApiBadRequestResponse({
+    description: '객체 키가 올바르지 않습니다.',
+  })
   @ApiOperation({
     summary: '객체 공개 URL 조회',
     description: '공개 객체의 직접 URL(서명되지 않은 URL)을 반환합니다.',
@@ -133,6 +154,10 @@ export class StorageController {
   }
 
   @Delete('objects')
+  @UsePipes(new ZodValidationPipe(deleteObjectRequestSchema))
+  @ApiBadRequestResponse({
+    description: '객체 키가 올바르지 않습니다.',
+  })
   @ApiOperation({
     summary: '객체 삭제',
     description:

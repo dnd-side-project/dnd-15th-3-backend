@@ -51,7 +51,7 @@ describe('MeetingController', () => {
     const app = moduleFixture.createNestApplication()
     const document = SwaggerModule.createDocument(
       app,
-      new DocumentBuilder().build(),
+      new DocumentBuilder().addBearerAuth().build(),
     )
     const schema = document.components?.schemas?.CreateMeetingDto as
       | {
@@ -79,6 +79,22 @@ describe('MeetingController', () => {
       type: 'array',
       items: { $ref: '#/components/schemas/CategorySlug' },
     })
+    expect(
+      document.paths?.['/meetings/{meetingId}/course-plan']?.get,
+    ).toMatchObject({
+      security: [{ bearer: [] }],
+    })
+    expect(
+      document.paths?.['/meetings/{meetingId}/course-plan']?.get?.parameters,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'accessToken',
+          deprecated: true,
+          required: false,
+        }),
+      ]),
+    )
 
     await app.close()
   })

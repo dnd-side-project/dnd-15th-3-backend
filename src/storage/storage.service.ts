@@ -8,7 +8,16 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { parseWithZod } from '../common/pipes/zod-validation.pipe'
 import type { Env } from '../config/env'
+import {
+  DEFAULT_DOWNLOAD_URL_EXPIRES_IN,
+  DEFAULT_UPLOAD_URL_EXPIRES_IN,
+  deleteObjectRequestSchema,
+  getDownloadUrlRequestSchema,
+  getPublicUrlRequestSchema,
+  getUploadUrlRequestSchema,
+} from './schemas/storage-request.schema'
 
 @Injectable()
 export class StorageService {
@@ -35,33 +44,47 @@ export class StorageService {
   async getPresignedUploadUrl(
     key: string,
     contentType?: string,
-    expiresIn = 300,
+    expiresIn = DEFAULT_UPLOAD_URL_EXPIRES_IN,
   ): Promise<string> {
+    const request = parseWithZod(getUploadUrlRequestSchema, {
+      key,
+      contentType,
+      expiresIn,
+    })
     const command = new PutObjectCommand({
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
       Bucket: this.bucketName,
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
-      Key: key,
+      Key: request.key,
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
-      ContentType: contentType,
+      ContentType: request.contentType,
     })
-    return await getSignedUrl(this.s3Client, command, { expiresIn })
+    return await getSignedUrl(this.s3Client, command, {
+      expiresIn: request.expiresIn ?? DEFAULT_UPLOAD_URL_EXPIRES_IN,
+    })
   }
 
   async getPresignedDownloadUrl(
     key: string,
-    expiresIn = 3600,
+    expiresIn = DEFAULT_DOWNLOAD_URL_EXPIRES_IN,
   ): Promise<string> {
+    const request = parseWithZod(getDownloadUrlRequestSchema, {
+      key,
+      expiresIn,
+    })
     const command = new GetObjectCommand({
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
       Bucket: this.bucketName,
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
-      Key: key,
+      Key: request.key,
     })
-    return await getSignedUrl(this.s3Client, command, { expiresIn })
+    return await getSignedUrl(this.s3Client, command, {
+      expiresIn: request.expiresIn ?? DEFAULT_DOWNLOAD_URL_EXPIRES_IN,
+    })
   }
 
   async getPublicUrl(key: string): Promise<string> {
+    const request = parseWithZod(getPublicUrlRequestSchema, { key })
     const endpoint = this.s3Client.config.endpoint
     if (!endpoint) {
       throw new Error('S3 endpoint is not configured')
@@ -70,15 +93,16 @@ export class StorageService {
     const baseUrl = `${resolved.protocol}//${resolved.hostname}${
       resolved.port ? `:${resolved.port}` : ''
     }${resolved.path}`.replace(/\/+$/, '')
-    return `${baseUrl}/${this.bucketName}/${key}`
+    return `${baseUrl}/${this.bucketName}/${request.key}`
   }
 
   async deleteObject(key: string): Promise<void> {
+    const request = parseWithZod(deleteObjectRequestSchema, { key })
     const command = new DeleteObjectCommand({
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
       Bucket: this.bucketName,
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
-      Key: key,
+      Key: request.key,
     })
     await this.s3Client.send(command)
   }
