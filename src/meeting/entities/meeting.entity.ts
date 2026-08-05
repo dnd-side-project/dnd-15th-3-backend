@@ -1,6 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity'
 import { Place } from 'src/place/entities/place.entity'
 import { Check, Column, Entity, JoinColumn, ManyToOne } from 'typeorm'
+import { MeetingStatus } from '../enums/meeting-status.enum'
 import { MeetingType } from './meeting-type.entity'
 
 @Entity()
@@ -16,6 +17,13 @@ export class Meeting extends BaseEntity {
 
   @Column({ length: 10 })
   name: string
+
+  @Column({
+    type: 'enum',
+    enum: MeetingStatus,
+    default: MeetingStatus.RecommendationCollecting,
+  })
+  status: MeetingStatus
 
   @Column('date')
   date: string
