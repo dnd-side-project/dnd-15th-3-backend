@@ -1,4 +1,10 @@
-import { Controller, Get, HttpStatus, Param } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  HttpStatus,
+  NotImplementedException,
+  Param,
+} from '@nestjs/common'
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
@@ -9,7 +15,7 @@ import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingErrorCode } from './exception/meeting-error-code'
 
-@ApiTags('Meeting')
+@ApiTags('모임')
 @Controller('api/v1/meetings')
 export class MeetingController {
   @Get(':meetingId')
@@ -44,10 +50,16 @@ export class MeetingController {
     CommonErrorCode.internalServerError,
     '예상하지 못한 서버 오류',
   )
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
   getMeetingStatus(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-  ): MeetingStatusResponseDto {
-    return { status: MeetingStatus.RecommendationCollecting }
+  ): never {
+    throw new NotImplementedException(
+      '모임 상태 조회 API는 실제 데이터 연동 후 제공됩니다.',
+    )
   }
 
   @Get(':meetingId/categories')
@@ -82,13 +94,16 @@ export class MeetingController {
     CommonErrorCode.internalServerError,
     '예상하지 못한 서버 오류',
   )
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
   getCategoryVisitOrder(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-  ): CategoryVisitOrderResponseDto[] {
-    return [
-      { courseStepId: '1', category: '음식점', order: 1 },
-      { courseStepId: '2', category: '카페', order: 2 },
-    ]
+  ): never {
+    throw new NotImplementedException(
+      '카테고리 방문 순서 조회 API는 실제 데이터 연동 후 제공됩니다.',
+    )
   }
 
   @Get(':meetingId/places/pins')
@@ -121,26 +136,13 @@ export class MeetingController {
     CommonErrorCode.internalServerError,
     '예상하지 못한 서버 오류',
   )
-  getMapPins(
-    @Param('meetingId', BigIntStringPipe) meetingId: string,
-  ): MapPinsResponseDto {
-    return {
-      startPlace: {
-        placeId: '1',
-        name: '성수역 3번 출구',
-        category: '기타',
-        x: 127.0557,
-        y: 37.5446,
-      },
-      sharedPlaces: [
-        {
-          placeId: '2',
-          name: '성수 카페 모모',
-          category: '카페',
-          x: 127.0571,
-          y: 37.5438,
-        },
-      ],
-    }
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  getMapPins(@Param('meetingId', BigIntStringPipe) meetingId: string): never {
+    throw new NotImplementedException(
+      '전체 지도 핀 조회 API는 실제 데이터 연동 후 제공됩니다.',
+    )
   }
 }
