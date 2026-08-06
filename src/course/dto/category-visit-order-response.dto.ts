@@ -5,7 +5,7 @@ export class CategoryVisitOrderResponseDto {
   courseStepId: string
 
   @ApiProperty({ description: '카테고리 이름', example: '카페' })
-  label: string
+  category: string
 
   @ApiProperty({ description: '방문 순서', example: 1 })
   order: number

@@ -85,8 +85,8 @@ export class MeetingController {
     @Param('meetingId', BigIntStringPipe) meetingId: string,
   ): CategoryVisitOrderResponseDto[] {
     return [
-      { courseStepId: '1', label: '음식점', order: 1 },
-      { courseStepId: '2', label: '카페', order: 2 },
+      { courseStepId: '1', category: '음식점', order: 1 },
+      { courseStepId: '2', category: '카페', order: 2 },
     ]
   }
 }
