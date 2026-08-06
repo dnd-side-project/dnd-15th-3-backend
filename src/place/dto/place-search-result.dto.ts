@@ -15,4 +15,11 @@ export class PlaceSearchResultDto {
 
   @ApiProperty({ description: '대표 사진 URL', example: 'https://...' })
   primaryImageUrl: string
+
+  @ApiProperty({
+    description: '미리보기 사이트 링크',
+    example: 'https://...',
+    required: false,
+  })
+  previewUrl?: string
 }
