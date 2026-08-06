@@ -7,13 +7,13 @@ export class ErrorResponseDto {
     description: '클라이언트에서 사용하는 에러 코드',
     example: 'COURSE_NOT_FOUND',
   })
-  code: string
+  code!: string
 
   @ApiProperty({
     description: '사용자에게 보여줄 에러 메시지',
     example: '코스를 찾을 수 없습니다.',
   })
-  message: string
+  message!: string
 
   @ApiProperty({
     description:

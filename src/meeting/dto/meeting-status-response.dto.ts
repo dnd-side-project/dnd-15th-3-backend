@@ -7,5 +7,5 @@ export class MeetingStatusResponseDto {
     example: MeetingStatus.CourseGenerating,
     description: '모임의 현재 상태',
   })
-  status: MeetingStatus
+  status!: MeetingStatus
 }
