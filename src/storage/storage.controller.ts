@@ -18,19 +18,19 @@ import { StorageService } from './storage.service'
 
 class GetUploadUrlDto {
   @ApiProperty({
-    description: 'Object key (path) in the bucket',
+    description: '버킷 내 객체 키(경로)',
     example: 'uploads/profile-avatar.png',
   })
   key!: string
 
   @ApiPropertyOptional({
-    description: 'MIME type of the file to upload',
+    description: '업로드할 파일의 MIME 타입',
     example: 'image/png',
   })
   contentType?: string
 
   @ApiPropertyOptional({
-    description: 'URL expiry in seconds (default: 300)',
+    description: 'URL 만료 시간(초, 기본값: 300)',
     example: 300,
     default: 300,
   })
@@ -39,13 +39,13 @@ class GetUploadUrlDto {
 
 class GetDownloadUrlDto {
   @ApiProperty({
-    description: 'Object key (path) in the bucket',
+    description: '버킷 내 객체 키(경로)',
     example: 'uploads/profile-avatar.png',
   })
   key!: string
 
   @ApiPropertyOptional({
-    description: 'URL expiry in seconds (default: 3600)',
+    description: 'URL 만료 시간(초, 기본값: 3600)',
     example: 3600,
     default: 3600,
   })
@@ -54,7 +54,7 @@ class GetDownloadUrlDto {
 
 class GetPublicUrlDto {
   @ApiProperty({
-    description: 'Object key (path) in the bucket',
+    description: '버킷 내 객체 키(경로)',
     example: 'uploads/profile-avatar.png',
   })
   key!: string
@@ -62,25 +62,25 @@ class GetPublicUrlDto {
 
 class DeleteObjectDto {
   @ApiProperty({
-    description: 'Object key (path) in the bucket',
+    description: '버킷 내 객체 키(경로)',
     example: 'uploads/profile-avatar.png',
   })
   key!: string
 }
 
-@ApiTags('Storage')
+@ApiTags('스토리지')
 @Controller('storage')
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post('upload-url')
   @ApiOperation({
-    summary: 'Get pre-signed upload URL',
+    summary: '업로드용 사전 서명 URL 조회',
     description:
-      'Returns a pre-signed PUT URL. The client uploads the file directly to OCI Object Storage using this URL.',
+      '사전 서명된 PUT URL을 반환합니다. 클라이언트는 이 URL을 사용해 OCI Object Storage에 파일을 직접 업로드합니다.',
   })
   @ApiBody({ type: GetUploadUrlDto })
-  @ApiResponse({ status: 201, description: 'Pre-signed upload URL generated' })
+  @ApiResponse({ status: 201, description: '업로드용 사전 서명 URL 생성 완료' })
   async getUploadUrl(@Body() dto: GetUploadUrlDto) {
     const url = await this.storageService.getPresignedUploadUrl(
       dto.key,
@@ -96,14 +96,14 @@ export class StorageController {
 
   @Post('download-url')
   @ApiOperation({
-    summary: 'Get pre-signed download URL',
+    summary: '다운로드용 사전 서명 URL 조회',
     description:
-      'Returns a pre-signed GET URL for private objects. The client downloads the file directly from OCI Object Storage.',
+      '비공개 객체에 대한 사전 서명된 GET URL을 반환합니다. 클라이언트는 이 URL을 사용해 OCI Object Storage에서 파일을 직접 다운로드합니다.',
   })
   @ApiBody({ type: GetDownloadUrlDto })
   @ApiResponse({
     status: 201,
-    description: 'Pre-signed download URL generated',
+    description: '다운로드용 사전 서명 URL 생성 완료',
   })
   async getDownloadUrl(@Body() dto: GetDownloadUrlDto) {
     const url = await this.storageService.getPresignedDownloadUrl(
@@ -119,11 +119,11 @@ export class StorageController {
 
   @Post('public-url')
   @ApiOperation({
-    summary: 'Get public URL for an object',
-    description: 'Returns a direct (non-signed) URL for public objects.',
+    summary: '객체 공개 URL 조회',
+    description: '공개 객체의 직접 URL(서명되지 않은 URL)을 반환합니다.',
   })
   @ApiBody({ type: GetPublicUrlDto })
-  @ApiResponse({ status: 201, description: 'Public URL generated' })
+  @ApiResponse({ status: 201, description: '공개 URL 생성 완료' })
   async getPublicUrl(@Body() dto: GetPublicUrlDto) {
     return {
       publicUrl: await this.storageService.getPublicUrl(dto.key),
@@ -134,12 +134,12 @@ export class StorageController {
 
   @Delete('objects')
   @ApiOperation({
-    summary: 'Delete an object',
+    summary: '객체 삭제',
     description:
-      'Permanently deletes the object from the bucket. Executed server-side with the configured credentials.',
+      '버킷에서 객체를 영구적으로 삭제합니다. 설정된 인증 정보로 서버에서 실행됩니다.',
   })
   @ApiBody({ type: DeleteObjectDto })
-  @ApiResponse({ status: 204, description: 'Object deleted' })
+  @ApiResponse({ status: 204, description: '객체 삭제 완료' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteObject(@Body() dto: DeleteObjectDto) {
     await this.storageService.deleteObject(dto.key)
