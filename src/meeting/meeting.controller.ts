@@ -137,8 +137,8 @@ export class MeetingController {
           placeId: '2',
           name: '성수 카페 모모',
           category: '카페',
-          x: 120.0557,
-          y: 29.5446,
+          x: 127.0571,
+          y: 37.5438,
         },
       ],
     }
