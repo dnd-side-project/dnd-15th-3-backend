@@ -91,9 +91,9 @@ export class CatalogController {
 
   @Get('places/search')
   @ApiOperation({
-    summary: '장소 검색',
+    summary: '추천 장소 검색',
     description:
-      '출발 장소와 추천 장소를 검색합니다. 구현 시 카카오 로컬 API 결과를 내부 Place 형식으로 정규화해 반환합니다.',
+      '추천 장소를 검색합니다. 구현 시 카카오 로컬 API 결과를 내부 Place 형식으로 정규화해 반환합니다.',
   })
   @ApiQuery({ name: 'keyword', description: '검색어', example: '성수역' })
   @ApiQuery({
@@ -103,12 +103,12 @@ export class CatalogController {
     example: '1',
   })
   @ApiOkResponse({
-    description: '장소 검색 성공',
+    description: '추천 장소 검색 성공',
     type: PlaceSearchResponseDto,
     isArray: true,
   })
   @ApiBadRequestResponse({ description: '검색어가 비어 있습니다.' })
-  @ApiNotFoundResponse({ description: '검색 결과가 없습니다.' })
+  @ApiNotFoundResponse({ description: '추천 장소 검색 결과가 없습니다.' })
   @ApiResponse({
     status: 501,
     description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
@@ -118,7 +118,7 @@ export class CatalogController {
     @Query('categoryId') _categoryId?: string,
   ): never {
     throw new NotImplementedException(
-      '장소 검색 API는 실제 데이터 연동 후 제공됩니다.',
+      '추천 장소 검색 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 

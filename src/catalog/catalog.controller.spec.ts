@@ -128,6 +128,17 @@ describe('CatalogController', () => {
       'longitude',
     ])
 
+    const placeSearchPath = document.paths?.['/places/search'] as
+      | {
+          get?: { description?: string; summary?: string }
+        }
+      | undefined
+    expect(placeSearchPath?.get?.summary).toBe('추천 장소 검색')
+    expect(placeSearchPath?.get?.description).toContain(
+      '추천 장소를 검색합니다.',
+    )
+    expect(placeSearchPath?.get?.description).not.toContain('출발 장소')
+
     const firstMeetingPath = document.paths?.['/places/firstmeeting_search'] as
       | { get?: { responses?: Record<string, unknown> } }
       | undefined
