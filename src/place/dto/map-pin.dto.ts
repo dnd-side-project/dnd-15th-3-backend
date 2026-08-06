@@ -11,8 +11,8 @@ export class MapPinDto {
   category!: string
 
   @ApiProperty({ description: '경도', example: 128.753 })
-  x!: number
+  longitude!: number
 
   @ApiProperty({ description: '위도', example: 35.825 })
-  y!: number
+  latitude!: number
 }
