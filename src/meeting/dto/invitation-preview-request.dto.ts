@@ -9,5 +9,5 @@ export class InvitationPreviewRequestDto {
     maxLength: 6,
     pattern: '^[A-Z0-9]{6}$',
   })
-  accessToken!: string
+  invitationCode!: string
 }

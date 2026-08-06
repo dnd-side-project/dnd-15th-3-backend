@@ -8,7 +8,7 @@ export class MeetingResponseDto {
   meetingId!: string
 
   @ApiProperty({ description: '초대 코드', example: 'DNDFOR' })
-  accessToken!: string
+  invitationCode!: string
 
   @ApiProperty({
     description:

@@ -72,7 +72,7 @@ export const createMeetingRequestSchema = z.object({
 export const invitationPreviewRequestSchema = z.object({
   // 형식이 맞지 않는 비어 있지 않은 코드는 "없는 초대 코드"로 처리해
   // 초대 코드 오타와 존재하지 않는 코드를 동일한 404 흐름으로 보낸다.
-  accessToken: z.string().trim().min(1, '초대 코드를 입력해주세요.'),
+  invitationCode: z.string().trim().min(1, '초대 코드를 입력해주세요.'),
 })
 
 export const joinMeetingRequestSchema = invitationPreviewRequestSchema.and(

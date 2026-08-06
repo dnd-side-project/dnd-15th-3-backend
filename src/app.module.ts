@@ -16,31 +16,35 @@ if (existsSync('.env')) {
   loadEnvFile('.env')
 }
 
+export function createTypeOrmOptions(
+  config: ConfigService<Env, true>,
+): TypeOrmModuleOptions {
+  const ssl = config.get('DB_SSL', { infer: true })
+  const sslCa = config.get('DB_SSL_CA', { infer: true })
+
+  return {
+    type: 'postgres',
+    host: config.get('DB_HOST', { infer: true }),
+    port: config.get('DB_PORT', { infer: true }),
+    username: config.get('DB_USERNAME', { infer: true }),
+    password: config.get('DB_PASSWORD', { infer: true }),
+    database: config.get('DB_DATABASE', { infer: true }),
+    ssl: ssl
+      ? {
+          ca: sslCa || undefined,
+          rejectUnauthorized: true,
+        }
+      : false,
+    entities: [`${__dirname}/**/*.entity{.ts,.js}`],
+    namingStrategy: new SnakeNamingStrategy(),
+    synchronize: config.get('DB_SYNCHRONIZE', { infer: true }),
+  }
+}
+
 const infrastructureModules = [
   TypeOrmModule.forRootAsync({
     inject: [ConfigService],
-    useFactory: (config: ConfigService<Env, true>) => {
-      const ssl = config.get('DB_SSL', { infer: true })
-      const sslCa = config.get('DB_SSL_CA', { infer: true })
-
-      return {
-        type: 'postgres' as const,
-        host: config.get('DB_HOST', { infer: true }),
-        port: config.get('DB_PORT', { infer: true }),
-        username: config.get('DB_USERNAME', { infer: true }),
-        password: config.get('DB_PASSWORD', { infer: true }),
-        database: config.get('DB_DATABASE', { infer: true }),
-        ssl: ssl
-          ? {
-              ca: sslCa || undefined,
-              rejectUnauthorized: false,
-            }
-          : false,
-        entities: [`${__dirname}/**/*.entity{.ts,.js}`],
-        namingStrategy: new SnakeNamingStrategy(),
-        synchronize: config.get('DB_SYNCHRONIZE', { infer: true }),
-      } as TypeOrmModuleOptions
-    },
+    useFactory: createTypeOrmOptions,
   }),
   StorageModule,
   HealthModule,

@@ -56,6 +56,30 @@ describe('MeetingController', () => {
           properties?: Record<string, unknown>
         }
       | undefined
+    const invitationPreviewSchema = document.components?.schemas
+      ?.InvitationPreviewRequestDto as
+      | {
+          properties?: Record<string, unknown>
+        }
+      | undefined
+    const joinMeetingSchema = document.components?.schemas?.JoinMeetingDto as
+      | {
+          properties?: Record<string, unknown>
+        }
+      | undefined
+    const meetingInvitationSchema = document.components?.schemas
+      ?.MeetingInvitationResponseDto as
+      | {
+          properties?: Record<string, unknown>
+        }
+      | undefined
+    const meetingScreenSchema = document.components?.schemas
+      ?.MeetingScreenResponseDto as
+      | {
+          properties?: Record<string, { nullable?: boolean }>
+          required?: string[]
+        }
+      | undefined
 
     expect(enumSchema?.enum).toEqual(Object.values(MeetingTypeCode))
     expect(schema?.properties?.meetingTypeCode).toMatchObject({
@@ -73,6 +97,18 @@ describe('MeetingController', () => {
     })
     expect(document.components?.schemas?.ProfileAvatarId).toMatchObject({
       enum: Object.values(ProfileAvatarId),
+    })
+    expect(invitationPreviewSchema?.properties).toHaveProperty('invitationCode')
+    expect(invitationPreviewSchema?.properties).not.toHaveProperty(
+      'accessToken',
+    )
+    expect(joinMeetingSchema?.properties).toHaveProperty('invitationCode')
+    expect(joinMeetingSchema?.properties).not.toHaveProperty('accessToken')
+    expect(meetingInvitationSchema?.properties).toHaveProperty('invitationCode')
+    expect(meetingScreenSchema?.properties).toHaveProperty('invitationCode')
+    expect(meetingScreenSchema?.required).toContain('selectedCourse')
+    expect(meetingScreenSchema?.properties?.selectedCourse).toMatchObject({
+      nullable: true,
     })
 
     const meetingsPath = document.paths?.['/meetings'] as

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiProperty } from '@nestjs/swagger'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { CourseCategoryStepResponseDto } from './course-category-step-response.dto'
@@ -92,7 +92,7 @@ export class MeetingScreenResponseDto extends MeetingResponseDto {
   })
   recommendations!: RecommendationPreviewDto[]
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: '선정된 코스. 아직 선정 전이면 null',
     type: () => SelectedCourseResponseDto,
     nullable: true,

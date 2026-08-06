@@ -12,9 +12,10 @@ secret_value() {
 
 export DB_HOST=127.0.0.1
 export DB_PORT=15432
-export DB_USERNAME="$(secret_value POSTGRES_USER)"
-export DB_PASSWORD="$(secret_value POSTGRES_PASSWORD)"
-export DB_DATABASE="$(secret_value POSTGRES_DB)"
+DB_USERNAME="$(secret_value POSTGRES_USER)"
+DB_PASSWORD="$(secret_value POSTGRES_PASSWORD)"
+DB_DATABASE="$(secret_value POSTGRES_DB)"
+export DB_USERNAME DB_PASSWORD DB_DATABASE
 export DB_SSL=false
 export DB_SYNCHRONIZE=false
 
