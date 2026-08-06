@@ -7,6 +7,7 @@ import { AppService } from './app.service'
 import { type Env, validateEnv } from './config/env'
 import { HealthModule } from './health/health.module'
 import { MeetingModule } from './meeting/meeting.module'
+import { PlaceModule } from './place/place.module'
 import { StorageModule } from './storage/storage.module'
 
 @Module({
@@ -43,6 +44,7 @@ import { StorageModule } from './storage/storage.module'
     StorageModule,
     HealthModule,
     MeetingModule,
+    PlaceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
