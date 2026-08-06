@@ -4,6 +4,7 @@ import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decor
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { CategoryVisitOrderResponseDto } from 'src/course/dto/category-visit-order-response.dto'
+import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingErrorCode } from './exception/meeting-error-code'
@@ -88,5 +89,58 @@ export class MeetingController {
       { courseStepId: '1', category: '음식점', order: 1 },
       { courseStepId: '2', category: '카페', order: 2 },
     ]
+  }
+
+  @Get(':meetingId/places/pins')
+  @ApiParam({
+    name: 'meetingId',
+    description: '조회할 모임의 ID',
+    example: '1',
+  })
+  @ApiOperation({
+    summary: '전체 지도 핀 조회',
+    description:
+      '지도에 추가한 모든 장소의 위치 정보가 핀으로 표시됩니다. ' +
+      '사용자가 공유한 장소와 모임 시작지를 구분해서 반환합니다.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: MapPinsResponseDto })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    'meetingId 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '인증 정보가 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.notParticipant,
+    '해당 모임의 참여자가 아님',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임을 찾을 수 없음')
+  @ApiErrorResponse(
+    CommonErrorCode.internalServerError,
+    '예상하지 못한 서버 오류',
+  )
+  getMapPins(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+  ): MapPinsResponseDto {
+    return {
+      startPlace: {
+        placeId: '1',
+        name: '성수역 3번 출구',
+        category: '기타',
+        x: 127.0557,
+        y: 37.5446,
+      },
+      sharedPlaces: [
+        {
+          placeId: '2',
+          name: '성수 카페 모모',
+          category: '카페',
+          x: 120.0557,
+          y: 29.5446,
+        },
+      ],
+    }
   }
 }
