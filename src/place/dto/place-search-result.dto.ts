@@ -13,13 +13,25 @@ export class PlaceSearchResultDto {
   @ApiProperty({ description: '주소', example: '서울 성동구 성수이로 1' })
   address!: string
 
-  @ApiProperty({ description: '대표 사진 URL', example: 'https://...' })
-  primaryImageUrl!: string
+  @ApiProperty({
+    description: '대표 사진 URL',
+    example: 'https://...',
+    required: false,
+  })
+  primaryImageUrl?: string
+
+  @ApiProperty({
+    description: '장소의 전체 사진 목록',
+    example: ['https://...', 'https://...'],
+    required: false,
+    type: [String],
+  })
+  imageUrls?: string[]
 
   @ApiProperty({
     description: '미리보기 사이트 링크',
     example: 'https://...',
     required: false,
   })
-  previewUrl?: string
+  previewUrl!: string
 }
