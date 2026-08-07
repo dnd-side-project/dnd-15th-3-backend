@@ -37,7 +37,7 @@ export class MeetingController {
   @ApiParam({
     name: 'meetingId',
     description: '조회할 모임의 ID',
-    example: '1',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
   @ApiOperation({
     summary: '모임 상태 조회',
@@ -81,7 +81,7 @@ export class MeetingController {
   @ApiParam({
     name: 'meetingId',
     description: '조회할 모임의 ID',
-    example: '1',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
   @ApiOperation({
     summary: '카테고리 방문 순서 조회',
@@ -125,7 +125,7 @@ export class MeetingController {
   @ApiParam({
     name: 'meetingId',
     description: '조회할 모임의 ID',
-    example: '1',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
   @ApiOperation({
     summary: '전체 지도 핀 조회',
@@ -169,7 +169,11 @@ export class MeetingController {
       '장소 리스트에서 + 버튼을 눌러 장소를 모임에 추가합니다. ' +
       '이미 추가된 장소를 동시에 추가 요청하면 409로 거부됩니다.',
   })
-  @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
+  @ApiParam({
+    name: 'meetingId',
+    description: '모임 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
   @ApiBody({ type: AddPlaceRequestDto })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: '장소 추가 성공' })
   @ApiBadRequestResponse({

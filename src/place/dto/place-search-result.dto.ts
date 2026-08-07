@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger'
 
 export class PlaceSearchResultDto {
-  @ApiProperty({ description: '장소 ID', example: '1' })
+  @ApiProperty({ description: '장소 ID', example: '1', pattern: '^\\d+$' })
   placeId!: string
 
   @ApiProperty({ description: '카테고리 이름', example: '카페' })

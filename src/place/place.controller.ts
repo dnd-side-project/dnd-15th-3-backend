@@ -19,7 +19,11 @@ export class PlaceController {
     summary: '장소 상세 조회',
     description: '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다.',
   })
-  @ApiParam({ name: 'placeId', description: '조회할 장소의 ID', example: '1' })
+  @ApiParam({
+    name: 'placeId',
+    description: '조회할 장소의 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
   @ApiOkResponse({ type: PlaceSearchResultDto })
   @ApiBadRequestResponse({ description: 'placeId 형식이 올바르지 않습니다.' })
   @ApiNotFoundResponse({ description: '장소를 찾을 수 없습니다.' })
