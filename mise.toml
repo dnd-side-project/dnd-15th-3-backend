@@ -1,40 +1,22 @@
 [tools]
 node = "24"
 pnpm = "11.15.1"
-postgres = "17"
 redis = "7"
 terraform = "latest"
 
 [env]
 _.file = ".env.development"
-PGDATA = ".mise/data/postgres"
 
 [tasks.setup]
 description = "최초 프로젝트 환경 세팅"
 run = [
   "mise install",
   "pnpm install",
-  "mise run db-init",
 ]
 
-[tasks.db-init]
-description = "PostgreSQL 데이터 디렉토리 초기화 (최초 1회)"
-run = [
-  "mkdir -p .mise/data/postgres",
-  "pg_ctl initdb -D .mise/data/postgres",
-]
-
-[tasks.db-start]
-description = "로컬 PostgreSQL 시작"
-run = "pg_ctl start -D .mise/data/postgres -l .mise/data/postgres/logfile -o '-k /tmp'"
-
-[tasks.db-stop]
-description = "로컬 PostgreSQL 중지"
-run = "pg_ctl stop -D .mise/data/postgres"
-
-[tasks.db-psql]
-description = "PostgreSQL CLI 접속"
-run = "psql -h /tmp"
+[tasks.db-forward-dev]
+description = "개발 클러스터 PostgreSQL port-forward"
+run = "bash scripts/dev-db-forward.sh"
 
 [tasks.redis-start]
 description = "로컬 Redis 시작"
@@ -47,6 +29,19 @@ run = "redis-cli shutdown"
 [tasks.redis-cli]
 description = "Redis CLI 접속"
 run = "redis-cli"
+
+[tasks.dev-api]
+description = "개발 API와 클러스터 DB tunnel 실행 (감시 모드)"
+env = { NODE_ENV = "development" }
+run = "bash scripts/dev-api-cluster.sh"
+
+[tasks.prod-api]
+description = "프로덕션 API 서버 빌드 및 실행"
+env = { NODE_ENV = "production" }
+run = [
+  "pnpm build",
+  "pnpm start:prod",
+]
 
 [tasks.ci]
 description = "로컬에서 CI와 동일한 검증 실행"

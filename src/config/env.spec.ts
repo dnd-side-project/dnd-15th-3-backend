@@ -25,6 +25,7 @@ describe('validateEnv', () => {
       expect(env.OCI_REGION).toBe('ap-hyderabad-1')
       expect(env.OCI_BUCKET_NAME_DEV).toBe('momo-bucket-dev')
       expect(env.OCI_BUCKET_NAME_PROD).toBe('momo-bucket-prod')
+      expect(env.KAKAO_REST_API_KEY).toBe('')
     })
 
     it('defaults NODE_ENV to development when not provided', () => {

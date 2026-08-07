@@ -12,7 +12,7 @@ import {
 } from '@nestjs/terminus'
 import { OciStorageHealthIndicator } from './storage.health'
 
-@ApiTags('Health')
+@ApiTags('헬스 체크')
 @Controller('health')
 export class HealthController {
   private readonly logger = new Logger(HealthController.name)
@@ -25,11 +25,11 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
-  @ApiOperation({ summary: 'App level health check' })
-  @ApiResponse({ status: 200, description: 'All dependencies are healthy' })
+  @ApiOperation({ summary: '애플리케이션 상태 확인' })
+  @ApiResponse({ status: 200, description: '모든 의존성이 정상입니다.' })
   @ApiResponse({
     status: 503,
-    description: 'One or more dependencies are unhealthy',
+    description: '하나 이상의 의존성이 비정상입니다.',
   })
   async checkAppHealth() {
     const result = await this.health.check([
