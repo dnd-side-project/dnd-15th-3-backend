@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { MeetingPlaceRecommendationDto } from './meeting-place-recommendation.dto'
 
@@ -24,9 +25,10 @@ export class MeetingPlaceRecommendationListDto {
 
   @ApiProperty({
     description: '실제 적용된 카테고리 필터. 전체 조회면 null',
-    example: '카페',
+    enum: CategorySlug,
+    example: CategorySlug.Cafe,
     nullable: true,
     required: false,
   })
-  appliedCategory!: string | null
+  appliedCategory!: CategorySlug | null
 }
