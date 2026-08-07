@@ -23,6 +23,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
@@ -105,8 +106,9 @@ export class MeetingController {
   @ApiQuery({
     name: 'category',
     description: '카테고리 필터. 미지정 시 전체 카테고리를 조회합니다.',
+    enum: CategorySlug,
     required: false,
-    example: '카페',
+    example: CategorySlug.Cafe,
   })
   @ApiQuery({
     name: 'sort',
@@ -125,7 +127,7 @@ export class MeetingController {
   @ApiOkResponse({ type: MeetingPlaceRecommendationListDto })
   @ApiBadRequestResponse({
     description:
-      'meetingId 형식이 올바르지 않거나 sort 값이 유효하지 않습니다.',
+      'meetingId 형식이 올바르지 않거나 category, sort 값이 유효하지 않습니다.',
   })
   @ApiUnauthorizedResponse({
     description: '인증 정보가 없거나 유효하지 않습니다.',
@@ -138,7 +140,7 @@ export class MeetingController {
   })
   getPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('category') category?: string,
+    @Query('category') category?: CategorySlug,
     @Query('sort') sort?: PlaceSortOption,
   ): never {
     throw new NotImplementedException(
