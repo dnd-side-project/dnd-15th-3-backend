@@ -40,23 +40,23 @@ describe('MeetingController', () => {
       return Object.keys(responses ?? {}).sort()
     }
 
-    const meetingStatusPath = document.paths?.[
-      '/api/v1/meetings/{meetingId}'
-    ] as PathOperations | undefined
+    const meetingStatusPath = document.paths?.['/meetings/{meetingId}'] as
+      | PathOperations
+      | undefined
     expect(responseCodes(meetingStatusPath?.get?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '501'].sort(),
     )
 
-    const mapPinsPath = document.paths?.[
-      '/api/v1/meetings/{meetingId}/places/pins'
-    ] as PathOperations | undefined
+    const mapPinsPath = document.paths?.['/meetings/{meetingId}/places/pins'] as
+      | PathOperations
+      | undefined
     expect(responseCodes(mapPinsPath?.get?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '501'].sort(),
     )
 
-    const placesPath = document.paths?.[
-      '/api/v1/meetings/{meetingId}/places'
-    ] as PathOperations | undefined
+    const placesPath = document.paths?.['/meetings/{meetingId}/places'] as
+      | PathOperations
+      | undefined
     expect(responseCodes(placesPath?.get?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '501'].sort(),
     )

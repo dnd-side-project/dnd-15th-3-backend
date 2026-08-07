@@ -33,7 +33,7 @@ import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
 
 @ApiTags('모임')
-@Controller('api/v1/meetings')
+@Controller('meetings')
 export class MeetingController {
   @Get(':meetingId')
   @ApiParam({
