@@ -36,43 +36,33 @@ describe('MeetingController', () => {
       post?: { responses?: Record<string, unknown> }
     }
 
+    function responseCodes(responses?: Record<string, unknown>) {
+      return Object.keys(responses ?? {}).sort()
+    }
+
     const meetingStatusPath = document.paths?.[
       '/api/v1/meetings/{meetingId}'
     ] as PathOperations | undefined
-    expect(meetingStatusPath?.get?.responses).toHaveProperty('200')
-    expect(meetingStatusPath?.get?.responses).toHaveProperty('400')
-    expect(meetingStatusPath?.get?.responses).toHaveProperty('401')
-    expect(meetingStatusPath?.get?.responses).toHaveProperty('403')
-    expect(meetingStatusPath?.get?.responses).toHaveProperty('404')
-    expect(meetingStatusPath?.get?.responses).toHaveProperty('501')
+    expect(responseCodes(meetingStatusPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '501'].sort(),
+    )
 
     const mapPinsPath = document.paths?.[
       '/api/v1/meetings/{meetingId}/places/pins'
     ] as PathOperations | undefined
-    expect(mapPinsPath?.get?.responses).toHaveProperty('200')
-    expect(mapPinsPath?.get?.responses).toHaveProperty('400')
-    expect(mapPinsPath?.get?.responses).toHaveProperty('401')
-    expect(mapPinsPath?.get?.responses).toHaveProperty('403')
-    expect(mapPinsPath?.get?.responses).toHaveProperty('404')
-    expect(mapPinsPath?.get?.responses).toHaveProperty('501')
+    expect(responseCodes(mapPinsPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '501'].sort(),
+    )
 
     const placesPath = document.paths?.[
       '/api/v1/meetings/{meetingId}/places'
     ] as PathOperations | undefined
-    expect(placesPath?.get?.responses).toHaveProperty('200')
-    expect(placesPath?.get?.responses).toHaveProperty('400')
-    expect(placesPath?.get?.responses).toHaveProperty('401')
-    expect(placesPath?.get?.responses).toHaveProperty('403')
-    expect(placesPath?.get?.responses).toHaveProperty('404')
-    expect(placesPath?.get?.responses).toHaveProperty('501')
-
-    expect(placesPath?.post?.responses).toHaveProperty('204')
-    expect(placesPath?.post?.responses).toHaveProperty('400')
-    expect(placesPath?.post?.responses).toHaveProperty('401')
-    expect(placesPath?.post?.responses).toHaveProperty('403')
-    expect(placesPath?.post?.responses).toHaveProperty('404')
-    expect(placesPath?.post?.responses).toHaveProperty('409')
-    expect(placesPath?.post?.responses).toHaveProperty('501')
+    expect(responseCodes(placesPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '501'].sort(),
+    )
+    expect(responseCodes(placesPath?.post?.responses)).toEqual(
+      ['204', '400', '401', '403', '404', '409', '501'].sort(),
+    )
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
 
