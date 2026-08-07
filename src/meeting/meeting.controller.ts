@@ -1,16 +1,31 @@
 import {
+  Body,
   Controller,
   Get,
+  HttpCode,
   HttpStatus,
   NotImplementedException,
   Param,
+  Post,
 } from '@nestjs/common'
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { CategoryVisitOrderResponseDto } from 'src/course/dto/category-visit-order-response.dto'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
+import { AddPlaceRequestDto } from './dto/add-place-request.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingErrorCode } from './exception/meeting-error-code'
@@ -143,6 +158,39 @@ export class MeetingController {
   getMapPins(@Param('meetingId', BigIntStringPipe) meetingId: string): never {
     throw new NotImplementedException(
       '전체 지도 핀 조회 API는 실제 데이터 연동 후 제공됩니다.',
+    )
+  }
+
+  @Post(':meetingId/places')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: '장소 추가',
+    description:
+      '장소 리스트에서 + 버튼을 눌러 장소를 모임에 추가합니다. ' +
+      '이미 추가된 장소를 동시에 추가 요청하면 409로 거부됩니다.',
+  })
+  @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
+  @ApiBody({ type: AddPlaceRequestDto })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: '장소 추가 성공' })
+  @ApiBadRequestResponse({
+    description: 'meetingId 형식이 올바르지 않거나 placeId가 비어 있습니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 정보가 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
+  @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
+  @ApiConflictResponse({ description: '이미 추가된 장소입니다.' })
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  addPlace(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Body() _dto: AddPlaceRequestDto,
+  ): never {
+    throw new NotImplementedException(
+      '장소 추가 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 }
