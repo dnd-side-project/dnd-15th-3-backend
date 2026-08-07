@@ -7,6 +7,7 @@ import {
   NotImplementedException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common'
 import {
   ApiBadRequestResponse,
@@ -17,13 +18,16 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
+import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { AddPlaceRequestDto } from './dto/add-place-request.dto'
+import { MeetingPlaceRecommendationListDto } from './dto/meeting-place-recommendation-list.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
 
@@ -89,6 +93,56 @@ export class MeetingController {
   getMapPins(@Param('meetingId', BigIntStringPipe) meetingId: string): never {
     throw new NotImplementedException(
       '전체 지도 핀 조회 API는 실제 데이터 연동 후 제공됩니다.',
+    )
+  }
+
+  @Get(':meetingId/places')
+  @ApiParam({
+    name: 'meetingId',
+    description: '조회할 모임의 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiQuery({
+    name: 'category',
+    description: '카테고리 필터. 미지정 시 전체 카테고리를 조회합니다.',
+    required: false,
+    example: '카페',
+  })
+  @ApiQuery({
+    name: 'sort',
+    description: '정렬 기준. 미지정 시 추천순으로 정렬합니다.',
+    enum: PlaceSortOption,
+    required: false,
+    example: PlaceSortOption.Recommended,
+  })
+  @ApiOperation({
+    summary: '추가된 장소 목록 조회',
+    description:
+      '모임에 추가된 장소 목록을 조회합니다. ' +
+      '전체 또는 카테고리별로 필터링할 수 있고, 추천순/생성일순 정렬을 선택할 수 있습니다. ' +
+      '개수가 많지 않은 목록이므로 페이지네이션 없이 전체 목록을 한 번에 반환합니다.',
+  })
+  @ApiOkResponse({ type: MeetingPlaceRecommendationListDto })
+  @ApiBadRequestResponse({
+    description:
+      'meetingId 형식이 올바르지 않거나 sort 값이 유효하지 않습니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 정보가 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
+  @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  getPlaces(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('category') category?: string,
+    @Query('sort') sort?: PlaceSortOption,
+  ): never {
+    throw new NotImplementedException(
+      '추가된 장소 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 
