@@ -47,14 +47,6 @@ const courseSlugsSchema = z
     MAX_COURSE_STEPS,
     `코스는 최대 ${MAX_COURSE_STEPS}개까지 선택할 수 있습니다.`,
   )
-  .superRefine((categorySlugs, context) => {
-    if (new Set(categorySlugs).size !== categorySlugs.length) {
-      context.addIssue({
-        code: 'custom',
-        message: '코스 카테고리는 중복해서 선택할 수 없습니다.',
-      })
-    }
-  })
 
 export const createMeetingRequestSchema = z.object({
   meetingTypeCode: meetingTypeCodeSchema,

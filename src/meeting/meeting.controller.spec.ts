@@ -95,6 +95,10 @@ describe('MeetingController', () => {
       type: 'array',
       items: { $ref: '#/components/schemas/CategorySlug' },
     })
+    expect(schema?.properties?.categorySlugs).not.toHaveProperty('uniqueItems')
+    expect(coursePlanSchema?.properties?.categorySlugs).not.toHaveProperty(
+      'uniqueItems',
+    )
     expect(document.components?.schemas?.ProfileAvatarId).toMatchObject({
       enum: Object.values(ProfileAvatarId),
     })
@@ -105,6 +109,7 @@ describe('MeetingController', () => {
     expect(joinMeetingSchema?.properties).toHaveProperty('invitationCode')
     expect(joinMeetingSchema?.properties).not.toHaveProperty('accessToken')
     expect(meetingInvitationSchema?.properties).toHaveProperty('invitationCode')
+    expect(meetingInvitationSchema?.properties).toHaveProperty('place')
     expect(meetingScreenSchema?.properties).toHaveProperty('invitationCode')
     expect(meetingScreenSchema?.required).toContain('selectedCourse')
     expect(meetingScreenSchema?.properties?.selectedCourse).toMatchObject({

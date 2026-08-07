@@ -11,7 +11,6 @@ export class UpdateCoursePlanDto {
     isArray: true,
     minItems: 0,
     maxItems: MAX_COURSE_STEPS,
-    uniqueItems: true,
     example: [CategorySlug.Restaurant, CategorySlug.Cafe, CategorySlug.Bar],
   })
   categorySlugs!: CategorySlug[]

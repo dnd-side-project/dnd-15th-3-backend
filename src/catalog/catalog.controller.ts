@@ -96,12 +96,6 @@ export class CatalogController {
       '추천 장소를 검색합니다. 구현 시 카카오 로컬 API 결과를 내부 Place 형식으로 정규화해 반환합니다.',
   })
   @ApiQuery({ name: 'keyword', description: '검색어', example: '성수역' })
-  @ApiQuery({
-    name: 'categoryId',
-    required: false,
-    description: '카테고리 ID 필터',
-    example: '1',
-  })
   @ApiOkResponse({
     description: '추천 장소 검색 성공',
     type: PlaceSearchResponseDto,
@@ -113,10 +107,7 @@ export class CatalogController {
     status: 501,
     description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
   })
-  searchPlaces(
-    @Query('keyword') _keyword: string,
-    @Query('categoryId') _categoryId?: string,
-  ): never {
+  searchPlaces(@Query('keyword') _keyword: string): never {
     throw new NotImplementedException(
       '추천 장소 검색 API는 실제 데이터 연동 후 제공됩니다.',
     )

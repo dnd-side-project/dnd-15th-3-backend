@@ -4,6 +4,9 @@ export class PlaceSearchResponseDto {
   @ApiProperty({ description: '장소 ID', example: '101' })
   id!: string
 
+  @ApiProperty({ description: '장소가 속한 카테고리 ID', example: '1' })
+  categoryId!: string
+
   @ApiProperty({ description: '장소명', example: '성수 카페 모모' })
   name!: string
 

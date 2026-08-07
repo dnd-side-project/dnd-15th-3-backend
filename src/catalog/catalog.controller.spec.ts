@@ -130,7 +130,15 @@ describe('CatalogController', () => {
 
     const placeSearchPath = document.paths?.['/places/search'] as
       | {
-          get?: { description?: string; summary?: string }
+          get?: {
+            description?: string
+            summary?: string
+            parameters?: Array<{
+              name?: string
+              description?: string
+              required?: boolean
+            }>
+          }
         }
       | undefined
     expect(placeSearchPath?.get?.summary).toBe('추천 장소 검색')
@@ -144,6 +152,18 @@ describe('CatalogController', () => {
       | undefined
     expect(firstMeetingPath?.get?.responses).toHaveProperty('200')
     expect(firstMeetingPath?.get?.responses).toHaveProperty('503')
+
+    const placeSearchSchema = document.components?.schemas
+      ?.PlaceSearchResponseDto as
+      | { properties?: Record<string, unknown> }
+      | undefined
+    expect(placeSearchSchema?.properties).toHaveProperty('categoryId')
+
+    expect(
+      placeSearchPath?.get?.parameters?.some(
+        (parameter) => parameter.name === 'categoryId',
+      ),
+    ).toBe(false)
 
     const meetingTypesPath = document.paths?.['/meeting-types'] as
       | { get?: { responses?: Record<string, unknown> } }

@@ -44,7 +44,6 @@ export class CreateMeetingDto {
     isArray: true,
     minItems: 1,
     maxItems: MAX_COURSE_STEPS,
-    uniqueItems: true,
     example: [CategorySlug.Restaurant, CategorySlug.Cafe, CategorySlug.Bar],
   })
   categorySlugs!: CategorySlug[]

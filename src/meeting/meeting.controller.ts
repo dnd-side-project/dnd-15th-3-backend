@@ -105,7 +105,7 @@ export class MeetingController {
     type: CoursePlanResponseDto,
   })
   @ApiBadRequestResponse({
-    description: `카테고리가 중복되었거나 ${MAX_COURSE_STEPS}개를 초과했습니다.`,
+    description: `코스 카테고리가 ${MAX_COURSE_STEPS}개를 초과했습니다.`,
   })
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
