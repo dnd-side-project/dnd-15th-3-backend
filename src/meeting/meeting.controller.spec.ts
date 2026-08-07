@@ -15,6 +15,7 @@ describe('MeetingController', () => {
       NotImplementedException,
     )
     expect(() => controller.getMapPins('1')).toThrow(NotImplementedException)
+    expect(() => controller.getPlaces('1')).toThrow(NotImplementedException)
     expect(() => controller.addPlace('1', { placeId: '2' })).toThrow(
       NotImplementedException,
     )
@@ -55,16 +56,23 @@ describe('MeetingController', () => {
     expect(mapPinsPath?.get?.responses).toHaveProperty('404')
     expect(mapPinsPath?.get?.responses).toHaveProperty('501')
 
-    const addPlacePath = document.paths?.[
+    const placesPath = document.paths?.[
       '/api/v1/meetings/{meetingId}/places'
     ] as PathOperations | undefined
-    expect(addPlacePath?.post?.responses).toHaveProperty('204')
-    expect(addPlacePath?.post?.responses).toHaveProperty('400')
-    expect(addPlacePath?.post?.responses).toHaveProperty('401')
-    expect(addPlacePath?.post?.responses).toHaveProperty('403')
-    expect(addPlacePath?.post?.responses).toHaveProperty('404')
-    expect(addPlacePath?.post?.responses).toHaveProperty('409')
-    expect(addPlacePath?.post?.responses).toHaveProperty('501')
+    expect(placesPath?.get?.responses).toHaveProperty('200')
+    expect(placesPath?.get?.responses).toHaveProperty('400')
+    expect(placesPath?.get?.responses).toHaveProperty('401')
+    expect(placesPath?.get?.responses).toHaveProperty('403')
+    expect(placesPath?.get?.responses).toHaveProperty('404')
+    expect(placesPath?.get?.responses).toHaveProperty('501')
+
+    expect(placesPath?.post?.responses).toHaveProperty('204')
+    expect(placesPath?.post?.responses).toHaveProperty('400')
+    expect(placesPath?.post?.responses).toHaveProperty('401')
+    expect(placesPath?.post?.responses).toHaveProperty('403')
+    expect(placesPath?.post?.responses).toHaveProperty('404')
+    expect(placesPath?.post?.responses).toHaveProperty('409')
+    expect(placesPath?.post?.responses).toHaveProperty('501')
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
 
@@ -83,6 +91,15 @@ describe('MeetingController', () => {
       ?.AddPlaceRequestDto as SchemaWithProperties | undefined
     expect(Object.keys(addPlaceRequestSchema?.properties ?? {})).toEqual([
       'placeId',
+    ])
+
+    const placeListSchema = document.components?.schemas
+      ?.MeetingPlaceRecommendationListDto as SchemaWithProperties | undefined
+    expect(Object.keys(placeListSchema?.properties ?? {})).toEqual([
+      'items',
+      'totalCount',
+      'appliedSort',
+      'appliedCategory',
     ])
 
     await app.close()
