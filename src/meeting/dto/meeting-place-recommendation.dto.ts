@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 
 export class MeetingPlaceRecommendationDto {
@@ -11,6 +12,14 @@ export class MeetingPlaceRecommendationDto {
 
   @ApiProperty({ description: '카테고리 이름', example: '카페' })
   category!: string
+
+  @ApiProperty({
+    description: '카테고리 슬러그',
+    enum: CategorySlug,
+    enumName: 'CategorySlug',
+    example: CategorySlug.Cafe,
+  })
+  categorySlug!: CategorySlug
 
   @ApiProperty({ description: '장소 이름', example: '성수 카페 모모' })
   name!: string
