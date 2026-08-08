@@ -82,7 +82,8 @@ export class MeetingController {
     description:
       '지도에 추가한 모든 장소의 위치 정보가 핀으로 표시됩니다. ' +
       '사용자가 공유한 장소와 모임 시작지를 구분해서 반환합니다. ' +
-      '모임이 장소 추천 수집 중이거나 코스 생성에 실패한 상태일 때만 호출할 수 있습니다.',
+      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 실패 상태일 때만 호출할 수 있고, ' +
+      '코스가 생성 완료되었거나 확정된 상태에서는 호출할 수 없습니다.',
   })
   @ApiOkResponse({ type: MapPinsResponseDto })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
@@ -93,7 +94,7 @@ export class MeetingController {
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
   @ApiConflictResponse({
     description:
-      '모임이 장소 추천 수집 중이거나 코스 생성 실패 상태가 아니어서 지도 핀을 조회할 수 없습니다.',
+      '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
   })
   @ApiResponse({
     status: 501,
