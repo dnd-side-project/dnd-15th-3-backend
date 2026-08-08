@@ -29,6 +29,12 @@ export class CourseCommentDto {
   })
   authorRole!: ParticipantRole
 
+  @ApiProperty({
+    description: '현재 요청자가 작성한 댓글인지 여부',
+    example: false,
+  })
+  isMine!: boolean
+
   @ApiProperty({ description: '댓글 내용', example: '여기 코스 좋아요!' })
   content!: string
 

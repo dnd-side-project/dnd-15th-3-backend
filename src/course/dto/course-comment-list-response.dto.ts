@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
+import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseCommentDto } from './course-comment.dto'
 
 export class CourseCommentListResponseDto {
@@ -16,4 +17,15 @@ export class CourseCommentListResponseDto {
     example: ParticipantRole.Host,
   })
   viewerRole!: ParticipantRole
+
+  @ApiProperty({ description: '현재 요청자 닉네임', example: '모모' })
+  viewerNickname!: string
+
+  @ApiProperty({
+    description: '현재 요청자 프로필 캐릭터 ID',
+    enum: ProfileAvatarId,
+    enumName: 'ProfileAvatarId',
+    example: ProfileAvatarId.MomoGreen,
+  })
+  viewerProfileAvatarId!: ProfileAvatarId
 }
