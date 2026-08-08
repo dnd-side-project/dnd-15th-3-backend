@@ -59,14 +59,14 @@ describe('MeetingController', () => {
       | PathOperations
       | undefined
     expect(responseCodes(mapPinsPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '501'].sort(),
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
     const placesPath = document.paths?.['/meetings/{meetingId}/places'] as
       | PathOperations
       | undefined
     expect(responseCodes(placesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '501'].sort(),
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
     expect(responseCodes(placesPath?.post?.responses)).toEqual(
       ['204', '400', '401', '403', '404', '409', '501'].sort(),
