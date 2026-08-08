@@ -5,6 +5,7 @@ export class UpdatePlacePreferenceRequestDto {
   @ApiProperty({
     description: '설정할 반응. null이면 기존 반응을 취소합니다.',
     enum: PreferenceType,
+    enumName: 'PreferenceType',
     example: PreferenceType.Like,
     nullable: true,
   })

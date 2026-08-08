@@ -11,6 +11,7 @@ export class PlacePreferenceResponseDto {
   @ApiProperty({
     description: '내 반응. null인 경우 좋아요 혹은 싫어요 상태가 아닌 상태',
     enum: PreferenceType,
+    enumName: 'PreferenceType',
     example: PreferenceType.Like,
     nullable: true,
   })
