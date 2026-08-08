@@ -19,6 +19,7 @@ export class MeetingPlaceRecommendationListDto {
   @ApiProperty({
     description: '실제 적용된 정렬 기준',
     enum: PlaceSortOption,
+    enumName: 'PlaceSortOption',
     example: PlaceSortOption.Recommended,
   })
   appliedSort!: PlaceSortOption
