@@ -220,7 +220,8 @@ export class MeetingController {
     description:
       '추가된 장소에 대한 내 반응을 좋아요 또는 싫어요로 설정합니다. ' +
       'preference를 null로 보내면 기존 반응을 취소합니다. ' +
-      '모임이 장소 추천 수집 중이거나 코스 생성에 실패한 상태일 때만 호출할 수 있습니다.',
+      '모임이 장소 추천 수집 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있고, ' +
+      '코스 생성 중이거나 코스가 확정된 상태에서는 호출할 수 없습니다.',
   })
   @ApiBody({ type: UpdatePlacePreferenceRequestDto })
   @ApiOkResponse({ type: PlacePreferenceResponseDto })
@@ -237,7 +238,7 @@ export class MeetingController {
   })
   @ApiConflictResponse({
     description:
-      '모임이 장소 추천 수집 중이거나 코스 생성 실패 상태가 아니어서 반응을 변경할 수 없습니다.',
+      '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
   })
   @ApiResponse({
     status: 501,
