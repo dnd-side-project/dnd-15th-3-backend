@@ -168,7 +168,9 @@ export class MeetingController {
     summary: '장소 추가',
     description:
       '장소 리스트에서 + 버튼을 눌러 장소를 모임에 추가합니다. ' +
-      '이미 추가된 장소를 동시에 추가 요청하면 409로 거부됩니다.',
+      '이미 추가된 장소를 동시에 추가 요청하면 409로 거부됩니다. ' +
+      '모임이 장소 추천 수집 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있고, ' +
+      '코스 생성 중이거나 코스가 확정된 상태에서는 호출할 수 없습니다.',
   })
   @ApiParam({
     name: 'meetingId',
@@ -185,7 +187,10 @@ export class MeetingController {
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
-  @ApiConflictResponse({ description: '이미 추가된 장소입니다.' })
+  @ApiConflictResponse({
+    description:
+      '이미 추가된 장소이거나, 모임이 코스 생성 중이거나 코스가 확정된 상태여서 장소를 추가할 수 없습니다.',
+  })
   @ApiResponse({
     status: 501,
     description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
