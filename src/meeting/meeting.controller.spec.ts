@@ -2,6 +2,7 @@ import { NotImplementedException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
+import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { MeetingController } from './meeting.controller'
 
 function createController() {
@@ -77,6 +78,10 @@ describe('MeetingController', () => {
     expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
+
+    expect(document.components?.schemas?.PlaceSortOption).toMatchObject({
+      enum: Object.values(PlaceSortOption),
+    })
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
     type SchemaWithNullableProperties = {
