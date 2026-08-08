@@ -11,7 +11,6 @@ import {
   Query,
 } from '@nestjs/common'
 import {
-  ApiAcceptedResponse,
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
@@ -24,7 +23,6 @@ import {
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
-  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
@@ -255,52 +253,6 @@ export class MeetingController {
   ): never {
     throw new NotImplementedException(
       '장소 반응 설정 API는 실제 데이터 연동 후 제공됩니다.',
-    )
-  }
-
-  @Post(':meetingId/courses')
-  @HttpCode(HttpStatus.ACCEPTED)
-  @ApiParam({
-    name: 'meetingId',
-    description: '모임 ID',
-    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
-  })
-  @ApiOperation({
-    summary: 'AI 코스 생성',
-    description:
-      'AI를 이용해 모임에 추가된 장소 추천을 기반으로 코스 생성을 요청합니다. ' +
-      '코스 순서 기준으로 각 카테고리를 채울 장소가 확보되어 있는지 먼저 확인합니다. ' +
-      '요청이 접수되면 모임 상태가 코스 생성 중으로 즉시 전환되고, ' +
-      '이후 모임 상태 조회 API로 완료 또는 실패 여부를 확인할 수 있습니다. ' +
-      '방장만 호출할 수 있고, 모임이 장소 추천 수집 중이거나 코스 생성 실패 상태일 때만 호출할 수 있습니다.',
-  })
-  @ApiAcceptedResponse({
-    description: '코스 생성 요청이 접수되어 처리 중입니다.',
-    type: MeetingStatusResponseDto,
-  })
-  @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
-  @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
-  })
-  @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
-  @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
-  @ApiUnprocessableEntityResponse({
-    description:
-      '코스 순서에 필요한 카테고리 중 장소가 확보되지 않은 카테고리가 있어 코스를 생성할 수 없습니다.',
-  })
-  @ApiConflictResponse({
-    description:
-      '모임이 코스 생성 중이거나 이미 코스가 생성 완료·확정된 상태여서 다시 생성할 수 없습니다.',
-  })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
-  generateCourse(
-    @Param('meetingId', BigIntStringPipe) meetingId: string,
-  ): never {
-    throw new NotImplementedException(
-      'AI 코스 생성 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 }
