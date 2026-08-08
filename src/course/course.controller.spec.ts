@@ -17,6 +17,9 @@ describe('CourseController', () => {
     expect(() => controller.getCourseCandidates('1')).toThrow(
       NotImplementedException,
     )
+    expect(() => controller.getCourseDetail('1', '2')).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -48,6 +51,13 @@ describe('CourseController', () => {
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
+    const courseDetailPath = document.paths?.[
+      '/meetings/{meetingId}/courses/{courseCandidateId}'
+    ] as PathOperations | undefined
+    expect(responseCodes(courseDetailPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
     type SchemaWithProperties = { properties?: Record<string, unknown> }
 
     const courseListSchema = document.components?.schemas
@@ -62,6 +72,25 @@ describe('CourseController', () => {
     expect(Object.keys(courseSummarySchema?.properties ?? {})).toEqual([
       'courseCandidateId',
       'order',
+    ])
+
+    const courseDetailSchema = document.components?.schemas
+      ?.CourseDetailResponseDto as SchemaWithProperties | undefined
+    expect(Object.keys(courseDetailSchema?.properties ?? {})).toEqual([
+      'route',
+      'totalCount',
+    ])
+
+    const routeStepSchema = document.components?.schemas?.CourseRouteStepDto as
+      | SchemaWithProperties
+      | undefined
+    expect(Object.keys(routeStepSchema?.properties ?? {})).toEqual([
+      'recommendationId',
+      'order',
+      'categorySlug',
+      'primaryImageUrl',
+      'longitude',
+      'latitude',
     ])
 
     await app.close()
