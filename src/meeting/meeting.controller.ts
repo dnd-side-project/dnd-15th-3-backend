@@ -133,7 +133,8 @@ export class MeetingController {
       '모임에 추가된 장소 목록을 조회합니다. ' +
       '전체 또는 카테고리별로 필터링할 수 있고, 추천순/생성일순 정렬을 선택할 수 있습니다. ' +
       '개수가 많지 않은 목록이므로 페이지네이션 없이 전체 목록을 한 번에 반환합니다. ' +
-      '모임이 장소 추천 수집 중이거나 코스 생성에 실패한 상태일 때만 호출할 수 있습니다.',
+      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 실패 상태일 때만 호출할 수 있고, ' +
+      '코스가 생성 완료되었거나 확정된 상태에서는 호출할 수 없습니다.',
   })
   @ApiOkResponse({ type: MeetingPlaceRecommendationListDto })
   @ApiBadRequestResponse({
@@ -147,7 +148,7 @@ export class MeetingController {
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
   @ApiConflictResponse({
     description:
-      '모임이 장소 추천 수집 중이거나 코스 생성 실패 상태가 아니어서 장소 목록을 조회할 수 없습니다.',
+      '모임이 코스 생성 완료 또는 확정된 상태여서 장소 목록을 조회할 수 없습니다.',
   })
   @ApiResponse({
     status: 501,
