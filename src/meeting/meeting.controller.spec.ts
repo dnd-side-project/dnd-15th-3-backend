@@ -26,6 +26,9 @@ describe('MeetingController', () => {
         preference: PreferenceType.Like,
       }),
     ).toThrow(NotImplementedException)
+    expect(() => controller.generateCourse('1')).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -77,6 +80,13 @@ describe('MeetingController', () => {
     ] as PathOperations | undefined
     expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
+    const coursesPath = document.paths?.['/meetings/{meetingId}/courses'] as
+      | PathOperations
+      | undefined
+    expect(responseCodes(coursesPath?.post?.responses)).toEqual(
+      ['202', '400', '401', '403', '404', '409', '422', '501'].sort(),
     )
 
     expect(document.components?.schemas?.PlaceSortOption).toMatchObject({
