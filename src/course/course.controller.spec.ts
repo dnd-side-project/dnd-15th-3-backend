@@ -23,6 +23,9 @@ describe('CourseController', () => {
     expect(() => controller.getCourseComments('1', '2')).toThrow(
       NotImplementedException,
     )
+    expect(() =>
+      controller.createCourseComment('1', '2', { content: '좋아요!' }),
+    ).toThrow(NotImplementedException)
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -67,8 +70,14 @@ describe('CourseController', () => {
     expect(responseCodes(courseCommentsPath?.get?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
+    expect(responseCodes(courseCommentsPath?.post?.responses)).toEqual(
+      ['201', '400', '401', '403', '404', '409', '501'].sort(),
+    )
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
+    type SchemaWithLengthProperties = {
+      properties?: Record<string, { minLength?: number; maxLength?: number }>
+    }
 
     const courseListSchema = document.components?.schemas
       ?.CourseCandidateListResponseDto as SchemaWithProperties | undefined
@@ -124,6 +133,16 @@ describe('CourseController', () => {
       'content',
       'createdAt',
     ])
+
+    const createCommentRequestSchema = document.components?.schemas
+      ?.CreateCourseCommentRequestDto as
+      | (SchemaWithProperties & SchemaWithLengthProperties)
+      | undefined
+    expect(Object.keys(createCommentRequestSchema?.properties ?? {})).toEqual([
+      'content',
+    ])
+    expect(createCommentRequestSchema?.properties?.content?.minLength).toBe(1)
+    expect(createCommentRequestSchema?.properties?.content?.maxLength).toBe(300)
 
     await app.close()
   })
