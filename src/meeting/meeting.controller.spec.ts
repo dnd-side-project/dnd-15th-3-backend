@@ -82,6 +82,9 @@ describe('MeetingController', () => {
     expect(document.components?.schemas?.PlaceSortOption).toMatchObject({
       enum: Object.values(PlaceSortOption),
     })
+    expect(document.components?.schemas?.PreferenceType).toMatchObject({
+      enum: Object.values(PreferenceType),
+    })
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
     type SchemaWithNullableProperties = {
