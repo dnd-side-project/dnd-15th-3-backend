@@ -14,6 +14,9 @@ describe('CourseController', () => {
     expect(() => controller.generateCourse('1')).toThrow(
       NotImplementedException,
     )
+    expect(() => controller.getCourseCandidates('1')).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -27,6 +30,7 @@ describe('CourseController', () => {
     )
 
     type PathOperations = {
+      get?: { responses?: Record<string, unknown> }
       post?: { responses?: Record<string, unknown> }
     }
 
@@ -40,6 +44,25 @@ describe('CourseController', () => {
     expect(responseCodes(coursesPath?.post?.responses)).toEqual(
       ['202', '400', '401', '403', '404', '409', '422', '501'].sort(),
     )
+    expect(responseCodes(coursesPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
+    type SchemaWithProperties = { properties?: Record<string, unknown> }
+
+    const courseListSchema = document.components?.schemas
+      ?.CourseCandidateListResponseDto as SchemaWithProperties | undefined
+    expect(Object.keys(courseListSchema?.properties ?? {})).toEqual([
+      'courseCandidates',
+      'totalCount',
+    ])
+
+    const courseSummarySchema = document.components?.schemas
+      ?.CourseCandidateSummaryDto as SchemaWithProperties | undefined
+    expect(Object.keys(courseSummarySchema?.properties ?? {})).toEqual([
+      'courseCandidateId',
+      'order',
+    ])
 
     await app.close()
   })
