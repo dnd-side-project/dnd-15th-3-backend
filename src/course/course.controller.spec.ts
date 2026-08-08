@@ -20,6 +20,9 @@ describe('CourseController', () => {
     expect(() => controller.getCourseDetail('1', '2')).toThrow(
       NotImplementedException,
     )
+    expect(() => controller.getCourseComments('1', '2')).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -58,6 +61,13 @@ describe('CourseController', () => {
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
+    const courseCommentsPath = document.paths?.[
+      '/meetings/{meetingId}/courses/{courseCandidateId}/comments'
+    ] as PathOperations | undefined
+    expect(responseCodes(courseCommentsPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
     type SchemaWithProperties = { properties?: Record<string, unknown> }
 
     const courseListSchema = document.components?.schemas
@@ -91,6 +101,28 @@ describe('CourseController', () => {
       'primaryImageUrl',
       'longitude',
       'latitude',
+    ])
+
+    const commentListSchema = document.components?.schemas
+      ?.CourseCommentListResponseDto as SchemaWithProperties | undefined
+    expect(Object.keys(commentListSchema?.properties ?? {})).toEqual([
+      'comments',
+      'viewerRole',
+      'viewerNickname',
+      'viewerProfileAvatarId',
+    ])
+
+    const commentSchema = document.components?.schemas?.CourseCommentDto as
+      | SchemaWithProperties
+      | undefined
+    expect(Object.keys(commentSchema?.properties ?? {})).toEqual([
+      'commentId',
+      'nickname',
+      'profileAvatarId',
+      'authorRole',
+      'isMine',
+      'content',
+      'createdAt',
     ])
 
     await app.close()
