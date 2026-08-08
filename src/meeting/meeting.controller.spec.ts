@@ -1,6 +1,7 @@
 import { NotImplementedException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
+import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import { MeetingController } from './meeting.controller'
 
 function createController() {
@@ -19,6 +20,11 @@ describe('MeetingController', () => {
     expect(() => controller.addPlace('1', { placeId: '2' })).toThrow(
       NotImplementedException,
     )
+    expect(() =>
+      controller.updatePlacePreference('1', '2', {
+        preference: PreferenceType.Like,
+      }),
+    ).toThrow(NotImplementedException)
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -34,6 +40,7 @@ describe('MeetingController', () => {
     type PathOperations = {
       get?: { responses?: Record<string, unknown> }
       post?: { responses?: Record<string, unknown> }
+      patch?: { responses?: Record<string, unknown> }
     }
 
     function responseCodes(responses?: Record<string, unknown>) {
@@ -64,7 +71,17 @@ describe('MeetingController', () => {
       ['204', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
+    const preferencePath = document.paths?.[
+      '/meetings/{meetingId}/places/{recommendationId}/preference'
+    ] as PathOperations | undefined
+    expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
     type SchemaWithProperties = { properties?: Record<string, unknown> }
+    type SchemaWithNullableProperties = {
+      properties?: Record<string, { nullable?: boolean }>
+    }
 
     const statusSchema = document.components?.schemas
       ?.MeetingStatusResponseDto as SchemaWithProperties | undefined
@@ -84,13 +101,46 @@ describe('MeetingController', () => {
     ])
 
     const placeListSchema = document.components?.schemas
-      ?.MeetingPlaceRecommendationListDto as SchemaWithProperties | undefined
+      ?.MeetingPlaceRecommendationListDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
     expect(Object.keys(placeListSchema?.properties ?? {})).toEqual([
       'items',
       'totalCount',
       'appliedSort',
       'appliedCategory',
     ])
+    expect(placeListSchema?.properties?.appliedCategory?.nullable).toBe(true)
+
+    const placeRecommendationSchema = document.components?.schemas
+      ?.MeetingPlaceRecommendationDto as
+      | SchemaWithNullableProperties
+      | undefined
+    expect(placeRecommendationSchema?.properties?.myPreference?.nullable).toBe(
+      true,
+    )
+
+    const updatePreferenceRequestSchema = document.components?.schemas
+      ?.UpdatePlacePreferenceRequestDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(
+      Object.keys(updatePreferenceRequestSchema?.properties ?? {}),
+    ).toEqual(['preference'])
+    expect(
+      updatePreferenceRequestSchema?.properties?.preference?.nullable,
+    ).toBe(true)
+
+    const placePreferenceSchema = document.components?.schemas
+      ?.PlacePreferenceResponseDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(placePreferenceSchema?.properties ?? {})).toEqual([
+      'likeCount',
+      'dislikeCount',
+      'myPreference',
+    ])
+    expect(placePreferenceSchema?.properties?.myPreference?.nullable).toBe(true)
 
     await app.close()
   })
