@@ -26,6 +26,9 @@ describe('CourseController', () => {
     expect(() =>
       controller.createCourseComment('1', '2', { content: '좋아요!' }),
     ).toThrow(NotImplementedException)
+    expect(() => controller.getCourseGuide('1', '2')).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -74,9 +77,19 @@ describe('CourseController', () => {
       ['201', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
+    const courseGuidePath = document.paths?.[
+      '/meetings/{meetingId}/courses/{courseCandidateId}/guide'
+    ] as PathOperations | undefined
+    expect(responseCodes(courseGuidePath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
     type SchemaWithProperties = { properties?: Record<string, unknown> }
     type SchemaWithLengthProperties = {
       properties?: Record<string, { minLength?: number; maxLength?: number }>
+    }
+    type SchemaWithNullableProperties = {
+      properties?: Record<string, { nullable?: boolean }>
     }
 
     const courseListSchema = document.components?.schemas
@@ -143,6 +156,33 @@ describe('CourseController', () => {
     ])
     expect(createCommentRequestSchema?.properties?.content?.minLength).toBe(1)
     expect(createCommentRequestSchema?.properties?.content?.maxLength).toBe(300)
+
+    const courseGuideSchema = document.components?.schemas
+      ?.CourseGuideResponseDto as SchemaWithProperties | undefined
+    expect(Object.keys(courseGuideSchema?.properties ?? {})).toEqual([
+      'courseName',
+      'totalDistanceKm',
+      'totalCount',
+      'route',
+    ])
+
+    const courseGuideRouteStepSchema = document.components?.schemas
+      ?.CourseGuideRouteStepDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(courseGuideRouteStepSchema?.properties ?? {})).toEqual([
+      'placeId',
+      'order',
+      'name',
+      'category',
+      'categorySlug',
+      'address',
+      'primaryImageUrl',
+      'walkDurationToNextMin',
+    ])
+    expect(
+      courseGuideRouteStepSchema?.properties?.walkDurationToNextMin?.nullable,
+    ).toBe(true)
 
     await app.close()
   })
