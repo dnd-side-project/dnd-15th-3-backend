@@ -81,7 +81,8 @@ export class MeetingController {
     summary: '전체 지도 핀 조회',
     description:
       '지도에 추가한 모든 장소의 위치 정보가 핀으로 표시됩니다. ' +
-      '사용자가 공유한 장소와 모임 시작지를 구분해서 반환합니다.',
+      '사용자가 공유한 장소와 모임 시작지를 구분해서 반환합니다. ' +
+      '모임이 장소 추천 수집 중이거나 코스 생성에 실패한 상태일 때만 호출할 수 있습니다.',
   })
   @ApiOkResponse({ type: MapPinsResponseDto })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
@@ -90,6 +91,10 @@ export class MeetingController {
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
+  @ApiConflictResponse({
+    description:
+      '모임이 장소 추천 수집 중이거나 코스 생성 실패 상태가 아니어서 지도 핀을 조회할 수 없습니다.',
+  })
   @ApiResponse({
     status: 501,
     description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
@@ -126,7 +131,8 @@ export class MeetingController {
     description:
       '모임에 추가된 장소 목록을 조회합니다. ' +
       '전체 또는 카테고리별로 필터링할 수 있고, 추천순/생성일순 정렬을 선택할 수 있습니다. ' +
-      '개수가 많지 않은 목록이므로 페이지네이션 없이 전체 목록을 한 번에 반환합니다.',
+      '개수가 많지 않은 목록이므로 페이지네이션 없이 전체 목록을 한 번에 반환합니다. ' +
+      '모임이 장소 추천 수집 중이거나 코스 생성에 실패한 상태일 때만 호출할 수 있습니다.',
   })
   @ApiOkResponse({ type: MeetingPlaceRecommendationListDto })
   @ApiBadRequestResponse({
@@ -138,6 +144,10 @@ export class MeetingController {
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
+  @ApiConflictResponse({
+    description:
+      '모임이 장소 추천 수집 중이거나 코스 생성 실패 상태가 아니어서 장소 목록을 조회할 수 없습니다.',
+  })
   @ApiResponse({
     status: 501,
     description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
