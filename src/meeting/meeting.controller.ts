@@ -117,6 +117,7 @@ export class MeetingController {
     name: 'sort',
     description: '정렬 기준. 미지정 시 추천순으로 정렬합니다.',
     enum: PlaceSortOption,
+    enumName: 'PlaceSortOption',
     required: false,
     example: PlaceSortOption.Recommended,
   })
