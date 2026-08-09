@@ -26,6 +26,11 @@ describe('MeetingController', () => {
         preference: PreferenceType.Like,
       }),
     ).toThrow(NotImplementedException)
+    expect(() =>
+      controller.updateCourseImage('1', {
+        courseImageKey: 'course-cards/1/5.png',
+      }),
+    ).toThrow(NotImplementedException)
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -42,6 +47,7 @@ describe('MeetingController', () => {
       get?: { responses?: Record<string, unknown> }
       post?: { responses?: Record<string, unknown> }
       patch?: { responses?: Record<string, unknown> }
+      put?: { responses?: Record<string, unknown> }
     }
 
     function responseCodes(responses?: Record<string, unknown>) {
@@ -77,6 +83,13 @@ describe('MeetingController', () => {
     ] as PathOperations | undefined
     expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
+    const courseImagePath = document.paths?.[
+      '/meetings/{meetingId}/course-image'
+    ] as PathOperations | undefined
+    expect(responseCodes(courseImagePath?.put?.responses)).toEqual(
+      ['204', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
     expect(document.components?.schemas?.PlaceSortOption).toMatchObject({
@@ -149,6 +162,12 @@ describe('MeetingController', () => {
       'myPreference',
     ])
     expect(placePreferenceSchema?.properties?.myPreference?.nullable).toBe(true)
+
+    const updateCourseImageRequestSchema = document.components?.schemas
+      ?.UpdateCourseImageRequestDto as SchemaWithProperties | undefined
+    expect(
+      Object.keys(updateCourseImageRequestSchema?.properties ?? {}),
+    ).toEqual(['courseImageKey'])
 
     await app.close()
   })
