@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common'
 import {
@@ -32,6 +33,7 @@ import { AddPlaceRequestDto } from './dto/add-place-request.dto'
 import { MeetingPlaceRecommendationListDto } from './dto/meeting-place-recommendation-list.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
+import { UpdateCourseImageRequestDto } from './dto/update-course-image-request.dto'
 import { UpdatePlacePreferenceRequestDto } from './dto/update-place-preference-request.dto'
 import { MeetingStatus } from './enums/meeting-status.enum'
 
@@ -253,6 +255,51 @@ export class MeetingController {
   ): never {
     throw new NotImplementedException(
       '장소 반응 설정 API는 실제 데이터 연동 후 제공됩니다.',
+    )
+  }
+
+  @Put(':meetingId/course-image')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiParam({
+    name: 'meetingId',
+    description: '모임 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiOperation({
+    summary: '코스 카드 이미지 설정',
+    description:
+      '확정된 코스의 카드 뒷면에 사용할 지도 스크린샷 key를 재설정합니다. ' +
+      '코스 확정 시 이미지 업로드에 실패했거나 다시 설정하고 싶을 때 사용합니다. ' +
+      '방장만 호출할 수 있고, 모임이 코스 확정 상태일 때만 호출할 수 있습니다.',
+  })
+  @ApiBody({ type: UpdateCourseImageRequestDto })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: '코스 카드 이미지 설정 성공',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'meetingId 형식이 올바르지 않거나 courseImageKey가 비어 있습니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 정보가 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
+  @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
+  @ApiConflictResponse({
+    description:
+      '모임이 코스 확정 상태가 아니어서 코스 카드 이미지를 설정할 수 없습니다.',
+  })
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  updateCourseImage(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Body() _dto: UpdateCourseImageRequestDto,
+  ): never {
+    throw new NotImplementedException(
+      '코스 카드 이미지 설정 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 }
