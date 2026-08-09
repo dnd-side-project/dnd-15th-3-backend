@@ -32,6 +32,9 @@ describe('CourseController', () => {
     expect(() => controller.getExcludedPlaces('1', '2')).toThrow(
       NotImplementedException,
     )
+    expect(() => controller.confirmCourse('1', '2')).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -91,6 +94,13 @@ describe('CourseController', () => {
       '/meetings/{meetingId}/courses/{courseCandidateId}/excluded-places'
     ] as PathOperations | undefined
     expect(responseCodes(excludedPlacesPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
+    const confirmationPath = document.paths?.[
+      '/meetings/{meetingId}/courses/{courseCandidateId}/confirmation'
+    ] as PathOperations | undefined
+    expect(responseCodes(confirmationPath?.post?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
