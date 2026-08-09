@@ -6,6 +6,7 @@ import {
   HttpStatus,
   NotImplementedException,
   Param,
+  ParseEnumPipe,
   Patch,
   Post,
   Put,
@@ -31,6 +32,7 @@ import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { BigIntStringArrayPipe } from 'src/common/pipes/bigint-string-array.pipe'
+import { PositiveIntPipe } from 'src/common/pipes/positive-int.pipe'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { AddPlaceRequestDto } from './dto/add-place-request.dto'
@@ -328,8 +330,10 @@ export class MeetingController {
   })
   getPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('category') category?: CategorySlug,
-    @Query('sort') sort?: PlaceSortOption,
+    @Query('category', new ParseEnumPipe(CategorySlug, { optional: true }))
+    category?: CategorySlug,
+    @Query('sort', new ParseEnumPipe(PlaceSortOption, { optional: true }))
+    sort?: PlaceSortOption,
   ): never {
     throw new NotImplementedException(
       '추가된 장소 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
@@ -529,7 +533,7 @@ export class MeetingController {
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('placeId', BigIntStringPipe) placeId: string,
     @Query('excludeIds', BigIntStringArrayPipe) excludeIds?: string[],
-    @Query('size') size?: number,
+    @Query('size', new PositiveIntPipe(5)) size?: number,
   ): never {
     throw new NotImplementedException(
       '비슷한 장소 추천 API는 실제 데이터 연동 후 제공됩니다.',

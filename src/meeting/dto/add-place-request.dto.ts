@@ -1,4 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { IsString, Matches } from 'class-validator'
+import {
+  BIGINT_STRING_PATTERN,
+  INVALID_FORMAT_REASON,
+} from 'src/common/pipes/bigint-string.pipe'
 
 export class AddPlaceRequestDto {
   @ApiProperty({
@@ -6,5 +11,7 @@ export class AddPlaceRequestDto {
     example: '1',
     pattern: '^\\d+$',
   })
+  @IsString()
+  @Matches(BIGINT_STRING_PATTERN, { message: INVALID_FORMAT_REASON })
   placeId!: string
 }

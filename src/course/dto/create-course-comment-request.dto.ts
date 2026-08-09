@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
+import { IsString, Length } from 'class-validator'
 
 export class CreateCourseCommentRequestDto {
   @ApiProperty({
@@ -7,5 +9,8 @@ export class CreateCourseCommentRequestDto {
     minLength: 1,
     maxLength: 300,
   })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(1, 300)
   content!: string
 }

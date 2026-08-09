@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { IsEnum, ValidateIf } from 'class-validator'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 
 export class UpdatePlacePreferenceRequestDto {
@@ -9,5 +10,7 @@ export class UpdatePlacePreferenceRequestDto {
     example: PreferenceType.Like,
     nullable: true,
   })
+  @ValidateIf((dto) => dto.preference !== null)
+  @IsEnum(PreferenceType)
   preference!: PreferenceType | null
 }

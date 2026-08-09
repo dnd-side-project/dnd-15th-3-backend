@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator'
 
 export class ConfirmCourseRequestDto {
   @ApiProperty({
@@ -9,5 +10,8 @@ export class ConfirmCourseRequestDto {
     example: 'course-cards/1/5.png',
     required: false,
   })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
   courseImageKey?: string
 }

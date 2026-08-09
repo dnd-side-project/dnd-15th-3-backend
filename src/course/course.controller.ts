@@ -6,6 +6,7 @@ import {
   HttpStatus,
   NotImplementedException,
   Param,
+  ParseEnumPipe,
   Post,
   Query,
 } from '@nestjs/common'
@@ -310,7 +311,8 @@ export class CourseController {
   getExcludedPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
-    @Query('category') category?: CategorySlug,
+    @Query('category', new ParseEnumPipe(CategorySlug, { optional: true }))
+    category?: CategorySlug,
   ): never {
     throw new NotImplementedException(
       '제외된 장소 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
