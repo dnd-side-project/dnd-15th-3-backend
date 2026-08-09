@@ -31,6 +31,12 @@ describe('MeetingController', () => {
         courseImageKey: 'course-cards/1/5.png',
       }),
     ).toThrow(NotImplementedException)
+    expect(() => controller.getSimilarPlaces('1', '2')).toThrow(
+      NotImplementedException,
+    )
+    expect(() => controller.getSimilarPlaces('1', '2', ['3', '4'], 5)).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -90,6 +96,13 @@ describe('MeetingController', () => {
     ] as PathOperations | undefined
     expect(responseCodes(courseImagePath?.put?.responses)).toEqual(
       ['204', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
+    const similarPlacesPath = document.paths?.[
+      '/meetings/{meetingId}/places/{placeId}/similar'
+    ] as PathOperations | undefined
+    expect(responseCodes(similarPlacesPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
     expect(document.components?.schemas?.PlaceSortOption).toMatchObject({
@@ -176,6 +189,24 @@ describe('MeetingController', () => {
     expect(
       Object.keys(updateCourseImageRequestSchema?.properties ?? {}),
     ).toEqual(['courseImageKey'])
+
+    const placeSearchResponseSchema = document.components?.schemas
+      ?.PlaceSearchResponseDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(placeSearchResponseSchema?.properties ?? {})).toEqual([
+      'id',
+      'categoryId',
+      'name',
+      'address',
+      'latitude',
+      'longitude',
+      'primaryImageUrl',
+      'previewUrl',
+    ])
+    expect(
+      placeSearchResponseSchema?.properties?.primaryImageUrl?.nullable,
+    ).toBe(true)
 
     await app.close()
   })
