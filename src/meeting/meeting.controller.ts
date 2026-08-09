@@ -25,6 +25,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
+import { PlaceSearchResponseDto } from 'src/catalog/dto/place-search-response.dto'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
@@ -300,6 +301,66 @@ export class MeetingController {
   ): never {
     throw new NotImplementedException(
       '코스 카드 이미지 설정 API는 실제 데이터 연동 후 제공됩니다.',
+    )
+  }
+
+  @Get(':meetingId/places/:placeId/similar')
+  @ApiParam({
+    name: 'meetingId',
+    description: '모임 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiParam({
+    name: 'placeId',
+    description: '기준이 되는 장소 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiQuery({
+    name: 'excludeIds',
+    description:
+      '추천 결과에서 제외할 장소 ID 목록(콤마로 구분). 현재 화면에 노출 중인 추천 장소를 전달합니다.',
+    required: false,
+    example: '2,3,4',
+  })
+  @ApiQuery({
+    name: 'size',
+    description: '반환받을 추천 장소 개수. 미지정 시 5개',
+    required: false,
+    default: 5,
+    example: 5,
+  })
+  @ApiOperation({
+    summary: '비슷한 장소 추천',
+    description:
+      '기준 장소와 같은 카테고리이면서 일정 반경 이내에 있는 장소를 무작위로 추천합니다. ' +
+      '모임이 장소 추천 수집 중이거나 코스 생성 완료 상태일 때만 호출할 수 있습니다.',
+  })
+  @ApiOkResponse({ type: PlaceSearchResponseDto, isArray: true })
+  @ApiBadRequestResponse({
+    description:
+      'meetingId, placeId 형식이 올바르지 않거나 excludeIds, size 값이 유효하지 않습니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 정보가 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
+  @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
+  @ApiConflictResponse({
+    description:
+      '모임이 장소 추천 수집 중이거나 코스 생성 완료 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
+  })
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  getSimilarPlaces(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Param('placeId', BigIntStringPipe) placeId: string,
+    @Query('excludeIds') excludeIds?: string,
+    @Query('size') size?: number,
+  ): never {
+    throw new NotImplementedException(
+      '비슷한 장소 추천 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 }
