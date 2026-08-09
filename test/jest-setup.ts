@@ -1,0 +1,5 @@
+process.env.NODE_ENV ||= 'test'
+process.env.CORS_ORIGINS ||= 'http://localhost:5173'
+process.env.OCI_NAMESPACE ||= 'test-namespace'
+process.env.OCI_S3_ACCESS_KEY ||= 'test-access-key'
+process.env.OCI_S3_SECRET_KEY ||= 'test-secret-key'

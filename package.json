@@ -24,8 +24,6 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "typecheck": "tsc --noEmit",
-    "db:start": "mise run db-start",
-    "db:stop": "mise run db-stop",
     "redis:start": "mise run redis-start",
     "redis:stop": "mise run redis-stop",
     "ci": "mise run ci"
@@ -82,6 +80,7 @@
     },
     "collectCoverageFrom": ["**/*.(t|j)s"],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": ["<rootDir>/../test/jest-setup.ts"]
   }
 }

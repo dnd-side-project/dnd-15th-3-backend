@@ -20,8 +20,7 @@ async function bootstrap() {
   })
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('dnd-15th-3-backend API')
-    .setDescription('API documentation')
+    .setTitle('모모(momo) API')
     .setVersion('0.0.1')
     .build()
   const document = SwaggerModule.createDocument(app, swaggerConfig)

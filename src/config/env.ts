@@ -34,6 +34,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   CORS_ORIGINS: z.string().trim().min(1),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  KAKAO_REST_API_KEY: z.string().trim().default(''),
 
   // Database
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
