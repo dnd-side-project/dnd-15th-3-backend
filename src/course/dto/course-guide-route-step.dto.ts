@@ -39,6 +39,7 @@ export class CourseGuideRouteStepDto {
 
   @ApiProperty({
     description: '다음 장소까지 도보 이동 시간(분). 마지막 장소면 null',
+    type: 'number',
     example: 8,
     nullable: true,
   })

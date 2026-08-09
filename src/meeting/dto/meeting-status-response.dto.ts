@@ -11,6 +11,7 @@ export class MeetingStatusResponseDto {
 
   @ApiProperty({
     description: '확정된 코스 후보 ID. 확정 전이면 null',
+    type: 'string',
     example: '5',
     pattern: '^\\d+$',
     nullable: true,
