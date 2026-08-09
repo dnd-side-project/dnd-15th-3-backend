@@ -29,6 +29,7 @@ import {
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
+import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
 import { CourseCommentListResponseDto } from './dto/course-comment-list-response.dto'
@@ -375,6 +376,7 @@ export class CourseController {
       '여러 코스 후보 중 하나를 최종 코스로 확정합니다. ' +
       '방장만 호출할 수 있고, 모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다.',
   })
+  @ApiBody({ type: ConfirmCourseRequestDto })
   @ApiOkResponse({ type: MeetingStatusResponseDto })
   @ApiBadRequestResponse({
     description: 'meetingId, courseCandidateId 형식이 올바르지 않습니다.',
@@ -397,6 +399,7 @@ export class CourseController {
   confirmCourse(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Body() _dto: ConfirmCourseRequestDto,
   ): never {
     throw new NotImplementedException(
       '최종 코스 확정 API는 실제 데이터 연동 후 제공됩니다.',

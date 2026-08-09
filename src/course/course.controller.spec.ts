@@ -32,7 +32,7 @@ describe('CourseController', () => {
     expect(() => controller.getExcludedPlaces('1', '2')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.confirmCourse('1', '2')).toThrow(
+    expect(() => controller.confirmCourse('1', '2', {})).toThrow(
       NotImplementedException,
     )
   })
