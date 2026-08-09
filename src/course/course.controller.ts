@@ -7,6 +7,7 @@ import {
   NotImplementedException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common'
 import {
   ApiAcceptedResponse,
@@ -19,11 +20,13 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
@@ -32,6 +35,7 @@ import { CourseCommentListResponseDto } from './dto/course-comment-list-response
 import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
 import { CourseGuideResponseDto } from './dto/course-guide-response.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
+import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
 
 @ApiTags('코스')
 @Controller('meetings')
@@ -297,6 +301,60 @@ export class CourseController {
   ): never {
     throw new NotImplementedException(
       '코스 가이드 조회 API는 실제 데이터 연동 후 제공됩니다.',
+    )
+  }
+
+  @Get(':meetingId/courses/:courseCandidateId/excluded-places')
+  @ApiParam({
+    name: 'meetingId',
+    description: '모임 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiParam({
+    name: 'courseCandidateId',
+    description: '코스 후보 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiQuery({
+    name: 'category',
+    description: '카테고리 필터. 미지정 시 전체 카테고리를 조회합니다.',
+    enum: CategorySlug,
+    required: false,
+    example: CategorySlug.Cafe,
+  })
+  @ApiOperation({
+    summary: '제외된 장소 목록 조회',
+    description:
+      '이 코스에 선택되지 못한 장소 목록을 카테고리별로 조회합니다. ' +
+      '모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다.',
+  })
+  @ApiOkResponse({ type: ExcludedPlaceListResponseDto })
+  @ApiBadRequestResponse({
+    description:
+      'meetingId, courseCandidateId 형식이 올바르지 않거나 category 값이 유효하지 않습니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 정보가 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
+  @ApiNotFoundResponse({
+    description: '모임 또는 코스 후보를 찾을 수 없습니다.',
+  })
+  @ApiConflictResponse({
+    description:
+      '모임이 코스 생성 완료 상태가 아니어서 제외된 장소 목록을 조회할 수 없습니다.',
+  })
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  getExcludedPlaces(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('category') category?: CategorySlug,
+  ): never {
+    throw new NotImplementedException(
+      '제외된 장소 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 }
