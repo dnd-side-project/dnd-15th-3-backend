@@ -357,4 +357,49 @@ export class CourseController {
       '제외된 장소 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
+
+  @Post(':meetingId/courses/:courseCandidateId/confirmation')
+  @ApiParam({
+    name: 'meetingId',
+    description: '모임 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiParam({
+    name: 'courseCandidateId',
+    description: '확정할 코스 후보 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiOperation({
+    summary: '최종 코스 확정',
+    description:
+      '여러 코스 후보 중 하나를 최종 코스로 확정합니다. ' +
+      '방장만 호출할 수 있고, 모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다.',
+  })
+  @ApiOkResponse({ type: MeetingStatusResponseDto })
+  @ApiBadRequestResponse({
+    description: 'meetingId, courseCandidateId 형식이 올바르지 않습니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '인증 정보가 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
+  @ApiNotFoundResponse({
+    description: '모임 또는 코스 후보를 찾을 수 없습니다.',
+  })
+  @ApiConflictResponse({
+    description:
+      '모임이 코스 생성 완료 상태가 아니어서(아직 후보가 없거나 이미 확정됨) 코스를 확정할 수 없습니다.',
+  })
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  confirmCourse(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+  ): never {
+    throw new NotImplementedException(
+      '최종 코스 확정 API는 실제 데이터 연동 후 제공됩니다.',
+    )
+  }
 }
