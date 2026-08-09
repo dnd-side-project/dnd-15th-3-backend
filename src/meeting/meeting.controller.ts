@@ -224,7 +224,9 @@ export class MeetingController {
       '모임이 현재 어느 단계에 있는지 조회합니다. ' +
       '장소 추천 수집 중(RECOMMENDATION_COLLECTING) → 코스 생성 중(COURSE_GENERATING) → ' +
       '코스 생성 완료(COURSE_GENERATED) 또는 생성 실패(COURSE_GENERATION_FAILED) → ' +
-      '코스 확정(COURSE_CONFIRMED) 순서로 진행됩니다.',
+      '코스 확정(COURSE_CONFIRMED) 순서로 진행됩니다. ' +
+      'AI 코스 생성이 실패하면 내부 로직으로 경로를 직접 생성하는 방식으로 재시도하며, ' +
+      '이마저 실패하면 COURSE_GENERATION_FAILED로 전환됩니다.',
   })
   @ApiOkResponse({ type: MeetingStatusResponseDto })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
