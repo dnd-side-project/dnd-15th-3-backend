@@ -28,6 +28,7 @@ import {
 import { PlaceSearchResponseDto } from 'src/catalog/dto/place-search-response.dto'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
+import { BigIntStringArrayPipe } from 'src/common/pipes/bigint-string-array.pipe'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { AddPlaceRequestDto } from './dto/add-place-request.dto'
@@ -356,7 +357,7 @@ export class MeetingController {
   getSimilarPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('placeId', BigIntStringPipe) placeId: string,
-    @Query('excludeIds') excludeIds?: string,
+    @Query('excludeIds', BigIntStringArrayPipe) excludeIds?: string[],
     @Query('size') size?: number,
   ): never {
     throw new NotImplementedException(
