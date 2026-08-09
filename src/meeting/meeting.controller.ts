@@ -319,7 +319,9 @@ export class MeetingController {
   @ApiQuery({
     name: 'excludeIds',
     description:
-      '추천 결과에서 제외할 장소 ID 목록(콤마로 구분). 현재 화면에 노출 중인 추천 장소를 전달합니다.',
+      '추천 결과에서 제외할 장소 ID 목록(콤마로 구분). +' +
+      '현재 화면에 노출 중인 추천 장소를 전달합니다.+' +
+      ' 없으면 null',
     required: false,
     example: '2,3,4',
   })
@@ -334,7 +336,7 @@ export class MeetingController {
     summary: '비슷한 장소 추천',
     description:
       '기준 장소와 같은 카테고리이면서 일정 반경 이내에 있는 장소를 무작위로 추천합니다. ' +
-      '모임이 장소 추천 수집 중이거나 코스 생성 완료 상태일 때만 호출할 수 있습니다.',
+      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있습니다.',
   })
   @ApiOkResponse({ type: PlaceSearchResponseDto, isArray: true })
   @ApiBadRequestResponse({
@@ -348,7 +350,7 @@ export class MeetingController {
   @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
   @ApiConflictResponse({
     description:
-      '모임이 장소 추천 수집 중이거나 코스 생성 완료 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
+      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
   })
   @ApiResponse({
     status: 501,
