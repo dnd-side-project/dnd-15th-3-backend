@@ -8,4 +8,12 @@ export class MeetingStatusResponseDto {
     description: '모임의 현재 상태',
   })
   status!: MeetingStatus
+
+  @ApiProperty({
+    description: '확정된 코스 후보 ID. 확정 전이면 null',
+    example: '5',
+    pattern: '^\\d+$',
+    nullable: true,
+  })
+  confirmedCourseCandidateId!: string | null
 }
