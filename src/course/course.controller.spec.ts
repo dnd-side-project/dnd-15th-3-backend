@@ -29,6 +29,9 @@ describe('CourseController', () => {
     expect(() => controller.getCourseGuide('1', '2')).toThrow(
       NotImplementedException,
     )
+    expect(() => controller.getExcludedPlaces('1', '2')).toThrow(
+      NotImplementedException,
+    )
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -81,6 +84,13 @@ describe('CourseController', () => {
       '/meetings/{meetingId}/courses/{courseCandidateId}/guide'
     ] as PathOperations | undefined
     expect(responseCodes(courseGuidePath?.get?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
+    const excludedPlacesPath = document.paths?.[
+      '/meetings/{meetingId}/courses/{courseCandidateId}/excluded-places'
+    ] as PathOperations | undefined
+    expect(responseCodes(excludedPlacesPath?.get?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
@@ -183,6 +193,19 @@ describe('CourseController', () => {
     expect(
       courseGuideRouteStepSchema?.properties?.walkDurationToNextMin?.nullable,
     ).toBe(true)
+
+    const excludedPlaceListSchema = document.components?.schemas
+      ?.ExcludedPlaceListResponseDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(excludedPlaceListSchema?.properties ?? {})).toEqual([
+      'items',
+      'totalCount',
+      'appliedCategory',
+    ])
+    expect(excludedPlaceListSchema?.properties?.appliedCategory?.nullable).toBe(
+      true,
+    )
 
     await app.close()
   })
