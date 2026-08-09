@@ -129,21 +129,31 @@ describe('CourseController', () => {
     const courseDetailSchema = document.components?.schemas
       ?.CourseDetailResponseDto as SchemaWithProperties | undefined
     expect(Object.keys(courseDetailSchema?.properties ?? {})).toEqual([
-      'route',
+      'courseName',
+      'totalDistanceKm',
       'totalCount',
+      'route',
     ])
 
     const routeStepSchema = document.components?.schemas?.CourseRouteStepDto as
-      | SchemaWithProperties
+      | (SchemaWithProperties & SchemaWithNullableProperties)
       | undefined
     expect(Object.keys(routeStepSchema?.properties ?? {})).toEqual([
       'recommendationId',
+      'placeId',
       'order',
+      'name',
+      'category',
       'categorySlug',
+      'address',
       'primaryImageUrl',
       'longitude',
       'latitude',
+      'walkDurationToNextMin',
     ])
+    expect(routeStepSchema?.properties?.walkDurationToNextMin?.nullable).toBe(
+      true,
+    )
 
     const commentListSchema = document.components?.schemas
       ?.CourseCommentListResponseDto as SchemaWithProperties | undefined
