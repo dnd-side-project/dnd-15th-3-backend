@@ -105,8 +105,16 @@ describe('MeetingController', () => {
     }
 
     const statusSchema = document.components?.schemas
-      ?.MeetingStatusResponseDto as SchemaWithProperties | undefined
-    expect(Object.keys(statusSchema?.properties ?? {})).toEqual(['status'])
+      ?.MeetingStatusResponseDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(statusSchema?.properties ?? {})).toEqual([
+      'status',
+      'confirmedCourseCandidateId',
+    ])
+    expect(statusSchema?.properties?.confirmedCourseCandidateId?.nullable).toBe(
+      true,
+    )
 
     const mapPinsSchema = document.components?.schemas?.MapPinsResponseDto as
       | SchemaWithProperties
