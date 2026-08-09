@@ -273,7 +273,8 @@ export class CourseController {
   })
   @ApiQuery({
     name: 'category',
-    description: '카테고리 필터. 미지정 시 전체 카테고리를 조회합니다.',
+    description:
+      '카테고리 필터. 미지정 시 전체 카테고리를 조회합니다. 전체 조회면 null',
     enum: CategorySlug,
     required: false,
     example: CategorySlug.Cafe,

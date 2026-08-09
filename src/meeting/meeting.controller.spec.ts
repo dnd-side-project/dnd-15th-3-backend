@@ -81,7 +81,7 @@ describe('MeetingController', () => {
       ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
     expect(responseCodes(placesPath?.post?.responses)).toEqual(
-      ['204', '400', '401', '403', '404', '409', '501'].sort(),
+      ['201', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
     const preferencePath = document.paths?.[

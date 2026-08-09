@@ -15,6 +15,7 @@ import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
+  ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -32,6 +33,7 @@ import { BigIntStringArrayPipe } from 'src/common/pipes/bigint-string-array.pipe
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { AddPlaceRequestDto } from './dto/add-place-request.dto'
+import { MeetingPlaceRecommendationDto } from './dto/meeting-place-recommendation.dto'
 import { MeetingPlaceRecommendationListDto } from './dto/meeting-place-recommendation-list.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
@@ -169,7 +171,6 @@ export class MeetingController {
   }
 
   @Post(':meetingId/places')
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: '장소 추가',
     description:
@@ -184,7 +185,10 @@ export class MeetingController {
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
   @ApiBody({ type: AddPlaceRequestDto })
-  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: '장소 추가 성공' })
+  @ApiCreatedResponse({
+    description: '장소 추가 성공',
+    type: MeetingPlaceRecommendationDto,
+  })
   @ApiBadRequestResponse({
     description: 'meetingId 형식이 올바르지 않거나 placeId가 비어 있습니다.',
   })
