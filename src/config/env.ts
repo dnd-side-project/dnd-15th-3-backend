@@ -36,6 +36,14 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().trim().min(1),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   KAKAO_REST_API_KEY: z.string().trim().default(''),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  GOOGLE_PLACES_API_KEY: z.string().trim().default(''),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  INVITATION_BASE_URL: z
+    .string()
+    .trim()
+    .url()
+    .default('https://momo.example/invite'),
 
   // Database
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지

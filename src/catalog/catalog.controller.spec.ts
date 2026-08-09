@@ -1,76 +1,36 @@
-import {
-  BadRequestException,
-  NotImplementedException,
-  ServiceUnavailableException,
-} from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
-import { KakaoLocalService } from 'src/kakao/kakao-local.service'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CatalogController } from './catalog.controller'
+import { CatalogService } from './catalog.service'
 
 function createController() {
-  const kakaoLocal = {
-    searchAddressPlaces: jest.fn(),
+  const catalogService = {
+    getMeetingTypes: jest.fn().mockResolvedValue([]),
+    getCategories: jest.fn().mockResolvedValue([]),
+    getProfileAvatars: jest.fn().mockReturnValue([]),
   }
 
   return {
     controller: new CatalogController(
-      kakaoLocal as unknown as KakaoLocalService,
+      catalogService as unknown as CatalogService,
     ),
-    kakaoLocal,
+    catalogService,
   }
 }
 
 describe('CatalogController', () => {
-  it('does not provide frontend fixtures for unimplemented catalog APIs', () => {
-    const { controller } = createController()
+  it('카탈로그 조회를 서비스에 위임한다', () => {
+    const { controller, catalogService } = createController()
 
-    expect(() => controller.getMeetingTypes()).toThrow(NotImplementedException)
-    expect(() => controller.getCategories()).toThrow(NotImplementedException)
-    expect(() => controller.getProfileAvatars()).toThrow(
-      NotImplementedException,
-    )
-    expect(() => controller.searchPlaces('성수')).toThrow(
-      NotImplementedException,
-    )
-  })
+    controller.getMeetingTypes()
+    controller.getCategories()
+    controller.getProfileAvatars()
 
-  it('검색어가 입력될 때마다 카카오 주소 검색을 호출한다', async () => {
-    const { controller, kakaoLocal } = createController()
-    kakaoLocal.searchAddressPlaces.mockResolvedValue([])
-
-    await controller.searchFirstMeetingPlaces('ㄱ')
-
-    expect(kakaoLocal.searchAddressPlaces).toHaveBeenCalledWith({
-      query: 'ㄱ',
-      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
-      analyze_type: 'similar',
-      page: 1,
-      size: 10,
-    })
-  })
-
-  it('첫 만남 장소 검색어가 비어 있으면 실패한다', async () => {
-    const { controller } = createController()
-
-    await expect(controller.searchFirstMeetingPlaces(' ')).rejects.toThrow(
-      BadRequestException,
-    )
-  })
-
-  it('real mode exposes Kakao key configuration failures as 503', async () => {
-    const { controller, kakaoLocal } = createController()
-    kakaoLocal.searchAddressPlaces.mockRejectedValue(
-      new ServiceUnavailableException(
-        '카카오 REST API 키가 설정되지 않았습니다.',
-      ),
-    )
-
-    await expect(
-      controller.searchFirstMeetingPlaces('강남'),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException)
+    expect(catalogService.getMeetingTypes).toHaveBeenCalled()
+    expect(catalogService.getCategories).toHaveBeenCalled()
+    expect(catalogService.getProfileAvatars).toHaveBeenCalled()
   })
 
   it('documents the frontend contract without mock providers', async () => {
@@ -78,8 +38,12 @@ describe('CatalogController', () => {
       controllers: [CatalogController],
       providers: [
         {
-          provide: KakaoLocalService,
-          useValue: { searchAddressPlaces: jest.fn() },
+          provide: CatalogService,
+          useValue: {
+            getMeetingTypes: jest.fn(),
+            getCategories: jest.fn(),
+            getProfileAvatars: jest.fn(),
+          },
         },
       ],
     }).compile()
@@ -116,59 +80,10 @@ describe('CatalogController', () => {
     })
     expect(Object.keys(avatarSchema?.properties ?? {})).toEqual(['id', 'name'])
 
-    const firstMeetingPlaceSchema = document.components?.schemas
-      ?.FirstMeetingPlaceResponseDto as
-      | { properties?: Record<string, unknown> }
-      | undefined
-    expect(Object.keys(firstMeetingPlaceSchema?.properties ?? {})).toEqual([
-      'id',
-      'name',
-      'address',
-      'latitude',
-      'longitude',
-    ])
-
-    const placeSearchPath = document.paths?.['/places/search'] as
-      | {
-          get?: {
-            description?: string
-            summary?: string
-            parameters?: Array<{
-              name?: string
-              description?: string
-              required?: boolean
-            }>
-          }
-        }
-      | undefined
-    expect(placeSearchPath?.get?.summary).toBe('추천 장소 검색')
-    expect(placeSearchPath?.get?.description).toContain(
-      '추천 장소를 검색합니다.',
-    )
-    expect(placeSearchPath?.get?.description).not.toContain('출발 장소')
-
-    const firstMeetingPath = document.paths?.['/places/firstmeeting_search'] as
-      | { get?: { responses?: Record<string, unknown> } }
-      | undefined
-    expect(firstMeetingPath?.get?.responses).toHaveProperty('200')
-    expect(firstMeetingPath?.get?.responses).toHaveProperty('503')
-
-    const placeSearchSchema = document.components?.schemas
-      ?.PlaceSearchResponseDto as
-      | { properties?: Record<string, unknown> }
-      | undefined
-    expect(placeSearchSchema?.properties).toHaveProperty('categoryId')
-
-    expect(
-      placeSearchPath?.get?.parameters?.some(
-        (parameter) => parameter.name === 'categoryId',
-      ),
-    ).toBe(false)
-
     const meetingTypesPath = document.paths?.['/meeting-types'] as
       | { get?: { responses?: Record<string, unknown> } }
       | undefined
-    expect(meetingTypesPath?.get?.responses).toHaveProperty('501')
+    expect(meetingTypesPath?.get?.responses).toHaveProperty('200')
 
     await app.close()
   })

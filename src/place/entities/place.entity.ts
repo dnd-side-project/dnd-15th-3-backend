@@ -1,6 +1,7 @@
 import { Category } from 'src/category/entities/category.entity'
 import { BaseEntity } from 'src/common/entities/base.entity'
-import { Check, Column, Entity, JoinColumn, ManyToOne } from 'typeorm'
+import type { Point } from 'typeorm'
+import { Check, Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm'
 import { PlaceSource } from '../enums/place-source.enum'
 
 @Entity()
@@ -28,6 +29,48 @@ export class Place extends BaseEntity {
   @Column({ type: 'enum', enum: PlaceSource })
   source: PlaceSource
 
-  @Column({ length: 100 })
-  previewUrl: string
+  @Column({
+    type: 'varchar',
+    name: 'provider_place_id',
+    length: 255,
+    nullable: true,
+  })
+  providerPlaceId: string | null
+
+  @Column({
+    type: 'varchar',
+    name: 'place_url',
+    length: 500,
+    nullable: true,
+  })
+  placeUrl: string | null
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  phone: string | null
+
+  @Column({
+    type: 'varchar',
+    name: 'road_address',
+    length: 255,
+    nullable: true,
+  })
+  roadAddress: string | null
+
+  @Column({
+    type: 'varchar',
+    name: 'provider_category_code',
+    length: 100,
+    nullable: true,
+  })
+  providerCategoryCode: string | null
+
+  @Column({ type: 'timestamp', name: 'last_synced_at', nullable: true })
+  lastSyncedAt: Date | null
+
+  @Column('varchar', { length: 100, nullable: true })
+  previewUrl: string | null
+
+  @Index('IDX_place_location', { spatial: true, type: 'gist' })
+  @Column('geography', { spatialFeatureType: 'Point', srid: 4326 })
+  location: Point
 }

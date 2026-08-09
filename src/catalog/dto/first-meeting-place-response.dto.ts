@@ -1,8 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger'
 
 export class FirstMeetingPlaceResponseDto {
-  @ApiProperty({ description: '내부에서 사용할 장소 ID', example: '101' })
+  @ApiProperty({
+    description: '주소 Provider 결과 ID',
+    example: 'kakao-address-...',
+  })
   id!: string
+
+  @ApiProperty({
+    description: '주소 Provider의 외부 주소 ID',
+    example: 'kakao-address-...',
+  })
+  externalAddressId!: string
 
   @ApiProperty({ description: '장소명', example: '강남역 11번 출구' })
   name!: string

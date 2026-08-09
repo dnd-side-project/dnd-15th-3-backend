@@ -116,6 +116,7 @@ describe('KakaoLocalService', () => {
     await expect(service.searchAddressPlaces(request)).resolves.toEqual([
       {
         id: 'kakao-address-127.0276-37.4979',
+        externalAddressId: 'kakao-address-127.0276-37.4979',
         name: '서울 강남구',
         address: '서울 강남구',
         latitude: 37.4979,

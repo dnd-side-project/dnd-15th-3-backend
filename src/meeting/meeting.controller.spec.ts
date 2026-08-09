@@ -1,4 +1,3 @@
-import { NotImplementedException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
@@ -8,34 +7,106 @@ import {
   MeetingController,
   MeetingDetailController,
 } from './meeting.controller'
+import { MeetingService } from './meeting.service'
 
 describe('MeetingController', () => {
-  it('does not provide frontend fixtures for unimplemented meeting APIs', () => {
-    const controller = new MeetingController()
+  function createController() {
+    const meetingService = {
+      createMeeting: jest.fn().mockResolvedValue({}),
+      updateLocation: jest.fn().mockResolvedValue({}),
+      addRecommendation: jest.fn().mockResolvedValue({}),
+      getRecommendations: jest.fn().mockResolvedValue([]),
+      getCoursePlan: jest.fn().mockResolvedValue({}),
+      updateCoursePlan: jest.fn().mockResolvedValue({}),
+      previewInvitation: jest.fn().mockResolvedValue({}),
+      joinMeeting: jest.fn().mockResolvedValue({}),
+      getMeetingDetail: jest.fn().mockResolvedValue({}),
+    } as unknown as MeetingService
 
-    expect(() => controller.createMeeting({} as never)).toThrow(
-      NotImplementedException,
-    )
-    expect(() => controller.getCoursePlan('1', 'token')).toThrow(
-      NotImplementedException,
-    )
-    expect(() =>
-      controller.updateCoursePlan('1', 'token', {} as never),
-    ).toThrow(NotImplementedException)
-    expect(() => controller.previewInvitation({} as never)).toThrow(
-      NotImplementedException,
-    )
-    expect(() => controller.joinMeeting({} as never)).toThrow(
-      NotImplementedException,
-    )
-    expect(() =>
-      new MeetingDetailController().getMeetingDetail('1', 'token'),
-    ).toThrow(NotImplementedException)
+    return {
+      controller: new MeetingController(meetingService),
+      meetingService,
+    }
+  }
+
+  it('초대·참여·상세·코스 계획 API를 서비스에 전달한다', () => {
+    const { controller, meetingService } = createController()
+    const profile = {
+      userKey: 'device-2',
+      nickname: '게스트',
+      profileAvatarId: ProfileAvatarId.MomoBlue,
+    }
+
+    controller.getCoursePlan('1', 'token')
+    controller.updateCoursePlan('1', 'token', {
+      categorySlugs: [CategorySlug.Cafe],
+      version: 1,
+    })
+    controller.previewInvitation({ invitationCode: 'abc234' })
+    controller.joinMeeting({ invitationCode: 'ABC234', ...profile })
+    new MeetingDetailController(meetingService).getMeetingDetail('1', 'token')
+
+    expect(meetingService.getCoursePlan).toHaveBeenCalledWith('1', 'token')
+    expect(meetingService.updateCoursePlan).toHaveBeenCalledWith('1', 'token', {
+      categorySlugs: [CategorySlug.Cafe],
+      version: 1,
+    })
+    expect(meetingService.previewInvitation).toHaveBeenCalledWith({
+      invitationCode: 'ABC234',
+    })
+    expect(meetingService.joinMeeting).toHaveBeenCalledWith({
+      invitationCode: 'ABC234',
+      ...profile,
+    })
+    expect(meetingService.getMeetingDetail).toHaveBeenCalledWith('1', 'token')
+  })
+
+  it('모임 생성 요청을 검증하고 서비스에 전달한다', () => {
+    const { controller, meetingService } = createController()
+    const request = {
+      meetingTypeCode: MeetingTypeCode.Social,
+      name: '성수 모임',
+      date: '2026-08-23',
+      time: '12:00',
+      firstMeetingLocation: {
+        displayName: '강남역',
+        address: '서울 강남구',
+        latitude: 37.4979,
+        longitude: 127.0276,
+        externalAddressId: 'kakao-address-1',
+      },
+      categorySlugs: [CategorySlug.Cafe],
+      host: {
+        userKey: 'device-1',
+        nickname: '모모',
+        profileAvatarId: ProfileAvatarId.MomoBlue,
+      },
+    }
+
+    controller.createMeeting(request)
+
+    expect(meetingService.createMeeting).toHaveBeenCalledWith(request)
   })
 
   it('documents meeting type codes and request shapes for frontend mocking', async () => {
     const moduleFixture = await Test.createTestingModule({
       controllers: [MeetingController, MeetingDetailController],
+      providers: [
+        {
+          provide: MeetingService,
+          useValue: {
+            createMeeting: jest.fn(),
+            updateLocation: jest.fn(),
+            addRecommendation: jest.fn(),
+            getRecommendations: jest.fn(),
+            getCoursePlan: jest.fn(),
+            updateCoursePlan: jest.fn(),
+            previewInvitation: jest.fn(),
+            joinMeeting: jest.fn(),
+            getMeetingDetail: jest.fn(),
+          },
+        },
+      ],
     }).compile()
     const app = moduleFixture.createNestApplication()
     const document = SwaggerModule.createDocument(
@@ -109,7 +180,7 @@ describe('MeetingController', () => {
     expect(joinMeetingSchema?.properties).toHaveProperty('invitationCode')
     expect(joinMeetingSchema?.properties).not.toHaveProperty('accessToken')
     expect(meetingInvitationSchema?.properties).toHaveProperty('invitationCode')
-    expect(meetingInvitationSchema?.properties).toHaveProperty('place')
+    expect(meetingInvitationSchema?.properties).toHaveProperty('locationId')
     expect(meetingScreenSchema?.properties).toHaveProperty('invitationCode')
     expect(meetingScreenSchema?.required).toContain('selectedCourse')
     expect(meetingScreenSchema?.properties?.selectedCourse).toMatchObject({
@@ -119,7 +190,7 @@ describe('MeetingController', () => {
     const meetingsPath = document.paths?.['/meetings'] as
       | { post?: { responses?: Record<string, unknown> } }
       | undefined
-    expect(meetingsPath?.post?.responses).toHaveProperty('501')
+    expect(meetingsPath?.post?.responses).toHaveProperty('201')
 
     await app.close()
   })

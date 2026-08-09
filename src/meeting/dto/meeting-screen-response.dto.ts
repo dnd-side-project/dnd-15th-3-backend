@@ -2,12 +2,12 @@ import { ApiProperty } from '@nestjs/swagger'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { CourseCategoryStepResponseDto } from './course-category-step-response.dto'
+import { MeetingLocationResponseDto } from './meeting-location.dto'
 import { MeetingParticipantResponseDto } from './meeting-participant-response.dto'
 import { MeetingPermissionsResponseDto } from './meeting-permissions-response.dto'
 import { MeetingResponseDto } from './meeting-response.dto'
 import { MeetingTypeSummaryDto } from './meeting-type-summary.dto'
 import { ParticipantProfileDto } from './participant-profile.dto'
-import { PlaceSummaryDto } from './place-summary.dto'
 import { RecommendationPreviewDto } from './recommendation-preview.dto'
 import { SelectedCourseResponseDto } from './selected-course-response.dto'
 
@@ -21,18 +21,6 @@ export class MeetingScreenResponseDto extends MeetingResponseDto {
 
   @ApiProperty({ description: '현재 요청자가 방장인지 여부', example: true })
   isHost!: boolean
-
-  @ApiProperty({
-    description: '화면에서 공통으로 사용하는 첫 장소 ID',
-    example: '101',
-  })
-  placeId!: string
-
-  @ApiProperty({
-    description: '생성 시 입력한 firstLocationPlaceId와 동일한 내부 장소 ID',
-    example: '101',
-  })
-  firstLocationPlaceId!: string
 
   @ApiProperty({
     description: '역할별 화면 액션 권한',
@@ -65,8 +53,11 @@ export class MeetingScreenResponseDto extends MeetingResponseDto {
   })
   categorySlugs!: CategorySlug[]
 
-  @ApiProperty({ description: '첫 만남 장소', type: PlaceSummaryDto })
-  firstLocation!: PlaceSummaryDto
+  @ApiProperty({
+    description: '첫 만남 기준 위치',
+    type: MeetingLocationResponseDto,
+  })
+  firstLocation!: MeetingLocationResponseDto
 
   @ApiProperty({ description: '현재 사용자의 참여자 ID', example: '12' })
   viewerParticipantId!: string

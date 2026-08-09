@@ -9,4 +9,5 @@ images:
 patches:
   - path: ingress.yaml
   - path: environment.yaml
+  - path: worker-environment.yaml
   - path: resources.yaml
