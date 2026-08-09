@@ -34,7 +34,6 @@ import { CourseCandidateListResponseDto } from './dto/course-candidate-list-resp
 import { CourseCommentDto } from './dto/course-comment.dto'
 import { CourseCommentListResponseDto } from './dto/course-comment-list-response.dto'
 import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
-import { CourseGuideResponseDto } from './dto/course-guide-response.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
 import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
 
@@ -258,51 +257,6 @@ export class CourseController {
   ): never {
     throw new NotImplementedException(
       '코스 댓글 작성 API는 실제 데이터 연동 후 제공됩니다.',
-    )
-  }
-
-  @Get(':meetingId/courses/:courseCandidateId/guide')
-  @ApiParam({
-    name: 'meetingId',
-    description: '모임 ID',
-    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
-  })
-  @ApiParam({
-    name: 'courseCandidateId',
-    description: '코스 후보 ID',
-    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
-  })
-  @ApiOperation({
-    summary: '코스 가이드 조회',
-    description:
-      '선택된 코스의 방문 순서, 총 이동 거리, 방문 장소 개수, 장소 간 도보 이동 시간 등을 조회합니다. ' +
-      '모임이 코스 생성 완료 상태이거나 코스가 확정된 상태일 때 호출할 수 있습니다.',
-  })
-  @ApiOkResponse({ type: CourseGuideResponseDto })
-  @ApiBadRequestResponse({
-    description: 'meetingId, courseCandidateId 형식이 올바르지 않습니다.',
-  })
-  @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
-  })
-  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
-  @ApiNotFoundResponse({
-    description: '모임 또는 코스 후보를 찾을 수 없습니다.',
-  })
-  @ApiConflictResponse({
-    description:
-      '모임이 코스 생성 완료 상태도 확정 상태도 아니어서 코스 가이드를 조회할 수 없습니다.',
-  })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
-  getCourseGuide(
-    @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
-  ): never {
-    throw new NotImplementedException(
-      '코스 가이드 조회 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 

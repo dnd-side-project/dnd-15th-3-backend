@@ -26,9 +26,6 @@ describe('CourseController', () => {
     expect(() =>
       controller.createCourseComment('1', '2', { content: '좋아요!' }),
     ).toThrow(NotImplementedException)
-    expect(() => controller.getCourseGuide('1', '2')).toThrow(
-      NotImplementedException,
-    )
     expect(() => controller.getExcludedPlaces('1', '2')).toThrow(
       NotImplementedException,
     )
@@ -81,13 +78,6 @@ describe('CourseController', () => {
     )
     expect(responseCodes(courseCommentsPath?.post?.responses)).toEqual(
       ['201', '400', '401', '403', '404', '409', '501'].sort(),
-    )
-
-    const courseGuidePath = document.paths?.[
-      '/meetings/{meetingId}/courses/{courseCandidateId}/guide'
-    ] as PathOperations | undefined
-    expect(responseCodes(courseGuidePath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
     const excludedPlacesPath = document.paths?.[
@@ -186,33 +176,6 @@ describe('CourseController', () => {
     ])
     expect(createCommentRequestSchema?.properties?.content?.minLength).toBe(1)
     expect(createCommentRequestSchema?.properties?.content?.maxLength).toBe(300)
-
-    const courseGuideSchema = document.components?.schemas
-      ?.CourseGuideResponseDto as SchemaWithProperties | undefined
-    expect(Object.keys(courseGuideSchema?.properties ?? {})).toEqual([
-      'courseName',
-      'totalDistanceKm',
-      'totalCount',
-      'route',
-    ])
-
-    const courseGuideRouteStepSchema = document.components?.schemas
-      ?.CourseGuideRouteStepDto as
-      | (SchemaWithProperties & SchemaWithNullableProperties)
-      | undefined
-    expect(Object.keys(courseGuideRouteStepSchema?.properties ?? {})).toEqual([
-      'placeId',
-      'order',
-      'name',
-      'category',
-      'categorySlug',
-      'address',
-      'primaryImageUrl',
-      'walkDurationToNextMin',
-    ])
-    expect(
-      courseGuideRouteStepSchema?.properties?.walkDurationToNextMin?.nullable,
-    ).toBe(true)
 
     const excludedPlaceListSchema = document.components?.schemas
       ?.ExcludedPlaceListResponseDto as
