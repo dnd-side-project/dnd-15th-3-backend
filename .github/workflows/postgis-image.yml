@@ -80,8 +80,19 @@ jobs:
             sleep 2
           done
 
-          version="$(docker exec "$container" psql -U postgres -d postgres -Atqc \
-            "SELECT postgis_lib_version()")"
+          version=""
+          for attempt in $(seq 1 60); do
+            if version="$(docker exec "$container" psql -U postgres -d postgres -Atqc \
+              "SELECT postgis_lib_version()" 2>/dev/null)" && [ -n "$version" ]; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker logs "$container"
+              exit 1
+            fi
+            sleep 2
+          done
+
           echo "PostGIS version: $version"
           case "$version" in
             3.5.*) ;;
@@ -154,8 +165,19 @@ jobs:
             sleep 2
           done
 
-          version="$(docker exec "$container" psql -U postgres -d postgres -Atqc \
-            "SELECT postgis_lib_version()")"
+          version=""
+          for attempt in $(seq 1 60); do
+            if version="$(docker exec "$container" psql -U postgres -d postgres -Atqc \
+              "SELECT postgis_lib_version()" 2>/dev/null)" && [ -n "$version" ]; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker logs "$container"
+              exit 1
+            fi
+            sleep 2
+          done
+
           echo "PostGIS version: $version"
           case "$version" in
             3.5.*) ;;
