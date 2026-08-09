@@ -136,7 +136,8 @@ export class CourseController {
   @ApiOperation({
     summary: '코스 상세 조회',
     description:
-      'AI가 생성한 코스 후보의 상세 경로를 조회합니다. ' +
+      'AI가 생성한 코스 후보의 상세 경로와 ' +
+      '총 이동 거리를 조회합니다. ' +
       '모임이 코스 생성 완료 상태이거나 코스가 확정된 상태일 때 호출할 수 있습니다.',
   })
   @ApiOkResponse({ type: CourseDetailResponseDto })
