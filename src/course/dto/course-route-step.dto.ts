@@ -9,8 +9,21 @@ export class CourseRouteStepDto {
   })
   recommendationId!: string
 
+  @ApiProperty({
+    description: '장소 ID',
+    example: '1',
+    pattern: '^\\d+$',
+  })
+  placeId!: string
+
   @ApiProperty({ description: '방문 순서', example: 1 })
   order!: number
+
+  @ApiProperty({ description: '장소 이름', example: '성수 카페 모모' })
+  name!: string
+
+  @ApiProperty({ description: '카테고리 이름', example: '카페' })
+  category!: string
 
   @ApiProperty({
     description:
@@ -20,6 +33,9 @@ export class CourseRouteStepDto {
     example: CategorySlug.Cafe,
   })
   categorySlug!: CategorySlug
+
+  @ApiProperty({ description: '주소', example: '서울 성동구 성수이로 1' })
+  address!: string
 
   @ApiProperty({
     description: '대표 사진 URL. 없으면 카테고리별 기본 이미지를 사용',
@@ -33,4 +49,12 @@ export class CourseRouteStepDto {
 
   @ApiProperty({ description: '위도', example: 35.8242 })
   latitude!: number
+
+  @ApiProperty({
+    description: '다음 장소까지 도보 이동 시간(분). 마지막 장소면 null',
+    type: 'number',
+    example: 8,
+    nullable: true,
+  })
+  walkDurationToNextMin!: number | null
 }
