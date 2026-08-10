@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { PlaceSummaryDto } from './place-summary.dto'
 
 export class MeetingInvitationResponseDto {
   @ApiProperty({ description: '모임 ID', example: '1' })
@@ -23,12 +22,6 @@ export class MeetingInvitationResponseDto {
   @ApiProperty({ description: '모임 시간', example: '12:00' })
   time!: string
 
-  @ApiProperty({ description: '모임의 첫 장소 ID', example: '101' })
-  placeId!: string
-
-  @ApiProperty({
-    description: '모임의 첫 장소 상세 정보',
-    type: PlaceSummaryDto,
-  })
-  place!: PlaceSummaryDto
+  @ApiProperty({ description: '모임의 첫 만남 위치 ID', example: '12' })
+  locationId!: string
 }

@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
+import { MeetingLocationDto } from './meeting-location.dto'
 import { ParticipantProfileDto } from './participant-profile.dto'
 
 export class CreateMeetingDto {
@@ -31,11 +32,10 @@ export class CreateMeetingDto {
   time!: string
 
   @ApiProperty({
-    description:
-      '첫 만남 장소 검색 응답의 id. 응답값을 변환하지 않고 그대로 전달합니다.',
-    example: '101',
+    description: '첫 만남 위치 검색 결과에서 선택한 위치',
+    type: MeetingLocationDto,
   })
-  firstLocationPlaceId!: string
+  firstMeetingLocation!: MeetingLocationDto
 
   @ApiProperty({
     description: '코스 카테고리 슬러그 목록. 배열 순서가 코스 진행 순서입니다.',

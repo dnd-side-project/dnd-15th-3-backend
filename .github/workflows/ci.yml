@@ -9,6 +9,9 @@ on:
       - "*.json"                   # package, biome, tsconfig, nest-cli
       - "*.toml"                   # mise
       - "*.yaml"                   # pnpm-lock, pnpm-workspace
+      - "deploy/**/*.yaml"
+      - "deploy/**/*.yml"
+      - ".github/workflows/postgis-image.yml"
       - ".github/workflows/ci.yml"
   pull_request: *ci-trigger
 
@@ -36,3 +39,10 @@ jobs:
 
       - name: Test
         run: pnpm run test
+
+      - name: Render Kubernetes manifests
+        run: |
+          kubectl kustomize deploy/k8s/overlays/develop >/dev/null
+          kubectl kustomize deploy/k8s/overlays/main >/dev/null
+          kubectl kustomize deploy/k8s/postgres/overlays/develop >/dev/null
+          kubectl kustomize deploy/k8s/postgres/overlays/main >/dev/null
