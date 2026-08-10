@@ -74,31 +74,31 @@ describe('MeetingController', () => {
       | PathOperations
       | undefined
     expect(responseCodes(meetingStatusPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '501'].sort(),
+      ['200', '400', '401', '404', '501'].sort(),
     )
 
     const mapPinsPath = document.paths?.['/meetings/{meetingId}/places/pins'] as
       | PathOperations
       | undefined
     expect(responseCodes(mapPinsPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
     const placesPath = document.paths?.['/meetings/{meetingId}/places'] as
       | PathOperations
       | undefined
     expect(responseCodes(placesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
     expect(responseCodes(placesPath?.post?.responses)).toEqual(
-      ['201', '400', '401', '403', '404', '409', '501'].sort(),
+      ['201', '400', '401', '404', '409', '501'].sort(),
     )
 
     const preferencePath = document.paths?.[
       '/meetings/{meetingId}/places/{recommendationId}/preference'
     ] as PathOperations | undefined
     expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
     const courseImagePath = document.paths?.[
@@ -112,7 +112,7 @@ describe('MeetingController', () => {
       '/meetings/{meetingId}/places/{placeId}/similar'
     ] as PathOperations | undefined
     expect(responseCodes(similarPlacesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
     expect(document.components?.schemas?.PlaceSortOption).toMatchObject({

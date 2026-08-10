@@ -121,7 +121,6 @@ export class CourseController {
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
-  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
   @ApiConflictResponse({
     description:
@@ -171,7 +170,6 @@ export class CourseController {
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
-  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
     description: '모임 또는 코스 후보를 찾을 수 없습니다.',
   })
@@ -223,7 +221,6 @@ export class CourseController {
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
-  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
     description: '모임 또는 코스 후보를 찾을 수 없습니다.',
   })
@@ -277,7 +274,6 @@ export class CourseController {
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
-  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
     description: '모임 또는 코스 후보를 찾을 수 없습니다.',
   })
@@ -339,7 +335,6 @@ export class CourseController {
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
-  @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
     description: '모임 또는 코스 후보를 찾을 수 없습니다.',
   })

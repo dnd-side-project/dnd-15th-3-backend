@@ -63,31 +63,31 @@ describe('CourseController', () => {
       ['202', '400', '401', '403', '404', '409', '422', '501'].sort(),
     )
     expect(responseCodes(coursesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
     const courseDetailPath = document.paths?.[
       '/meetings/{meetingId}/courses/{courseCandidateId}'
     ] as PathOperations | undefined
     expect(responseCodes(courseDetailPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
     const courseCommentsPath = document.paths?.[
       '/meetings/{meetingId}/courses/{courseCandidateId}/comments'
     ] as PathOperations | undefined
     expect(responseCodes(courseCommentsPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
     expect(responseCodes(courseCommentsPath?.post?.responses)).toEqual(
-      ['201', '400', '401', '403', '404', '409', '501'].sort(),
+      ['201', '400', '401', '404', '409', '501'].sort(),
     )
 
     const excludedPlacesPath = document.paths?.[
       '/meetings/{meetingId}/courses/{courseCandidateId}/excluded-places'
     ] as PathOperations | undefined
     expect(responseCodes(excludedPlacesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
     const confirmationPath = document.paths?.[
