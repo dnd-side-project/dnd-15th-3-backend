@@ -7,6 +7,7 @@ import { Meeting } from './meeting.entity'
 
 @Entity()
 @Unique(['meeting', 'user'])
+@Unique(['meeting', 'nickname'])
 @Check(`length("access_token") >= 1`)
 @Check(`length("nickname") >= 1`)
 export class MeetingParticipant extends BaseEntity {

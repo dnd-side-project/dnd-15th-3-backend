@@ -1,9 +1,15 @@
+import { randomUUID } from 'node:crypto'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Category } from 'src/category/entities/category.entity'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
-import type { EntityManager, Point, Repository } from 'typeorm'
+import {
+  DataSource,
+  type EntityManager,
+  type Point,
+  type Repository,
+} from 'typeorm'
 import { Place } from '../entities/place.entity'
 import { PlaceSyncCoverage } from '../entities/place-sync-coverage.entity'
 import { PlaceSyncJob } from '../entities/place-sync-job.entity'
@@ -17,6 +23,7 @@ import {
   PLACE_SYNC_MAX_ATTEMPTS,
   PLACE_SYNC_RADIUS_METERS,
   PLACE_SYNC_RETRY_DELAYS_SECONDS,
+  PLACE_SYNC_TILE_LEASE_TTL_MS,
   PLACE_SYNC_TILE_QUERY_RADIUS_METERS,
 } from './place-sync.constants'
 import { PLACE_PROVIDER } from './place-sync.tokens'
@@ -27,6 +34,9 @@ export type PlaceCollectionStatus =
   | 'READY'
   | 'PARTIAL'
   | 'FAILED'
+
+class IncompletePlaceSyncCoverageError extends Error {}
+class PlaceSyncTileLeaseUnavailableError extends Error {}
 
 @Injectable()
 export class PlaceSyncService {
@@ -39,6 +49,7 @@ export class PlaceSyncService {
     private readonly coverageRepository: Repository<PlaceSyncCoverage>,
     @InjectRepository(Place)
     private readonly placeEntityRepository: Repository<Place>,
+    private readonly dataSource: DataSource,
     @Inject(PLACE_PROVIDER)
     private readonly provider: PlaceProvider,
   ) {}
@@ -157,54 +168,62 @@ export class PlaceSyncService {
           continue
         }
 
-        const places = await this.provider.searchNearby({
-          latitude: tile.latitude,
-          longitude: tile.longitude,
-          radiusMeters: PLACE_SYNC_TILE_QUERY_RADIUS_METERS,
-          providerTypes,
-        })
-        const filteredPlaces = places.filter((place) => {
-          if (
-            haversineDistanceMeters(
-              latitude,
-              longitude,
-              place.latitude,
-              place.longitude,
-            ) > job.radiusMeters
-          ) {
-            return false
-          }
-          if (seenProviderPlaceIds.has(place.providerPlaceId)) return false
-          seenProviderPlaceIds.add(place.providerPlaceId)
-          return true
-        })
+        const leaseOwnerToken = randomUUID()
+        const hasLease = await this.acquireTileLease(
+          job.source,
+          job.category.id,
+          tile.key,
+          leaseOwnerToken,
+        )
+        if (!hasLease) throw new PlaceSyncTileLeaseUnavailableError()
 
-        if (filteredPlaces.length > 0) {
-          await this.placeEntityRepository.upsert(
-            filteredPlaces.map((place) => ({
-              name: place.name,
-              address: place.address,
-              roadAddress: place.roadAddress,
-              latitude: place.latitude,
-              longitude: place.longitude,
-              location: {
-                type: 'Point',
-                coordinates: [place.longitude, place.latitude],
+        try {
+          const places = await this.collectTilePlaces(tile, providerTypes)
+          const filteredPlaces = places.filter((place) => {
+            if (
+              haversineDistanceMeters(
+                latitude,
+                longitude,
+                place.latitude,
+                place.longitude,
+              ) > job.radiusMeters
+            ) {
+              return false
+            }
+            if (seenProviderPlaceIds.has(place.providerPlaceId)) return false
+            seenProviderPlaceIds.add(place.providerPlaceId)
+            return true
+          })
+
+          if (filteredPlaces.length > 0) {
+            await this.placeEntityRepository.upsert(
+              filteredPlaces.map((place) => ({
+                name: place.name,
+                address: place.address,
+                roadAddress: place.roadAddress,
+                latitude: place.latitude,
+                longitude: place.longitude,
+                location: {
+                  type: 'Point',
+                  coordinates: [place.longitude, place.latitude],
+                },
+                source: job.source,
+                providerPlaceId: place.providerPlaceId,
+                placeUrl: place.placeUrl,
+                phone: place.phone,
+                providerCategoryCode: place.providerCategoryCode,
+                lastSyncedAt: new Date(),
+                category: job.category,
+              })),
+              {
+                conflictPaths: ['source', 'providerPlaceId'],
+                skipUpdateIfNoValuesChanged: true,
               },
-              source: job.source,
-              providerPlaceId: place.providerPlaceId,
-              placeUrl: place.placeUrl,
-              phone: place.phone,
-              providerCategoryCode: place.providerCategoryCode,
-              lastSyncedAt: new Date(),
-              category: job.category,
-            })),
-            {
-              conflictPaths: ['source', 'providerPlaceId'],
-              skipUpdateIfNoValuesChanged: true,
-            },
-          )
-          resultCount += filteredPlaces.length
+            )
+            resultCount += filteredPlaces.length
+          }
+        } finally {
+          await this.releaseTileLease(leaseOwnerToken)
         }
 
         const syncedAt = new Date()
@@ -263,5 +282,68 @@ export class PlaceSyncService {
       completedAt: new Date(),
       errorMessage: message,
     })
+  }
+
+  private async collectTilePlaces(
+    tile: ReturnType<typeof buildCoverageTiles>[number],
+    providerTypes: string[],
+  ) {
+    const result = await this.provider.searchNearby({
+      latitude: tile.latitude,
+      longitude: tile.longitude,
+      radiusMeters: PLACE_SYNC_TILE_QUERY_RADIUS_METERS,
+      providerTypes,
+    })
+    if (result.isComplete) return result.places
+
+    const coordinates = tile.coverage.coordinates[0]
+    const minLongitude = coordinates[0][0]
+    const minLatitude = coordinates[0][1]
+    const maxLongitude = coordinates[2][0]
+    const maxLatitude = coordinates[2][1]
+    const subtiles = await Promise.all(
+      [0.25, 0.75].flatMap((latitudeRatio) =>
+        [0.25, 0.75].map((longitudeRatio) =>
+          this.provider.searchNearby({
+            latitude: minLatitude + (maxLatitude - minLatitude) * latitudeRatio,
+            longitude:
+              minLongitude + (maxLongitude - minLongitude) * longitudeRatio,
+            radiusMeters: PLACE_SYNC_TILE_QUERY_RADIUS_METERS / 2,
+            providerTypes,
+          }),
+        ),
+      ),
+    )
+    if (subtiles.some((subtile) => !subtile.isComplete)) {
+      throw new IncompletePlaceSyncCoverageError(
+        `Place sync tile ${tile.key} remained capped after subdivision.`,
+      )
+    }
+    return subtiles.flatMap((subtile) => subtile.places)
+  }
+
+  private async acquireTileLease(
+    source: string,
+    categoryId: string,
+    tileKey: string,
+    ownerToken: string,
+  ): Promise<boolean> {
+    const rows = await this.dataSource.query(
+      `INSERT INTO "place_sync_tile_lease" ("category_id", "source", "tile_key", "owner_token", "expires_at")
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP + ($5 * INTERVAL '1 millisecond'))
+       ON CONFLICT ("source", "category_id", "tile_key") DO UPDATE
+       SET "owner_token" = EXCLUDED."owner_token", "expires_at" = EXCLUDED."expires_at"
+       WHERE "place_sync_tile_lease"."expires_at" <= CURRENT_TIMESTAMP
+       RETURNING "id"`,
+      [categoryId, source, tileKey, ownerToken, PLACE_SYNC_TILE_LEASE_TTL_MS],
+    )
+    return rows.length > 0
+  }
+
+  private async releaseTileLease(ownerToken: string): Promise<void> {
+    await this.dataSource.query(
+      `DELETE FROM "place_sync_tile_lease" WHERE "owner_token" = $1`,
+      [ownerToken],
+    )
   }
 }

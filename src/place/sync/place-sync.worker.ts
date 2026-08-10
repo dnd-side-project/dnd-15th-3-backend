@@ -8,6 +8,7 @@ const POLL_INTERVAL_MS = 5_000
 @Injectable()
 export class PlaceSyncWorker {
   private readonly logger = new Logger(PlaceSyncWorker.name)
+  private isRunning = true
 
   constructor(
     private readonly dataSource: DataSource,
@@ -15,7 +16,8 @@ export class PlaceSyncWorker {
   ) {}
 
   async runOnce(): Promise<boolean> {
-    await this.dataSource.query(`
+    await this.dataSource.query(
+      `
       UPDATE "place_sync_job"
       SET
         "status" = 'PENDING',
@@ -26,8 +28,10 @@ export class PlaceSyncWorker {
           'Worker가 중단되어 작업을 재개합니다.'
         )
       WHERE "status" = 'RUNNING'
-        AND "started_at" < CURRENT_TIMESTAMP - INTERVAL '${PLACE_SYNC_STALE_AFTER_MS} milliseconds'
-    `)
+        AND "started_at" < CURRENT_TIMESTAMP - ($1 * INTERVAL '1 millisecond')
+    `,
+      [PLACE_SYNC_STALE_AFTER_MS],
+    )
 
     const rows = await this.dataSource.query(`
       UPDATE "place_sync_job"
@@ -57,7 +61,7 @@ export class PlaceSyncWorker {
 
   async run(): Promise<void> {
     this.logger.log('Place sync worker started')
-    while (true) {
+    while (this.isRunning) {
       try {
         const processed = await this.runOnce()
         if (!processed) await this.delay(POLL_INTERVAL_MS)
@@ -69,6 +73,10 @@ export class PlaceSyncWorker {
         await this.delay(POLL_INTERVAL_MS)
       }
     }
+  }
+
+  stop(): void {
+    this.isRunning = false
   }
 
   private delay(milliseconds: number): Promise<void> {

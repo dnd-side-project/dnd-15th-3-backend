@@ -6,6 +6,7 @@ import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.ent
 import { Place } from './entities/place.entity'
 import { PlaceSyncCoverage } from './entities/place-sync-coverage.entity'
 import { PlaceSyncJob } from './entities/place-sync-job.entity'
+import { PlaceSyncTileLease } from './entities/place-sync-tile-lease.entity'
 import { PlaceController } from './place.controller'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
@@ -23,6 +24,7 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
       Place,
       PlaceSyncCoverage,
       PlaceSyncJob,
+      PlaceSyncTileLease,
     ]),
   ],
   controllers: [PlaceController],

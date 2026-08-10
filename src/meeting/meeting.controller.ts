@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common'
 import {
   ApiBadRequestResponse,
+  ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -22,6 +23,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
+import { AddRecommendationDto } from './dto/add-recommendation.dto'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { CreateMeetingDto } from './dto/create-meeting.dto'
 import { InvitationPreviewRequestDto } from './dto/invitation-preview-request.dto'
@@ -130,13 +132,14 @@ export class MeetingController {
     description: '추천 장소 추가 성공',
     type: RecommendationPreviewDto,
   })
+  @ApiBody({ type: AddRecommendationDto })
   @ApiBadRequestResponse({ description: '장소를 추가할 수 없습니다.' })
   @ApiConflictResponse({ description: '이미 모임에 추가된 장소입니다.' })
   @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
   addRecommendation(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
-    @Body() body: unknown,
+    @Body() body: AddRecommendationDto,
   ) {
     const parsed = addRecommendationRequestSchema.safeParse(body)
     if (!parsed.success) {

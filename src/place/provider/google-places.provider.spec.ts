@@ -41,19 +41,22 @@ describe('GooglePlacesProvider', () => {
         radiusMeters: 750,
         providerTypes: ['cafe'],
       }),
-    ).resolves.toEqual([
-      {
-        providerPlaceId: 'places/abc',
-        name: '성수 카페',
-        address: '서울 성동구 성수이로 1',
-        roadAddress: '서울 성동구 성수이로 1',
-        latitude: 37.5446,
-        longitude: 127.0557,
-        phone: '02-1234-5678',
-        placeUrl: 'https://maps.google.com/?cid=1',
-        providerCategoryCode: 'cafe',
-      },
-    ])
+    ).resolves.toEqual({
+      places: [
+        {
+          providerPlaceId: 'places/abc',
+          name: '성수 카페',
+          address: '서울 성동구 성수이로 1',
+          roadAddress: '서울 성동구 성수이로 1',
+          latitude: 37.5446,
+          longitude: 127.0557,
+          phone: '02-1234-5678',
+          placeUrl: 'https://maps.google.com/?cid=1',
+          providerCategoryCode: 'cafe',
+        },
+      ],
+      isComplete: true,
+    })
 
     const [, options] = fetchMock.mock.calls[0]
     expect(options?.method).toBe('POST')

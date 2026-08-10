@@ -19,10 +19,15 @@ export type PlaceProviderPlace = {
   providerCategoryCode: string | null
 }
 
+export type PlaceProviderSearchResult = {
+  places: PlaceProviderPlace[]
+  isComplete: boolean
+}
+
 export interface PlaceProvider {
   readonly source: PlaceSource
 
   searchNearby(
     request: PlaceProviderSearchRequest,
-  ): Promise<PlaceProviderPlace[]>
+  ): Promise<PlaceProviderSearchResult>
 }

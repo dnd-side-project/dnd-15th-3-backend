@@ -11,6 +11,7 @@ import type {
   PlaceProvider,
   PlaceProviderPlace,
   PlaceProviderSearchRequest,
+  PlaceProviderSearchResult,
 } from './place-provider'
 
 const GOOGLE_NEARBY_SEARCH_URL =
@@ -43,7 +44,7 @@ export class GooglePlacesProvider implements PlaceProvider {
 
   async searchNearby(
     request: PlaceProviderSearchRequest,
-  ): Promise<PlaceProviderPlace[]> {
+  ): Promise<PlaceProviderSearchResult> {
     const apiKey = this.config
       .get('GOOGLE_PLACES_API_KEY', { infer: true })
       .trim()
@@ -117,7 +118,7 @@ export class GooglePlacesProvider implements PlaceProvider {
       )
     }
 
-    return parsedResponse.data.places.map((place) => ({
+    const places = parsedResponse.data.places.map((place) => ({
       providerPlaceId: place.id,
       name: place.displayName.text,
       address: place.formattedAddress ?? place.displayName.text,
@@ -128,5 +129,7 @@ export class GooglePlacesProvider implements PlaceProvider {
       placeUrl: place.googleMapsUri ?? null,
       providerCategoryCode: place.primaryType ?? place.types?.[0] ?? null,
     }))
+
+    return { places, isComplete: places.length < 20 }
   }
 }

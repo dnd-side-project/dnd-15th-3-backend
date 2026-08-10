@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -23,7 +24,7 @@ import {
 } from 'src/place/sync/place-sync.constants'
 import { PlaceSyncService } from 'src/place/sync/place-sync.service'
 import { User } from 'src/user/entities/user.entity'
-import { DataSource, In, Repository } from 'typeorm'
+import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import { MeetingLocationResponseDto } from './dto/meeting-location.dto'
@@ -62,10 +63,28 @@ export class MeetingService {
   async createMeeting(
     request: CreateMeetingRequest,
   ): Promise<MeetingScreenResponseDto> {
-    const created = await this.dataSource.transaction(async (manager) => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        const created = await this.createMeetingInTransaction(request)
+        return this.toMeetingScreenResponse(created, request)
+      } catch (error) {
+        if (!this.isUniqueViolation(error)) throw error
+      }
+    }
+
+    throw new ServiceUnavailableException('초대 코드를 발급하지 못했습니다.')
+  }
+
+  private createMeetingInTransaction(request: CreateMeetingRequest): Promise<{
+    meeting: Meeting
+    location: MeetingLocation
+    steps: CourseCategoryStep[]
+    participant: MeetingParticipant
+    user: User
+  }> {
+    return this.dataSource.transaction(async (manager) => {
       const meetingTypeRepository = manager.getRepository(MeetingType)
       const categoryRepository = manager.getRepository(Category)
-      const userRepository = manager.getRepository(User)
       const meetingRepository = manager.getRepository(Meeting)
       const locationRepository = manager.getRepository(MeetingLocation)
       const participantRepository = manager.getRepository(MeetingParticipant)
@@ -90,16 +109,7 @@ export class MeetingService {
         categories.map((category) => [category.slug, category]),
       )
 
-      let user = await userRepository.findOne({
-        where: { userKey: request.host.userKey },
-      })
-      if (!user) {
-        user = await userRepository.save(
-          userRepository.create({
-            userKey: request.host.userKey,
-          }),
-        )
-      }
+      const user = await this.findOrCreateUser(manager, request.host.userKey)
 
       const meeting = await meetingRepository.save(
         meetingRepository.create({
@@ -107,8 +117,7 @@ export class MeetingService {
           name: request.name,
           date: request.date,
           time: request.time,
-          accessToken:
-            await this.generateUniqueInvitationCode(meetingRepository),
+          accessToken: this.generateInvitationCode(),
         }),
       )
 
@@ -161,8 +170,6 @@ export class MeetingService {
 
       return { meeting, location, steps, participant, user }
     })
-
-    return this.toMeetingScreenResponse(created, request)
   }
 
   async previewInvitation(
@@ -184,72 +191,82 @@ export class MeetingService {
   async joinMeeting(
     request: JoinMeetingRequest,
   ): Promise<MeetingScreenResponseDto> {
-    const joined = await this.dataSource.transaction(async (manager) => {
-      const meetingRepository = manager.getRepository(Meeting)
-      const meeting = await meetingRepository.findOne({
-        where: {
-          accessToken: this.normalizeInvitationCode(request.invitationCode),
-        },
-        relations: { meetingType: true, meetingLocation: true },
-      })
-      if (!meeting || !meeting.meetingLocation) {
-        throw new NotFoundException('유효한 초대 코드를 찾을 수 없습니다.')
-      }
-
-      const userRepository = manager.getRepository(User)
-      let user = await userRepository.findOne({
-        where: { userKey: request.userKey },
-      })
-      if (!user) {
-        user = await userRepository.save(
-          userRepository.create({
-            userKey: request.userKey,
-          }),
-        )
-      }
-
-      const participantRepository = manager.getRepository(MeetingParticipant)
-      let participant = await participantRepository.findOne({
-        where: { meeting: { id: meeting.id }, user: { id: user.id } },
-      })
-
-      if (!participant) {
-        const nicknameInUse = await participantRepository.findOne({
-          where: { meeting: { id: meeting.id }, nickname: request.nickname },
+    let joined: { meetingId: string; participantAccessToken: string }
+    try {
+      joined = await this.dataSource.transaction(async (manager) => {
+        const meetingRepository = manager.getRepository(Meeting)
+        const meeting = await meetingRepository.findOne({
+          where: {
+            accessToken: this.normalizeInvitationCode(request.invitationCode),
+          },
+          relations: { meetingType: true, meetingLocation: true },
         })
-        if (nicknameInUse) {
-          throw new ConflictException('이미 사용 중인 닉네임입니다.')
+        if (!meeting || !meeting.meetingLocation) {
+          throw new NotFoundException('유효한 초대 코드를 찾을 수 없습니다.')
         }
 
-        participant = await participantRepository.save(
-          participantRepository.create({
-            meeting,
-            user,
-            role: ParticipantRole.Member,
-            nickname: request.nickname,
-            accessToken: this.generateParticipantToken(),
-            profileAvatarId: request.profileAvatarId,
-          }),
-        )
-      } else {
-        if (participant.nickname !== request.nickname) {
+        const user = await this.findOrCreateUser(manager, request.userKey)
+
+        const participantRepository = manager.getRepository(MeetingParticipant)
+        let participant = await participantRepository.findOne({
+          where: { meeting: { id: meeting.id }, user: { id: user.id } },
+        })
+
+        if (!participant) {
           const nicknameInUse = await participantRepository.findOne({
             where: { meeting: { id: meeting.id }, nickname: request.nickname },
           })
-          if (nicknameInUse && nicknameInUse.id !== participant.id) {
+          if (nicknameInUse) {
             throw new ConflictException('이미 사용 중인 닉네임입니다.')
           }
-        }
-        participant.nickname = request.nickname
-        participant.profileAvatarId = request.profileAvatarId
-        participant = await participantRepository.save(participant)
-      }
 
-      return {
-        meetingId: meeting.id,
-        participantAccessToken: participant.accessToken,
+          await manager.query(
+            `INSERT INTO "meeting_participant" ("role", "access_token", "nickname", "profile_avatar_id", "meeting_id", "user_id")
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT ("meeting_id", "user_id") DO NOTHING`,
+            [
+              ParticipantRole.Member,
+              this.generateParticipantToken(),
+              request.nickname,
+              request.profileAvatarId,
+              meeting.id,
+              user.id,
+            ],
+          )
+          participant = await participantRepository.findOne({
+            where: { meeting: { id: meeting.id }, user: { id: user.id } },
+          })
+          if (!participant) {
+            throw new ConflictException('이미 사용 중인 닉네임입니다.')
+          }
+        } else {
+          if (participant.nickname !== request.nickname) {
+            const nicknameInUse = await participantRepository.findOne({
+              where: {
+                meeting: { id: meeting.id },
+                nickname: request.nickname,
+              },
+            })
+            if (nicknameInUse && nicknameInUse.id !== participant.id) {
+              throw new ConflictException('이미 사용 중인 닉네임입니다.')
+            }
+          }
+          participant.nickname = request.nickname
+          participant.profileAvatarId = request.profileAvatarId
+          participant = await participantRepository.save(participant)
+        }
+
+        return {
+          meetingId: meeting.id,
+          participantAccessToken: participant.accessToken,
+        }
+      })
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw new ConflictException('이미 사용 중인 닉네임입니다.')
       }
-    })
+      throw error
+    }
 
     return this.getMeetingScreen(
       joined.meetingId,
@@ -390,10 +407,12 @@ export class MeetingService {
       }
 
       const locationRepository = manager.getRepository(MeetingLocation)
-      const location = await locationRepository.findOne({
-        where: { meeting: { id: meetingId } },
-        relations: { meeting: true },
-      })
+      const location = await locationRepository
+        .createQueryBuilder('location')
+        .leftJoinAndSelect('location.meeting', 'meeting')
+        .where('location.meeting_id = :meetingId', { meetingId })
+        .setLock('pessimistic_write')
+        .getOne()
       if (!location) {
         throw new NotFoundException('모임 기준 위치를 찾을 수 없습니다.')
       }
@@ -705,22 +724,27 @@ export class MeetingService {
     return normalized
   }
 
-  private async generateUniqueInvitationCode(
-    repository: Repository<Meeting>,
-  ): Promise<string> {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      const code = Array.from({ length: 6 }, () =>
-        INVITATION_CODE_ALPHABET.charAt(
-          randomBytes(1)[0] % INVITATION_CODE_ALPHABET.length,
-        ),
-      ).join('')
-      const existing = await repository.findOne({
-        where: { accessToken: code },
-      })
-      if (!existing) return code
-    }
+  private generateInvitationCode(): string {
+    return Array.from({ length: 6 }, () =>
+      INVITATION_CODE_ALPHABET.charAt(
+        randomBytes(1)[0] % INVITATION_CODE_ALPHABET.length,
+      ),
+    ).join('')
+  }
 
-    throw new BadRequestException('초대 코드를 발급하지 못했습니다.')
+  private async findOrCreateUser(
+    manager: EntityManager,
+    userKey: string,
+  ): Promise<User> {
+    await manager.query(
+      `INSERT INTO "user" ("user_key") VALUES ($1) ON CONFLICT ("user_key") DO NOTHING`,
+      [userKey],
+    )
+    const user = await manager.getRepository(User).findOne({
+      where: { userKey },
+    })
+    if (!user) throw new Error('사용자 생성 후 사용자를 조회하지 못했습니다.')
+    return user
   }
 
   private generateParticipantToken(): string {

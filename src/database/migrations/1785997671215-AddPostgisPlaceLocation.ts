@@ -95,8 +95,19 @@ export class AddPostgisPlaceLocation1785997671215
     await queryRunner.query(`DROP TABLE "meeting_location"`)
     await queryRunner.query(`DROP INDEX "public"."IDX_place_location"`)
     await queryRunner.query(`ALTER TABLE "place" DROP COLUMN "location"`)
-    await queryRunner.query(
-      `ALTER TABLE "place" ALTER COLUMN "preview_url" SET NOT NULL`,
-    )
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'place'
+            AND column_name = 'preview_url'
+        ) THEN
+          ALTER TABLE "place" ALTER COLUMN "preview_url" SET NOT NULL;
+        END IF;
+      END $$
+    `)
   }
 }

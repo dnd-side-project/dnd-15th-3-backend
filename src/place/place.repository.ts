@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { DataSource } from 'typeorm'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
 import type { PlaceSearchItem } from './schema/place-search-response.schema'
-
-const SEARCH_RADIUS_METERS = 2000
+import { PLACE_SYNC_RADIUS_METERS } from './sync/place-sync.constants'
 
 type QueryParameter = number | string
 
@@ -43,7 +42,7 @@ export class PlaceRepository {
     const parameters: QueryParameter[] = [
       longitude,
       latitude,
-      SEARCH_RADIUS_METERS,
+      PLACE_SYNC_RADIUS_METERS,
     ]
 
     if (request.categoryId) {

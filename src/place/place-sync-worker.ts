@@ -7,8 +7,8 @@ async function bootstrap() {
   const worker = app.get(PlaceSyncWorker)
 
   const shutdown = async () => {
+    worker.stop()
     await app.close()
-    process.exit(0)
   }
 
   process.once('SIGTERM', shutdown)

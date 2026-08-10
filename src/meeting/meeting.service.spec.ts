@@ -179,7 +179,7 @@ describe('MeetingService', () => {
       [
         User,
         {
-          findOne: jest.fn().mockResolvedValue(null),
+          findOne: jest.fn().mockResolvedValue(guestUser),
           create: jest.fn((value) => value),
           save: jest.fn().mockResolvedValue(guestUser),
         },
@@ -190,13 +190,15 @@ describe('MeetingService', () => {
           findOne: jest
             .fn()
             .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce(null),
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(guest),
           create: jest.fn((value) => value),
           save: jest.fn().mockResolvedValue(guest),
         },
       ],
     ])
     const manager = {
+      query: jest.fn().mockResolvedValue([]),
       getRepository: jest.fn((entity: unknown) =>
         managerRepositories.get(entity),
       ),
@@ -359,7 +361,7 @@ describe('MeetingService', () => {
       find: jest.fn().mockResolvedValue([category]),
     }
     const userRepository = {
-      findOne: jest.fn().mockResolvedValue(null),
+      findOne: jest.fn().mockResolvedValue({ id: 'user-1' }),
       create: jest.fn((value) => value),
       save: jest.fn().mockResolvedValue({
         id: 'user-1',
@@ -410,6 +412,7 @@ describe('MeetingService', () => {
     managerRepositories.set(MeetingParticipant, participantRepository)
 
     const manager = {
+      query: jest.fn().mockResolvedValue([]),
       getRepository: jest.fn((entity: unknown) =>
         managerRepositories.get(entity),
       ),
@@ -458,9 +461,18 @@ describe('MeetingService', () => {
         .mockResolvedValue({ id: 'participant-1', role: 'HOST' }),
     }
     const locationRepository = {
-      findOne: jest.fn().mockResolvedValue(location),
       save: jest.fn().mockResolvedValue(updatedLocation),
+      createQueryBuilder: jest.fn(),
     }
+    const locationQueryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      setLock: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(location),
+    }
+    locationRepository.createQueryBuilder.mockImplementation(
+      () => locationQueryBuilder,
+    )
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
@@ -500,6 +512,9 @@ describe('MeetingService', () => {
       syncVersion: 2,
     })
     expect(queryBuilder.set).toHaveBeenCalled()
+    expect(locationQueryBuilder.setLock).toHaveBeenCalledWith(
+      'pessimistic_write',
+    )
     expect(placeSyncService.createJobs).toHaveBeenCalledWith(
       manager,
       meeting,

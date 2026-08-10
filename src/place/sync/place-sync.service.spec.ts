@@ -16,6 +16,9 @@ function createService() {
   const placeEntityRepository = {
     upsert: jest.fn(),
   }
+  const dataSource = {
+    query: jest.fn().mockResolvedValue([{ id: 'lease-1' }]),
+  }
   const provider = {
     source: PlaceSource.Google,
     searchNearby: jest.fn(),
@@ -26,11 +29,13 @@ function createService() {
       jobRepository as never,
       coverageRepository as never,
       placeEntityRepository as never,
+      dataSource as never,
       provider,
     ),
     jobRepository,
     coverageRepository,
     placeEntityRepository,
+    dataSource,
     provider,
   }
 }
@@ -69,19 +74,22 @@ describe('PlaceSyncService', () => {
       category: { id: '1', slug: 'cafe' },
     })
     coverageRepository.findOne.mockResolvedValue(null)
-    provider.searchNearby.mockResolvedValue([
-      {
-        providerPlaceId: 'google-place-1',
-        name: '카페',
-        address: '서울 주소',
-        roadAddress: '서울 도로명 주소',
-        latitude: 37.5,
-        longitude: 127,
-        phone: null,
-        placeUrl: null,
-        providerCategoryCode: 'cafe',
-      },
-    ])
+    provider.searchNearby.mockResolvedValue({
+      places: [
+        {
+          providerPlaceId: 'google-place-1',
+          name: '카페',
+          address: '서울 주소',
+          roadAddress: '서울 도로명 주소',
+          latitude: 37.5,
+          longitude: 127,
+          phone: null,
+          placeUrl: null,
+          providerCategoryCode: 'cafe',
+        },
+      ],
+      isComplete: true,
+    })
 
     await service.processJob('job-1')
 
@@ -121,6 +129,87 @@ describe('PlaceSyncService', () => {
         status: PlaceSyncJobStatus.Pending,
         errorMessage: 'rate limited',
       }),
+    )
+  })
+
+  it('최대 결과 수에 도달한 tile은 한 번 분할 조회한 뒤 coverage를 기록한다', async () => {
+    const { service, jobRepository, coverageRepository, provider } =
+      createService()
+    jobRepository.findOne.mockResolvedValue({
+      id: 'job-1',
+      source: PlaceSource.Google,
+      locationVersion: 1,
+      radiusMeters: 1,
+      attemptCount: 1,
+      resultCount: 0,
+      center: { type: 'Point', coordinates: [127, 37.5] },
+      category: { id: '1', slug: 'cafe' },
+    })
+    coverageRepository.findOne.mockResolvedValue(null)
+    provider.searchNearby.mockImplementation(({ radiusMeters }) =>
+      Promise.resolve({
+        places: [],
+        isComplete: radiusMeters < 750,
+      }),
+    )
+
+    await service.processJob('job-1')
+
+    expect(provider.searchNearby).toHaveBeenCalledWith(
+      expect.objectContaining({ radiusMeters: 750 }),
+    )
+    expect(provider.searchNearby).toHaveBeenCalledWith(
+      expect.objectContaining({ radiusMeters: 375 }),
+    )
+    expect(coverageRepository.save).toHaveBeenCalled()
+  })
+
+  it('다른 worker가 tile lease를 보유하면 외부 Provider를 호출하지 않고 재시도한다', async () => {
+    const { service, jobRepository, coverageRepository, dataSource, provider } =
+      createService()
+    dataSource.query.mockResolvedValue([])
+    jobRepository.findOne.mockResolvedValue({
+      id: 'job-1',
+      source: PlaceSource.Google,
+      locationVersion: 1,
+      radiusMeters: 1,
+      attemptCount: 1,
+      resultCount: 0,
+      center: { type: 'Point', coordinates: [127, 37.5] },
+      category: { id: '1', slug: 'cafe' },
+    })
+    coverageRepository.findOne.mockResolvedValue(null)
+
+    await service.processJob('job-1')
+
+    expect(provider.searchNearby).not.toHaveBeenCalled()
+    expect(jobRepository.update).toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({ status: PlaceSyncJobStatus.Pending }),
+    )
+  })
+
+  it('세 번째 실패는 더 이상 재시도하지 않는다', async () => {
+    const { service, jobRepository, coverageRepository, provider } =
+      createService()
+    jobRepository.findOne.mockResolvedValue({
+      id: 'job-1',
+      source: PlaceSource.Google,
+      locationVersion: 1,
+      radiusMeters: 1,
+      attemptCount: 3,
+      resultCount: 0,
+      center: { type: 'Point', coordinates: [127, 37.5] },
+      category: { id: '1', slug: 'cafe' },
+    })
+    coverageRepository.findOne.mockResolvedValue(null)
+    provider.searchNearby.mockRejectedValue(new Error('rate limited'))
+
+    await service.processJob('job-1')
+
+    expect(jobRepository.update).toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({ status: PlaceSyncJobStatus.Failed }),
     )
   })
 

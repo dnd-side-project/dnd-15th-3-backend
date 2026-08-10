@@ -4,6 +4,17 @@ export class CompletePlaceFlow1785997672215 implements MigrationInterface {
   name = 'CompletePlaceFlow1785997672215'
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const unsupportedMeetingTypeCount = await queryRunner.query(`
+      SELECT COUNT(*)::int AS "count"
+      FROM "meeting_type"
+      WHERE "display_order" NOT BETWEEN 1 AND 9
+    `)
+    if (Number(unsupportedMeetingTypeCount[0]?.count ?? 0) > 0) {
+      throw new Error(
+        'CompletePlaceFlow migration requires meeting_type.display_order values between 1 and 9.',
+      )
+    }
+
     await queryRunner.query(
       `ALTER TABLE "meeting_type" ADD "code" character varying(50)`,
     )
@@ -153,6 +164,23 @@ export class CompletePlaceFlow1785997672215 implements MigrationInterface {
     await queryRunner.query(
       `CREATE INDEX "IDX_place_sync_coverage_area" ON "place_sync_coverage" USING GiST ("coverage")`,
     )
+    await queryRunner.query(`
+      CREATE TABLE "place_sync_tile_lease" (
+        "id" BIGSERIAL NOT NULL,
+        "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "category_id" bigint NOT NULL,
+        "source" "public"."place_source_enum" NOT NULL,
+        "tile_key" character varying(100) NOT NULL,
+        "owner_token" character varying(64) NOT NULL,
+        "expires_at" TIMESTAMP NOT NULL,
+        CONSTRAINT "PK_place_sync_tile_lease" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_place_sync_tile_lease_scope" UNIQUE ("source", "category_id", "tile_key")
+      )
+    `)
+    await queryRunner.query(
+      `CREATE INDEX "IDX_place_sync_tile_lease_expiry" ON "place_sync_tile_lease" ("expires_at")`,
+    )
 
     await queryRunner.query(
       `ALTER TABLE "place_sync_job" ADD CONSTRAINT "FK_place_sync_job_meeting" FOREIGN KEY ("meeting_id") REFERENCES "meeting"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -163,6 +191,14 @@ export class CompletePlaceFlow1785997672215 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "place_sync_coverage" ADD CONSTRAINT "FK_place_sync_coverage_category" FOREIGN KEY ("category_id") REFERENCES "category"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     )
+    await queryRunner.query(
+      `ALTER TABLE "place_sync_tile_lease" ADD CONSTRAINT "FK_place_sync_tile_lease_category" FOREIGN KEY ("category_id") REFERENCES "category"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    )
+    await queryRunner.query(
+      `ALTER TABLE "meeting_participant" ADD CONSTRAINT "UQ_meeting_participant_nickname" UNIQUE ("meeting_id", "nickname")`,
+    )
+
+    await queryRunner.query(`UPDATE "category" SET "display_order" = -"id"`)
 
     await queryRunner.query(`
       INSERT INTO "category" ("name", "slug", "display_order") VALUES
@@ -247,6 +283,17 @@ export class CompletePlaceFlow1785997672215 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "meeting_participant" DROP COLUMN "profile_avatar_id"`,
     )
+
+    await queryRunner.query(
+      `ALTER TABLE "meeting_participant" DROP CONSTRAINT "UQ_meeting_participant_nickname"`,
+    )
+    await queryRunner.query(
+      `ALTER TABLE "place_sync_tile_lease" DROP CONSTRAINT "FK_place_sync_tile_lease_category"`,
+    )
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_place_sync_tile_lease_expiry"`,
+    )
+    await queryRunner.query(`DROP TABLE "place_sync_tile_lease"`)
 
     await queryRunner.query(
       `ALTER TABLE "place_sync_coverage" DROP CONSTRAINT "FK_place_sync_coverage_category"`,
