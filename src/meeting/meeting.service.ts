@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -13,6 +14,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { Category } from 'src/category/entities/category.entity'
 import { type Env } from 'src/config/env'
+import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { Place } from 'src/place/entities/place.entity'
@@ -29,11 +31,13 @@ import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import { MeetingLocationResponseDto } from './dto/meeting-location.dto'
 import { MeetingScreenResponseDto } from './dto/meeting-screen-response.dto'
+import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
 import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
 import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
+import { MeetingStatus } from './enums/meeting-status.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
 import type {
   CreateMeetingRequest,
@@ -58,6 +62,10 @@ export class MeetingService {
     private readonly placeRepository: Repository<Place>,
     @InjectRepository(MeetingPlaceRecommendation)
     private readonly recommendationRepository: Repository<MeetingPlaceRecommendation>,
+    @InjectRepository(Meeting)
+    private readonly meetingRepository: Repository<Meeting>,
+    @InjectRepository(CourseCandidate)
+    private readonly courseCandidateRepository: Repository<CourseCandidate>,
   ) {}
 
   async createMeeting(
@@ -569,6 +577,34 @@ export class MeetingService {
     )
   }
 
+  async getMeetingStatus(
+    meetingId: string,
+    accessToken: string,
+  ): Promise<MeetingStatusResponseDto> {
+    const { meeting } = await this.findParticipant(meetingId, accessToken)
+
+    const confirmedCourseCandidateId =
+      meeting.status === MeetingStatus.CourseConfirmed
+        ? await this.findConfirmedCourseCandidateId(meetingId)
+        : null
+
+    return { status: meeting.status, confirmedCourseCandidateId }
+  }
+
+  private async findConfirmedCourseCandidateId(
+    meetingId: string,
+  ): Promise<string> {
+    const confirmed = await this.courseCandidateRepository.findOne({
+      where: { meeting: { id: meetingId }, isSelected: true },
+    })
+    if (!confirmed) {
+      throw new InternalServerErrorException(
+        '확정된 모임인데 선택된 코스 후보를 찾을 수 없습니다.',
+      )
+    }
+    return confirmed.id
+  }
+
   private async findParticipant(
     meetingId: string,
     accessToken: string,
@@ -579,9 +615,15 @@ export class MeetingService {
         meeting: { id: meetingId },
         accessToken: accessToken.trim(),
       },
-      relations: { user: true },
+      relations: { user: true, meeting: true },
     })
     if (!participant) {
+      const meetingExists = await this.meetingRepository.exists({
+        where: { id: meetingId },
+      })
+      if (!meetingExists) {
+        throw new NotFoundException('모임을 찾을 수 없습니다.')
+      }
       throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
     }
     return participant

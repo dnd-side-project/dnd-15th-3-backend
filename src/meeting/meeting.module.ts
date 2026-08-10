@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Category } from 'src/category/entities/category.entity'
+import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { Place } from 'src/place/entities/place.entity'
@@ -21,6 +22,7 @@ import { MeetingService } from './meeting.service'
     PlaceModule,
     TypeOrmModule.forFeature([
       Category,
+      CourseCandidate,
       CourseCategoryStep,
       Meeting,
       MeetingLocation,

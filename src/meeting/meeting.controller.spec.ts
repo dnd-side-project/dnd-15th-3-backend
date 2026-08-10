@@ -5,6 +5,7 @@ import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
+import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 import {
   MeetingController,
@@ -23,6 +24,7 @@ function createController() {
     previewInvitation: jest.fn().mockResolvedValue({}),
     joinMeeting: jest.fn().mockResolvedValue({}),
     getMeetingDetail: jest.fn().mockResolvedValue({}),
+    getMeetingStatus: jest.fn().mockResolvedValue({}),
   } as unknown as MeetingService
 
   return {
@@ -32,12 +34,23 @@ function createController() {
 }
 
 describe('MeetingController', () => {
-  it('실제 데이터 연동 전까지 미구현 엔드포인트가 501을 반환한다', () => {
+  it('모임 상태 조회는 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = {
+      status: MeetingStatus.RecommendationCollecting,
+      confirmedCourseCandidateId: null,
+    }
+    ;(meetingService.getMeetingStatus as jest.Mock).mockResolvedValue(expected)
+
+    await expect(controller.getMeetingStatus('1', 'token')).resolves.toEqual(
+      expected,
+    )
+    expect(meetingService.getMeetingStatus).toHaveBeenCalledWith('1', 'token')
+  })
+
+  it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
     const { controller } = createController()
 
-    expect(() => controller.getMeetingStatus('1', 'token')).toThrow(
-      NotImplementedException,
-    )
     expect(() => controller.getMapPins('1', 'token')).toThrow(
       NotImplementedException,
     )
@@ -80,6 +93,7 @@ describe('MeetingController', () => {
             updateCoursePlan: jest.fn(),
             previewInvitation: jest.fn(),
             joinMeeting: jest.fn(),
+            getMeetingStatus: jest.fn(),
           },
         },
       ],
@@ -105,7 +119,7 @@ describe('MeetingController', () => {
       | PathOperations
       | undefined
     expect(responseCodes(meetingStatusPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '501'].sort(),
+      ['200', '400', '401', '404', '500'].sort(),
     )
 
     const mapPinsPath = document.paths?.['/meetings/{meetingId}/places/pins'] as
@@ -327,6 +341,7 @@ describe('MeetingController', () => {
             previewInvitation: jest.fn(),
             joinMeeting: jest.fn(),
             getMeetingDetail: jest.fn(),
+            getMeetingStatus: jest.fn(),
           },
         },
       ],

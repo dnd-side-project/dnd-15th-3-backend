@@ -19,6 +19,7 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -365,17 +366,15 @@ export class MeetingController {
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  @ApiInternalServerErrorResponse({
+    description:
+      '모임이 코스 확정 상태인데 확정된 코스 후보를 찾을 수 없는 데이터 정합성 오류입니다.',
   })
   getMeetingStatus(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new NotImplementedException(
-      '모임 상태 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    @Query('accessToken') accessToken: string,
+  ): Promise<MeetingStatusResponseDto> {
+    return this.meetingService.getMeetingStatus(meetingId, accessToken)
   }
 
   @Get(':meetingId/places/pins')
