@@ -97,6 +97,7 @@ export class KakaoLocalService {
 
       return {
         id: `kakao-address-${document.x}-${document.y}`,
+        externalAddressId: `kakao-address-${document.x}-${document.y}`,
         name: document.address_name,
         address,
         latitude: Number(document.y),

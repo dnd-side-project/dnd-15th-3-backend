@@ -1,7 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity'
-import { Place } from 'src/place/entities/place.entity'
-import { Check, Column, Entity, JoinColumn, ManyToOne } from 'typeorm'
+import { Check, Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm'
 import { MeetingStatus } from '../enums/meeting-status.enum'
+import { MeetingLocation } from './meeting-location.entity'
 import { MeetingType } from './meeting-type.entity'
 
 @Entity()
@@ -11,9 +11,11 @@ export class Meeting extends BaseEntity {
   @JoinColumn({ name: 'meeting_type_id' })
   meetingType: MeetingType
 
-  @ManyToOne(() => Place, { nullable: false })
-  @JoinColumn({ name: 'first_location_place_id' })
-  firstLocationPlace: Place
+  @OneToOne(
+    () => MeetingLocation,
+    (meetingLocation) => meetingLocation.meeting,
+  )
+  meetingLocation: MeetingLocation
 
   @Column({ length: 10 })
   name: string
@@ -33,6 +35,9 @@ export class Meeting extends BaseEntity {
 
   @Column({ unique: true })
   accessToken: string
+
+  @Column({ name: 'course_version', default: 1 })
+  courseVersion: number
 
   @Column({ nullable: true, unique: true })
   courseImageKey: string

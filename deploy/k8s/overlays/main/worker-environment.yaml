@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: momo-place-sync-worker
+spec:
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: CORS_ORIGINS
+              value: "https://dnd-15th-3-frontend.pages.dev"
+            - name: DB_HOST
+              value: momo-postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: momo-postgres-auth
+                  key: POSTGRES_DB
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: momo-postgres-auth
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: momo-postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: DB_SSL
+              value: "false"

@@ -26,6 +26,8 @@ describe('validateEnv', () => {
       expect(env.OCI_BUCKET_NAME_DEV).toBe('momo-bucket-dev')
       expect(env.OCI_BUCKET_NAME_PROD).toBe('momo-bucket-prod')
       expect(env.KAKAO_REST_API_KEY).toBe('')
+      expect(env.GOOGLE_PLACES_API_KEY).toBe('')
+      expect(env.INVITATION_BASE_URL).toBe('https://momo.example/invite')
     })
 
     it('defaults NODE_ENV to development when not provided', () => {
