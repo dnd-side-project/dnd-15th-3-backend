@@ -218,6 +218,12 @@ export class MeetingController {
     description: '조회할 모임의 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '모임 상태 조회',
     description:
@@ -231,7 +237,7 @@ export class MeetingController {
   @ApiOkResponse({ type: MeetingStatusResponseDto })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
@@ -241,6 +247,7 @@ export class MeetingController {
   })
   getMeetingStatus(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') _accessToken: string,
   ): never {
     throw new NotImplementedException(
       '모임 상태 조회 API는 실제 데이터 연동 후 제공됩니다.',
@@ -253,6 +260,12 @@ export class MeetingController {
     description: '조회할 모임의 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '전체 지도 핀 조회',
     description:
@@ -264,7 +277,7 @@ export class MeetingController {
   @ApiOkResponse({ type: MapPinsResponseDto })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
@@ -276,7 +289,10 @@ export class MeetingController {
     status: 501,
     description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
   })
-  getMapPins(@Param('meetingId', BigIntStringPipe) meetingId: string): never {
+  getMapPins(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') _accessToken: string,
+  ): never {
     throw new NotImplementedException(
       '전체 지도 핀 조회 API는 실제 데이터 연동 후 제공됩니다.',
     )
@@ -303,6 +319,12 @@ export class MeetingController {
     required: false,
     example: PlaceSortOption.Recommended,
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '추가된 장소 목록 조회',
     description:
@@ -318,7 +340,7 @@ export class MeetingController {
       'meetingId 형식이 올바르지 않거나 category, sort 값이 유효하지 않습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
@@ -332,6 +354,7 @@ export class MeetingController {
   })
   getPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') _accessToken: string,
     @Query('category', new ParseEnumPipe(CategorySlug, { optional: true }))
     category?: CategorySlug,
     @Query('sort', new ParseEnumPipe(PlaceSortOption, { optional: true }))
@@ -356,6 +379,12 @@ export class MeetingController {
     description: '모임 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiBody({ type: AddPlaceRequestDto })
   @ApiCreatedResponse({
     description: '장소 추가 성공',
@@ -365,7 +394,7 @@ export class MeetingController {
     description: 'meetingId 형식이 올바르지 않거나 placeId가 비어 있습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
@@ -379,6 +408,7 @@ export class MeetingController {
   })
   addPlace(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') _accessToken: string,
     @Body() _dto: AddPlaceRequestDto,
   ): never {
     throw new NotImplementedException(
@@ -397,6 +427,12 @@ export class MeetingController {
     description: '추천 장소 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '장소 반응(좋아요/싫어요) 설정',
     description:
@@ -412,7 +448,7 @@ export class MeetingController {
       'meetingId, recommendationId 형식이 올바르지 않거나 preference 값이 유효하지 않습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
@@ -429,6 +465,7 @@ export class MeetingController {
   updatePlacePreference(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('recommendationId', BigIntStringPipe) recommendationId: string,
+    @Query('accessToken') _accessToken: string,
     @Body() _dto: UpdatePlacePreferenceRequestDto,
   ): never {
     throw new NotImplementedException(
@@ -442,6 +479,12 @@ export class MeetingController {
     name: 'meetingId',
     description: '모임 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '코스 카드 이미지를 설정할 방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
   })
   @ApiOperation({
     summary: '코스 카드 이미지 설정',
@@ -460,7 +503,7 @@ export class MeetingController {
       'meetingId 형식이 올바르지 않거나 courseImageKey가 비어 있습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
@@ -474,6 +517,7 @@ export class MeetingController {
   })
   updateCourseImage(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') _accessToken: string,
     @Body() _dto: UpdateCourseImageRequestDto,
   ): never {
     throw new NotImplementedException(
@@ -507,6 +551,12 @@ export class MeetingController {
     default: 5,
     example: 5,
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '비슷한 장소 추천',
     description:
@@ -519,7 +569,7 @@ export class MeetingController {
       'meetingId, placeId 형식이 올바르지 않거나 excludeIds, size 값이 유효하지 않습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
@@ -534,6 +584,7 @@ export class MeetingController {
   getSimilarPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('placeId', BigIntStringPipe) placeId: string,
+    @Query('accessToken') _accessToken: string,
     @Query('excludeIds', BigIntStringArrayPipe) excludeIds?: string[],
     @Query('size', new PositiveIntPipe(5)) size?: number,
   ): never {

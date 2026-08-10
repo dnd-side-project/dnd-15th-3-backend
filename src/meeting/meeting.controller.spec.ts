@@ -19,30 +19,34 @@ describe('MeetingController', () => {
   it('실제 데이터 연동 전까지 모든 엔드포인트가 501을 반환한다', () => {
     const controller = createController()
 
-    expect(() => controller.getMeetingStatus('1')).toThrow(
+    expect(() => controller.getMeetingStatus('1', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.getMapPins('1')).toThrow(NotImplementedException)
-    expect(() => controller.getPlaces('1')).toThrow(NotImplementedException)
-    expect(() => controller.addPlace('1', { placeId: '2' })).toThrow(
+    expect(() => controller.getMapPins('1', 'token')).toThrow(
+      NotImplementedException,
+    )
+    expect(() => controller.getPlaces('1', 'token')).toThrow(
+      NotImplementedException,
+    )
+    expect(() => controller.addPlace('1', 'token', { placeId: '2' })).toThrow(
       NotImplementedException,
     )
     expect(() =>
-      controller.updatePlacePreference('1', '2', {
+      controller.updatePlacePreference('1', '2', 'token', {
         preference: PreferenceType.Like,
       }),
     ).toThrow(NotImplementedException)
     expect(() =>
-      controller.updateCourseImage('1', {
+      controller.updateCourseImage('1', 'token', {
         courseImageKey: 'course-cards/1/5.png',
       }),
     ).toThrow(NotImplementedException)
-    expect(() => controller.getSimilarPlaces('1', '2')).toThrow(
+    expect(() => controller.getSimilarPlaces('1', '2', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.getSimilarPlaces('1', '2', ['3', '4'], 5)).toThrow(
-      NotImplementedException,
-    )
+    expect(() =>
+      controller.getSimilarPlaces('1', '2', 'token', ['3', '4'], 5),
+    ).toThrow(NotImplementedException)
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
