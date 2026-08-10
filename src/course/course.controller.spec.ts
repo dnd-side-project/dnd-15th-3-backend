@@ -11,29 +11,29 @@ describe('CourseController', () => {
   it('실제 데이터 연동 전까지 모든 엔드포인트가 501을 반환한다', () => {
     const controller = createController()
 
-    expect(() => controller.generateCourse('1')).toThrow(
+    expect(() => controller.generateCourse('1', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.getCourseCandidates('1')).toThrow(
+    expect(() => controller.getCourseCandidates('1', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.getCourseDetail('1', '2')).toThrow(
+    expect(() => controller.getCourseDetail('1', '2', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.getCourseComments('1', '2')).toThrow(
+    expect(() => controller.getCourseComments('1', '2', 'token')).toThrow(
       NotImplementedException,
     )
     expect(() =>
-      controller.createCourseComment('1', '2', { content: '좋아요!' }),
+      controller.createCourseComment('1', '2', 'token', { content: '좋아요!' }),
     ).toThrow(NotImplementedException)
-    expect(() => controller.getExcludedPlaces('1', '2')).toThrow(
+    expect(() => controller.getExcludedPlaces('1', '2', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.confirmCourse('1', '2', {})).toThrow(
+    expect(() => controller.confirmCourse('1', '2', 'token', {})).toThrow(
       NotImplementedException,
     )
     expect(() =>
-      controller.addCoursePlace('1', '2', { recommendationId: '3' }),
+      controller.addCoursePlace('1', '2', 'token', { recommendationId: '3' }),
     ).toThrow(NotImplementedException)
   })
 

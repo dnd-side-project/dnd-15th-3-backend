@@ -50,6 +50,12 @@ export class CourseController {
     description: '모임 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: 'AI 코스 생성을 요청할 방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: 'AI 코스 생성',
     description:
@@ -67,7 +73,7 @@ export class CourseController {
   })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
@@ -85,6 +91,7 @@ export class CourseController {
   })
   generateCourse(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') _accessToken: string,
   ): never {
     throw new NotImplementedException(
       'AI 코스 생성 API는 실제 데이터 연동 후 제공됩니다.',
@@ -97,6 +104,12 @@ export class CourseController {
     description: '모임 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '코스 후보 목록 조회',
     description:
@@ -106,7 +119,7 @@ export class CourseController {
   @ApiOkResponse({ type: CourseCandidateListResponseDto })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
@@ -120,6 +133,7 @@ export class CourseController {
   })
   getCourseCandidates(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') _accessToken: string,
   ): never {
     throw new NotImplementedException(
       '코스 후보 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
@@ -137,6 +151,12 @@ export class CourseController {
     description: '코스 후보 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '코스 상세 조회',
     description:
@@ -149,7 +169,7 @@ export class CourseController {
     description: 'meetingId, courseCandidateId 형식이 올바르지 않습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
@@ -166,6 +186,7 @@ export class CourseController {
   getCourseDetail(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('accessToken') _accessToken: string,
   ): never {
     throw new NotImplementedException(
       '코스 상세 조회 API는 실제 데이터 연동 후 제공됩니다.',
@@ -183,6 +204,12 @@ export class CourseController {
     description: '코스 후보 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '코스 댓글 목록 조회',
     description:
@@ -194,7 +221,7 @@ export class CourseController {
     description: 'meetingId, courseCandidateId 형식이 올바르지 않습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
@@ -211,6 +238,7 @@ export class CourseController {
   getCourseComments(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('accessToken') _accessToken: string,
   ): never {
     throw new NotImplementedException(
       '코스 댓글 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
@@ -228,6 +256,12 @@ export class CourseController {
     description: '코스 후보 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '코스 댓글 작성',
     description:
@@ -241,7 +275,7 @@ export class CourseController {
       'meetingId, courseCandidateId 형식이 올바르지 않거나 content가 비어 있거나 300자를 초과합니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
@@ -258,6 +292,7 @@ export class CourseController {
   createCourseComment(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('accessToken') _accessToken: string,
     @Body() _dto: CreateCourseCommentRequestDto,
   ): never {
     throw new NotImplementedException(
@@ -284,6 +319,12 @@ export class CourseController {
     required: false,
     example: CategorySlug.Cafe,
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여 시 발급된 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '제외된 장소 목록 조회',
     description:
@@ -296,7 +337,7 @@ export class CourseController {
       'meetingId, courseCandidateId 형식이 올바르지 않거나 category 값이 유효하지 않습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '해당 모임의 참여자가 아닙니다.' })
   @ApiNotFoundResponse({
@@ -313,6 +354,7 @@ export class CourseController {
   getExcludedPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('accessToken') _accessToken: string,
     @Query('category', new ParseEnumPipe(CategorySlug, { optional: true }))
     category?: CategorySlug,
   ): never {
@@ -332,6 +374,12 @@ export class CourseController {
     description: '코스 후보 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '코스에 장소를 추가할 방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '코스 장소 추가',
     description:
@@ -349,7 +397,7 @@ export class CourseController {
       'meetingId, courseCandidateId 형식이 올바르지 않거나 recommendationId가 비어 있습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
   @ApiNotFoundResponse({
@@ -367,6 +415,7 @@ export class CourseController {
   addCoursePlace(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('accessToken') _accessToken: string,
     @Body() _dto: AddCoursePlaceRequestDto,
   ): never {
     throw new NotImplementedException(
@@ -385,6 +434,12 @@ export class CourseController {
     description: '확정할 코스 후보 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '코스를 확정할 방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
   @ApiOperation({
     summary: '최종 코스 확정',
     description:
@@ -397,7 +452,7 @@ export class CourseController {
     description: 'meetingId, courseCandidateId 형식이 올바르지 않습니다.',
   })
   @ApiUnauthorizedResponse({
-    description: '인증 정보가 없거나 유효하지 않습니다.',
+    description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
   @ApiNotFoundResponse({
@@ -414,6 +469,7 @@ export class CourseController {
   confirmCourse(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('accessToken') _accessToken: string,
     @Body() _dto: ConfirmCourseRequestDto,
   ): never {
     throw new NotImplementedException(
