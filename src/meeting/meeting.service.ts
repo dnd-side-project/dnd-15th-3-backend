@@ -13,10 +13,13 @@ import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { Category } from 'src/category/entities/category.entity'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { type Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
+import { MapPinDto } from 'src/place/dto/map-pin.dto'
+import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { Place } from 'src/place/entities/place.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
@@ -39,6 +42,7 @@ import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
+import { MAP_PINS_AVAILABLE_STATUSES } from './meeting-status.constants'
 import type {
   CreateMeetingRequest,
   InvitationPreviewRequest,
@@ -908,6 +912,71 @@ export class MeetingService {
       })),
       recommendations: [],
       selectedCourse: null,
+    }
+  }
+
+  async getMapPins(
+    meetingId: string,
+    accessToken: string,
+  ): Promise<MapPinsResponseDto> {
+    const { meeting } = await this.findParticipant(meetingId, accessToken)
+    this.assertMeetingStatus(
+      meeting.status,
+      MAP_PINS_AVAILABLE_STATUSES,
+      '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
+    )
+
+    const [meetingWithLocation, recommendations] = await Promise.all([
+      this.meetingRepository.findOne({
+        where: { id: meetingId },
+        relations: { meetingLocation: true },
+      }),
+      this.recommendationRepository.find({
+        where: { meeting: { id: meetingId } },
+        relations: { place: { category: true } },
+        order: { createdAt: 'ASC' },
+      }),
+    ])
+    if (!meetingWithLocation?.meetingLocation) {
+      throw new InternalServerErrorException(
+        '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+    }
+
+    return {
+      startPlace: this.toStartPlacePin(meetingWithLocation.meetingLocation),
+      sharedPlaces: recommendations.map((recommendation) =>
+        this.toPlacePin(recommendation.place),
+      ),
+    }
+  }
+
+  private assertMeetingStatus(
+    status: MeetingStatus,
+    allowedStatuses: readonly MeetingStatus[],
+    message: string,
+  ): void {
+    if (!allowedStatuses.includes(status)) {
+      throw new ConflictException(message)
+    }
+  }
+
+  private toStartPlacePin(location: MeetingLocation): MapPinDto {
+    return {
+      name: location.displayName,
+      longitude: location.longitude,
+      latitude: location.latitude,
+    }
+  }
+
+  private toPlacePin(place: Place): MapPinDto {
+    return {
+      placeId: place.id,
+      name: place.name,
+      category: place.category.name,
+      categorySlug: place.category.slug as CategorySlug,
+      longitude: place.longitude,
+      latitude: place.latitude,
     }
   }
 }

@@ -749,4 +749,120 @@ describe('MeetingService', () => {
       )
     })
   })
+
+  describe('getMapPins', () => {
+    it('accessToken이 빈 문자열이면 DB 조회 없이 401을 던진다', async () => {
+      const {
+        service,
+        participantRepository,
+        meetingRepository,
+        recommendationRepository,
+      } = createMeetingService()
+
+      const promise = service.getMapPins('1', '')
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(participantRepository.findOne).not.toHaveBeenCalled()
+      expect(meetingRepository.findOne).not.toHaveBeenCalled()
+      expect(recommendationRepository.find).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      MeetingStatus.RecommendationCollecting,
+      MeetingStatus.CourseGenerating,
+      MeetingStatus.CourseGenerationFailed,
+    ])('%s 상태에서는 시작지와 공유 장소를 함께 반환한다', async (status) => {
+      const {
+        service,
+        participantRepository,
+        meetingRepository,
+        recommendationRepository,
+      } = createMeetingService()
+      participantRepository.findOne.mockResolvedValue({
+        meeting: { status },
+      })
+      meetingRepository.findOne.mockResolvedValue({
+        meetingLocation: {
+          displayName: '강남역',
+          longitude: 127.0276,
+          latitude: 37.4979,
+        },
+      })
+      recommendationRepository.find.mockResolvedValue([
+        {
+          place: {
+            id: 'place-1',
+            name: '성수 카페 모모',
+            longitude: 127.0557,
+            latitude: 37.5446,
+            category: { name: '카페', slug: CategorySlug.Cafe },
+          },
+        },
+      ])
+
+      await expect(service.getMapPins('1', 'token')).resolves.toEqual({
+        startPlace: {
+          name: '강남역',
+          longitude: 127.0276,
+          latitude: 37.4979,
+        },
+        sharedPlaces: [
+          {
+            placeId: 'place-1',
+            name: '성수 카페 모모',
+            category: '카페',
+            categorySlug: CategorySlug.Cafe,
+            longitude: 127.0557,
+            latitude: 37.5446,
+          },
+        ],
+      })
+      expect(meetingRepository.findOne).toHaveBeenCalledWith({
+        where: { id: '1' },
+        relations: { meetingLocation: true },
+      })
+      expect(recommendationRepository.find).toHaveBeenCalledWith({
+        where: { meeting: { id: '1' } },
+        relations: { place: { category: true } },
+        order: { createdAt: 'ASC' },
+      })
+    })
+
+    it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(
+      '%s 상태에서는 DB 조회 없이 409를 던진다',
+      async (status) => {
+        const {
+          service,
+          participantRepository,
+          meetingRepository,
+          recommendationRepository,
+        } = createMeetingService()
+        participantRepository.findOne.mockResolvedValue({
+          meeting: { status },
+        })
+
+        const promise = service.getMapPins('1', 'token')
+
+        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        expect(meetingRepository.findOne).not.toHaveBeenCalled()
+        expect(recommendationRepository.find).not.toHaveBeenCalled()
+      },
+    )
+
+    it('모임은 있지만 시작지 정보가 없으면 데이터 정합성 오류로 500을 던진다', async () => {
+      const { service, participantRepository, meetingRepository } =
+        createMeetingService()
+      participantRepository.findOne.mockResolvedValue({
+        meeting: { status: MeetingStatus.RecommendationCollecting },
+      })
+      meetingRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.getMapPins('1', 'token')
+
+      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toThrow(
+        '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+    })
+  })
 })

@@ -25,6 +25,7 @@ function createController() {
     joinMeeting: jest.fn().mockResolvedValue({}),
     getMeetingDetail: jest.fn().mockResolvedValue({}),
     getMeetingStatus: jest.fn().mockResolvedValue({}),
+    getMapPins: jest.fn().mockResolvedValue({}),
   } as unknown as MeetingService
 
   return {
@@ -48,12 +49,21 @@ describe('MeetingController', () => {
     expect(meetingService.getMeetingStatus).toHaveBeenCalledWith('1', 'token')
   })
 
+  it('전체 지도 핀 조회는 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = {
+      startPlace: { name: '강남역', longitude: 127.0276, latitude: 37.4979 },
+      sharedPlaces: [],
+    }
+    ;(meetingService.getMapPins as jest.Mock).mockResolvedValue(expected)
+
+    await expect(controller.getMapPins('1', 'token')).resolves.toEqual(expected)
+    expect(meetingService.getMapPins).toHaveBeenCalledWith('1', 'token')
+  })
+
   it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
     const { controller } = createController()
 
-    expect(() => controller.getMapPins('1', 'token')).toThrow(
-      NotImplementedException,
-    )
     expect(() => controller.getPlaces('1', 'token')).toThrow(
       NotImplementedException,
     )
@@ -94,6 +104,7 @@ describe('MeetingController', () => {
             previewInvitation: jest.fn(),
             joinMeeting: jest.fn(),
             getMeetingStatus: jest.fn(),
+            getMapPins: jest.fn(),
           },
         },
       ],
@@ -126,7 +137,7 @@ describe('MeetingController', () => {
       | PathOperations
       | undefined
     expect(responseCodes(mapPinsPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '500'].sort(),
     )
 
     const placesPath = document.paths?.['/meetings/{meetingId}/places'] as
@@ -190,6 +201,19 @@ describe('MeetingController', () => {
     expect(Object.keys(mapPinsSchema?.properties ?? {})).toEqual(
       expect.arrayContaining(['startPlace', 'sharedPlaces']),
     )
+
+    const mapPinSchema = document.components?.schemas?.MapPinDto as
+      | (SchemaWithProperties & { required?: string[] })
+      | undefined
+    expect(Object.keys(mapPinSchema?.properties ?? {})).toEqual([
+      'placeId',
+      'name',
+      'category',
+      'categorySlug',
+      'longitude',
+      'latitude',
+    ])
+    expect(mapPinSchema?.required).toEqual(['name', 'longitude', 'latitude'])
 
     const addPlaceRequestSchema = document.components?.schemas
       ?.AddPlaceRequestDto as SchemaWithProperties | undefined

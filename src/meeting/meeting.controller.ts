@@ -407,17 +407,15 @@ export class MeetingController {
     description:
       '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  @ApiInternalServerErrorResponse({
+    description:
+      '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
   })
   getMapPins(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new NotImplementedException(
-      '전체 지도 핀 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    @Query('accessToken') accessToken: string,
+  ): Promise<MapPinsResponseDto> {
+    return this.meetingService.getMapPins(meetingId, accessToken)
   }
 
   @Get(':meetingId/places')
