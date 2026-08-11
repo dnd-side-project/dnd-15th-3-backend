@@ -15,3 +15,7 @@ export const PLACE_PREFERENCE_EDITABLE_STATUSES: readonly MeetingStatus[] = [
 export const COURSE_CANDIDATES_VISIBLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.CourseGenerated,
 ]
+
+export const COURSE_COMMENTS_VISIBLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.CourseGenerated,
+]

@@ -4,10 +4,14 @@ import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
 import { CourseController } from './course.controller'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
+import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
 import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recommendation-vote.repository'
 
 @Module({
-  imports: [MeetingAccessModule, TypeOrmModule.forFeature([CourseCandidate])],
+  imports: [
+    MeetingAccessModule,
+    TypeOrmModule.forFeature([CourseCandidate, CourseCandidateComment]),
+  ],
   controllers: [CourseController],
   providers: [MeetingPlaceRecommendationVoteRepository, CourseService],
   exports: [MeetingPlaceRecommendationVoteRepository],
