@@ -18,6 +18,8 @@ import { type Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
+import { PreferenceType } from 'src/course/enums/preference-type.enum'
+import { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
 import { MapPinDto } from 'src/place/dto/map-pin.dto'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { Place } from 'src/place/entities/place.entity'
@@ -35,6 +37,7 @@ import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.
 import { MeetingLocationResponseDto } from './dto/meeting-location.dto'
 import { MeetingScreenResponseDto } from './dto/meeting-screen-response.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
+import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
 import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
 import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
@@ -42,7 +45,10 @@ import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
-import { MAP_PINS_AVAILABLE_STATUSES } from './meeting-status.constants'
+import {
+  MAP_PINS_VISIBLE_STATUSES,
+  PLACE_PREFERENCE_EDITABLE_STATUSES,
+} from './meeting-status.constants'
 import type {
   CreateMeetingRequest,
   InvitationPreviewRequest,
@@ -70,6 +76,7 @@ export class MeetingService {
     private readonly meetingRepository: Repository<Meeting>,
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
+    private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
   ) {}
 
   async createMeeting(
@@ -922,7 +929,7 @@ export class MeetingService {
     const { meeting } = await this.findParticipant(meetingId, accessToken)
     this.assertMeetingStatus(
       meeting.status,
-      MAP_PINS_AVAILABLE_STATUSES,
+      MAP_PINS_VISIBLE_STATUSES,
       '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
     )
 
@@ -978,5 +985,35 @@ export class MeetingService {
       longitude: place.longitude,
       latitude: place.latitude,
     }
+  }
+
+  async updatePlacePreference(
+    meetingId: string,
+    recommendationId: string,
+    accessToken: string,
+    preference: PreferenceType | null,
+  ): Promise<PlacePreferenceResponseDto> {
+    const participant = await this.findParticipant(meetingId, accessToken)
+    this.assertMeetingStatus(
+      participant.meeting.status,
+      PLACE_PREFERENCE_EDITABLE_STATUSES,
+      '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
+    )
+
+    const recommendationExists = await this.recommendationRepository.exists({
+      where: { id: recommendationId, meeting: { id: meetingId } },
+    })
+    if (!recommendationExists) {
+      throw new NotFoundException('추천 장소를 찾을 수 없습니다.')
+    }
+
+    const { likeCount, dislikeCount } =
+      await this.voteRepository.applyPreference(
+        recommendationId,
+        participant.id,
+        preference,
+      )
+
+    return { likeCount, dislikeCount, myPreference: preference }
   }
 }

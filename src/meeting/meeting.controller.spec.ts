@@ -26,6 +26,7 @@ function createController() {
     getMeetingDetail: jest.fn().mockResolvedValue({}),
     getMeetingStatus: jest.fn().mockResolvedValue({}),
     getMapPins: jest.fn().mockResolvedValue({}),
+    updatePlacePreference: jest.fn().mockResolvedValue({}),
   } as unknown as MeetingService
 
   return {
@@ -61,6 +62,30 @@ describe('MeetingController', () => {
     expect(meetingService.getMapPins).toHaveBeenCalledWith('1', 'token')
   })
 
+  it('장소 반응 설정은 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = {
+      likeCount: 1,
+      dislikeCount: 0,
+      myPreference: PreferenceType.Like,
+    }
+    ;(meetingService.updatePlacePreference as jest.Mock).mockResolvedValue(
+      expected,
+    )
+
+    await expect(
+      controller.updatePlacePreference('1', '2', 'token', {
+        preference: PreferenceType.Like,
+      }),
+    ).resolves.toEqual(expected)
+    expect(meetingService.updatePlacePreference).toHaveBeenCalledWith(
+      '1',
+      '2',
+      'token',
+      PreferenceType.Like,
+    )
+  })
+
   it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
     const { controller } = createController()
 
@@ -70,11 +95,6 @@ describe('MeetingController', () => {
     expect(() => controller.addPlace('1', 'token', { placeId: '2' })).toThrow(
       NotImplementedException,
     )
-    expect(() =>
-      controller.updatePlacePreference('1', '2', 'token', {
-        preference: PreferenceType.Like,
-      }),
-    ).toThrow(NotImplementedException)
     expect(() =>
       controller.updateCourseImage('1', 'token', {
         courseImageKey: 'course-cards/1/5.png',
@@ -105,6 +125,7 @@ describe('MeetingController', () => {
             joinMeeting: jest.fn(),
             getMeetingStatus: jest.fn(),
             getMapPins: jest.fn(),
+            updatePlacePreference: jest.fn(),
           },
         },
       ],
@@ -154,7 +175,7 @@ describe('MeetingController', () => {
       '/meetings/{meetingId}/places/{recommendationId}/preference'
     ] as PathOperations | undefined
     expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409'].sort(),
     )
 
     const courseImagePath = document.paths?.[

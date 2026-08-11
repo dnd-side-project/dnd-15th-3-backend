@@ -575,18 +575,17 @@ export class MeetingController {
     description:
       '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
   updatePlacePreference(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('recommendationId', BigIntStringPipe) recommendationId: string,
-    @Query('accessToken') _accessToken: string,
-    @Body() _dto: UpdatePlacePreferenceRequestDto,
-  ): never {
-    throw new NotImplementedException(
-      '장소 반응 설정 API는 실제 데이터 연동 후 제공됩니다.',
+    @Query('accessToken') accessToken: string,
+    @Body() dto: UpdatePlacePreferenceRequestDto,
+  ): Promise<PlacePreferenceResponseDto> {
+    return this.meetingService.updatePlacePreference(
+      meetingId,
+      recommendationId,
+      accessToken,
+      dto.preference,
     )
   }
 

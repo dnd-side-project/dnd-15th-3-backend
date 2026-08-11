@@ -11,6 +11,8 @@ import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import type { Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { PreferenceType } from 'src/course/enums/preference-type.enum'
+import type { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import type { PlaceSyncService } from 'src/place/sync/place-sync.service'
 import { User } from 'src/user/entities/user.entity'
@@ -65,6 +67,7 @@ function createMeetingService() {
     find: jest.fn(),
     create: jest.fn((value) => value),
     save: jest.fn(),
+    exists: jest.fn(),
   }
   const dataSource = {
     transaction: jest.fn(),
@@ -77,6 +80,9 @@ function createMeetingService() {
   const courseCandidateRepository = {
     findOne: jest.fn(),
   }
+  const voteRepository = {
+    applyPreference: jest.fn(),
+  }
 
   const service = new MeetingService(
     config as unknown as ConfigService<Env, true>,
@@ -87,6 +93,7 @@ function createMeetingService() {
     recommendationRepository as never,
     meetingRepository as unknown as Repository<Meeting>,
     courseCandidateRepository as unknown as Repository<CourseCandidate>,
+    voteRepository as unknown as MeetingPlaceRecommendationVoteRepository,
   )
 
   return {
@@ -99,6 +106,7 @@ function createMeetingService() {
     dataSource,
     meetingRepository,
     courseCandidateRepository,
+    voteRepository,
   }
 }
 
@@ -863,6 +871,155 @@ describe('MeetingService', () => {
       await expect(promise).rejects.toThrow(
         '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
+    })
+  })
+
+  describe('updatePlacePreference', () => {
+    it('accessToken이 빈 문자열이면 DB 조회 없이 401을 던진다', async () => {
+      const {
+        service,
+        participantRepository,
+        recommendationRepository,
+        voteRepository,
+      } = createMeetingService()
+
+      const promise = service.updatePlacePreference(
+        '1',
+        '2',
+        '',
+        PreferenceType.Like,
+      )
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(participantRepository.findOne).not.toHaveBeenCalled()
+      expect(recommendationRepository.exists).not.toHaveBeenCalled()
+      expect(voteRepository.applyPreference).not.toHaveBeenCalled()
+    })
+
+    it.each([MeetingStatus.CourseGenerating, MeetingStatus.CourseConfirmed])(
+      '%s 상태에서는 DB 조회 없이 409를 던진다',
+      async (status) => {
+        const {
+          service,
+          participantRepository,
+          recommendationRepository,
+          voteRepository,
+        } = createMeetingService()
+        participantRepository.findOne.mockResolvedValue({
+          id: 'participant-1',
+          meeting: { status },
+        })
+
+        const promise = service.updatePlacePreference(
+          '1',
+          '2',
+          'token',
+          PreferenceType.Like,
+        )
+
+        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        expect(recommendationRepository.exists).not.toHaveBeenCalled()
+        expect(voteRepository.applyPreference).not.toHaveBeenCalled()
+      },
+    )
+
+    it('추천 장소가 해당 모임 소속이 아니면 404를 던진다', async () => {
+      const {
+        service,
+        participantRepository,
+        recommendationRepository,
+        voteRepository,
+      } = createMeetingService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { status: MeetingStatus.RecommendationCollecting },
+      })
+      recommendationRepository.exists.mockResolvedValue(false)
+
+      const promise = service.updatePlacePreference(
+        '1',
+        '2',
+        'token',
+        PreferenceType.Like,
+      )
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      expect(recommendationRepository.exists).toHaveBeenCalledWith({
+        where: { id: '2', meeting: { id: '1' } },
+      })
+      expect(voteRepository.applyPreference).not.toHaveBeenCalled()
+    })
+
+    it('검증을 통과하면 voteRepository에 위임하고 결과를 응답 형태로 반환한다', async () => {
+      const {
+        service,
+        participantRepository,
+        recommendationRepository,
+        voteRepository,
+      } = createMeetingService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { status: MeetingStatus.RecommendationCollecting },
+      })
+      recommendationRepository.exists.mockResolvedValue(true)
+      voteRepository.applyPreference.mockResolvedValue({
+        likeCount: 3,
+        dislikeCount: 1,
+      })
+
+      const result = await service.updatePlacePreference(
+        '1',
+        '2',
+        'token',
+        PreferenceType.Like,
+      )
+
+      expect(voteRepository.applyPreference).toHaveBeenCalledWith(
+        '2',
+        'participant-1',
+        PreferenceType.Like,
+      )
+      expect(result).toEqual({
+        likeCount: 3,
+        dislikeCount: 1,
+        myPreference: PreferenceType.Like,
+      })
+    })
+
+    it('preference가 null이어도 그대로 voteRepository에 위임한다', async () => {
+      const {
+        service,
+        participantRepository,
+        recommendationRepository,
+        voteRepository,
+      } = createMeetingService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { status: MeetingStatus.CourseGenerated },
+      })
+      recommendationRepository.exists.mockResolvedValue(true)
+      voteRepository.applyPreference.mockResolvedValue({
+        likeCount: 0,
+        dislikeCount: 0,
+      })
+
+      const result = await service.updatePlacePreference(
+        '1',
+        '2',
+        'token',
+        null,
+      )
+
+      expect(voteRepository.applyPreference).toHaveBeenCalledWith(
+        '2',
+        'participant-1',
+        null,
+      )
+      expect(result).toEqual({
+        likeCount: 0,
+        dislikeCount: 0,
+        myPreference: null,
+      })
     })
   })
 })
