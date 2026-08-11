@@ -231,11 +231,11 @@ describe('MeetingController', () => {
       Object.keys(updateCourseImageRequestSchema?.properties ?? {}),
     ).toEqual(['courseImageKey'])
 
-    const placeSearchResponseSchema = document.components?.schemas
-      ?.PlaceSearchResponseDto as
+    const similarPlaceResponseSchema = document.components?.schemas
+      ?.SimilarPlaceResponseDto as
       | (SchemaWithProperties & SchemaWithNullableProperties)
       | undefined
-    expect(Object.keys(placeSearchResponseSchema?.properties ?? {})).toEqual([
+    expect(Object.keys(similarPlaceResponseSchema?.properties ?? {})).toEqual([
       'id',
       'categoryId',
       'name',
@@ -246,7 +246,7 @@ describe('MeetingController', () => {
       'previewUrl',
     ])
     expect(
-      placeSearchResponseSchema?.properties?.primaryImageUrl?.nullable,
+      similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
     ).toBe(true)
 
     await app.close()

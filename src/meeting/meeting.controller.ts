@@ -28,7 +28,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { PlaceSearchResponseDto } from 'src/catalog/dto/place-search-response.dto'
+import { SimilarPlaceResponseDto } from 'src/catalog/dto/similar-place-response.dto'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
@@ -683,7 +683,7 @@ export class MeetingController {
       '기준 장소와 같은 카테고리이면서 일정 반경 이내에 있는 장소를 무작위로 추천합니다. ' +
       '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있습니다.',
   })
-  @ApiOkResponse({ type: PlaceSearchResponseDto, isArray: true })
+  @ApiOkResponse({ type: SimilarPlaceResponseDto, isArray: true })
   @ApiBadRequestResponse({
     description:
       'meetingId, placeId 형식이 올바르지 않거나 excludeIds, size 값이 유효하지 않습니다.',

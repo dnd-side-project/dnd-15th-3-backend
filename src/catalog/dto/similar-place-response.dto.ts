@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 
-export class PlaceSearchResponseDto {
+export class SimilarPlaceResponseDto {
   @ApiProperty({ description: '장소 ID', example: '101' })
   id!: string
 
