@@ -27,6 +27,7 @@ import {
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger'
+import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
@@ -380,7 +381,7 @@ export class CourseController {
     description:
       '제외된 장소 목록에서 고른 장소를 코스에 바로 반영합니다. ' +
       '방장만 호출할 수 있고, 모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다. ' +
-      '코스는 최대 6개의 장소로 구성되며, 이미 6개인 경우 추가할 수 없습니다.',
+      `코스는 최대 ${MAX_COURSE_STEPS}개의 장소로 구성되며, 이미 ${MAX_COURSE_STEPS}개인 경우 추가할 수 없습니다.`,
   })
   @ApiBody({ type: AddCoursePlaceRequestDto })
   @ApiCreatedResponse({
@@ -401,7 +402,7 @@ export class CourseController {
   @ApiConflictResponse({
     description:
       '모임이 코스 생성 완료 상태가 아니거나, 이미 코스에 포함된 장소이거나, ' +
-      '코스에 이미 장소가 6개 있어서 추가할 수 없습니다.',
+      `코스에 이미 장소가 ${MAX_COURSE_STEPS}개 있어서 추가할 수 없습니다.`,
   })
   @ApiResponse({
     status: 501,
