@@ -40,6 +40,7 @@ import { CourseCommentDto } from './dto/course-comment.dto'
 import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
 import { CourseRouteStepDto } from './dto/course-route-step.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
+import { CreateCourseCommentResponseDto } from './dto/create-course-comment-response.dto'
 import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
 
 @ApiTags('코스')
@@ -266,7 +267,7 @@ export class CourseController {
       '모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다.',
   })
   @ApiBody({ type: CreateCourseCommentRequestDto })
-  @ApiCreatedResponse({ type: CourseCommentDto })
+  @ApiCreatedResponse({ type: CreateCourseCommentResponseDto })
   @ApiBadRequestResponse({
     description:
       'meetingId, courseCandidateId 형식이 올바르지 않거나 content가 비어 있거나 300자를 초과합니다.',
