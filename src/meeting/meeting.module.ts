@@ -8,6 +8,7 @@ import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-re
 import { Place } from 'src/place/entities/place.entity'
 import { PlaceModule } from 'src/place/place.module'
 import { User } from 'src/user/entities/user.entity'
+import { MeetingAccessModule } from './access/meeting-access.module'
 import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
 import { MeetingParticipant } from './entities/meeting-participant.entity'
@@ -22,6 +23,7 @@ import { MeetingService } from './meeting.service'
   imports: [
     PlaceModule,
     CourseModule,
+    MeetingAccessModule,
     TypeOrmModule.forFeature([
       Category,
       CourseCandidate,

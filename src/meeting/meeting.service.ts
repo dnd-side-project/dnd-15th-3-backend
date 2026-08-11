@@ -32,6 +32,15 @@ import {
 import { PlaceSyncService } from 'src/place/sync/place-sync.service'
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
+import { MeetingAccessService } from './access/meeting-access.service'
+import {
+  assertAccessToken,
+  assertMeetingStatus,
+} from './access/meeting-access.utils'
+import {
+  MAP_PINS_VISIBLE_STATUSES,
+  PLACE_PREFERENCE_EDITABLE_STATUSES,
+} from './constants/meeting-status.constants'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import { MeetingLocationResponseDto } from './dto/meeting-location.dto'
@@ -45,10 +54,6 @@ import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
-import {
-  MAP_PINS_VISIBLE_STATUSES,
-  PLACE_PREFERENCE_EDITABLE_STATUSES,
-} from './meeting-status.constants'
 import type {
   CreateMeetingRequest,
   InvitationPreviewRequest,
@@ -77,6 +82,7 @@ export class MeetingService {
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
     private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
+    private readonly meetingAccessService: MeetingAccessService,
   ) {}
 
   async createMeeting(
@@ -304,7 +310,7 @@ export class MeetingService {
     meetingId: string,
     accessToken: string,
   ): Promise<CoursePlanResponseDto> {
-    await this.findParticipant(meetingId, accessToken)
+    await this.meetingAccessService.findParticipant(meetingId, accessToken)
 
     const [meeting, steps] = await Promise.all([
       this.dataSource.getRepository(Meeting).findOne({
@@ -328,7 +334,7 @@ export class MeetingService {
     accessToken: string,
     request: UpdateCoursePlanRequest,
   ): Promise<CoursePlanResponseDto> {
-    this.assertAccessToken(accessToken)
+    assertAccessToken(accessToken)
     const normalizedAccessToken = accessToken.trim()
 
     const result = await this.dataSource.transaction(async (manager) => {
@@ -405,7 +411,7 @@ export class MeetingService {
     accessToken: string,
     input: MeetingLocationInput,
   ): Promise<MeetingLocationResponseDto> {
-    this.assertAccessToken(accessToken)
+    assertAccessToken(accessToken)
     const normalizedAccessToken = accessToken.trim()
 
     return this.dataSource.transaction(async (manager) => {
@@ -486,7 +492,7 @@ export class MeetingService {
     accessToken: string,
     request: AddRecommendationRequest,
   ): Promise<RecommendationPreviewDto> {
-    this.assertAccessToken(accessToken)
+    assertAccessToken(accessToken)
     const normalizedAccessToken = accessToken.trim()
     const participant = await this.participantRepository.findOne({
       where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
@@ -568,7 +574,7 @@ export class MeetingService {
     meetingId: string,
     accessToken: string,
   ): Promise<RecommendationPreviewDto[]> {
-    this.assertAccessToken(accessToken)
+    assertAccessToken(accessToken)
     const normalizedAccessToken = accessToken.trim()
     const participant = await this.participantRepository.findOne({
       where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
@@ -592,7 +598,10 @@ export class MeetingService {
     meetingId: string,
     accessToken: string,
   ): Promise<MeetingStatusResponseDto> {
-    const { meeting } = await this.findParticipant(meetingId, accessToken)
+    const { meeting } = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
 
     const confirmedCourseCandidateId =
       meeting.status === MeetingStatus.CourseConfirmed
@@ -616,35 +625,14 @@ export class MeetingService {
     return confirmed.id
   }
 
-  private async findParticipant(
-    meetingId: string,
-    accessToken: string,
-  ): Promise<MeetingParticipant> {
-    this.assertAccessToken(accessToken)
-    const participant = await this.participantRepository.findOne({
-      where: {
-        meeting: { id: meetingId },
-        accessToken: accessToken.trim(),
-      },
-      relations: { user: true, meeting: true },
-    })
-    if (!participant) {
-      const meetingExists = await this.meetingRepository.exists({
-        where: { id: meetingId },
-      })
-      if (!meetingExists) {
-        throw new NotFoundException('모임을 찾을 수 없습니다.')
-      }
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
-    }
-    return participant
-  }
-
   private async getMeetingScreen(
     meetingId: string,
     accessToken: string,
   ): Promise<MeetingScreenResponseDto> {
-    const viewer = await this.findParticipant(meetingId, accessToken)
+    const viewer = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
     const meeting = await this.dataSource.getRepository(Meeting).findOne({
       where: { id: meetingId },
       relations: { meetingType: true, meetingLocation: true },
@@ -804,12 +792,6 @@ export class MeetingService {
     return randomBytes(32).toString('hex')
   }
 
-  private assertAccessToken(accessToken: string): void {
-    if (!accessToken?.trim()) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
-    }
-  }
-
   private isUniqueViolation(error: unknown): boolean {
     if (typeof error !== 'object' || error === null) return false
     if (!('driverError' in error)) return false
@@ -926,8 +908,11 @@ export class MeetingService {
     meetingId: string,
     accessToken: string,
   ): Promise<MapPinsResponseDto> {
-    const { meeting } = await this.findParticipant(meetingId, accessToken)
-    this.assertMeetingStatus(
+    const { meeting } = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    assertMeetingStatus(
       meeting.status,
       MAP_PINS_VISIBLE_STATUSES,
       '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
@@ -958,16 +943,6 @@ export class MeetingService {
     }
   }
 
-  private assertMeetingStatus(
-    status: MeetingStatus,
-    allowedStatuses: readonly MeetingStatus[],
-    message: string,
-  ): void {
-    if (!allowedStatuses.includes(status)) {
-      throw new ConflictException(message)
-    }
-  }
-
   private toStartPlacePin(location: MeetingLocation): MapPinDto {
     return {
       name: location.displayName,
@@ -993,8 +968,11 @@ export class MeetingService {
     accessToken: string,
     preference: PreferenceType | null,
   ): Promise<PlacePreferenceResponseDto> {
-    const participant = await this.findParticipant(meetingId, accessToken)
-    this.assertMeetingStatus(
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    assertMeetingStatus(
       participant.meeting.status,
       PLACE_PREFERENCE_EDITABLE_STATUSES,
       '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',

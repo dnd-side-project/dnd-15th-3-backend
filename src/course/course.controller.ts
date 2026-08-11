@@ -17,6 +17,7 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -31,6 +32,7 @@ import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
+import { CourseService } from './course.service'
 import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
 import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
@@ -44,6 +46,8 @@ import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response
 @ApiTags('코스')
 @Controller('meetings')
 export class CourseController {
+  constructor(private readonly courseService: CourseService) {}
+
   @Post(':meetingId/courses')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiParam({
@@ -127,17 +131,15 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 코스 후보 목록을 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  @ApiInternalServerErrorResponse({
+    description:
+      '코스 생성이 완료된 모임인데 코스 후보를 찾을 수 없는 데이터 정합성 오류입니다.',
   })
   getCourseCandidates(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new NotImplementedException(
-      '코스 후보 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    @Query('accessToken') accessToken: string,
+  ): Promise<CourseCandidateListResponseDto> {
+    return this.courseService.getCourseCandidates(meetingId, accessToken)
   }
 
   @Get(':meetingId/courses/:courseCandidateId')

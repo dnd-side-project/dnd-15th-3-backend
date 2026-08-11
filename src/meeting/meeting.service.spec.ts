@@ -18,6 +18,7 @@ import type { PlaceSyncService } from 'src/place/sync/place-sync.service'
 import { User } from 'src/user/entities/user.entity'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import type { Repository } from 'typeorm'
+import type { MeetingAccessService } from './access/meeting-access.service'
 import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
 import { MeetingParticipant } from './entities/meeting-participant.entity'
@@ -83,6 +84,9 @@ function createMeetingService() {
   const voteRepository = {
     applyPreference: jest.fn(),
   }
+  const meetingAccessService = {
+    findParticipant: jest.fn(),
+  }
 
   const service = new MeetingService(
     config as unknown as ConfigService<Env, true>,
@@ -94,6 +98,7 @@ function createMeetingService() {
     meetingRepository as unknown as Repository<Meeting>,
     courseCandidateRepository as unknown as Repository<CourseCandidate>,
     voteRepository as unknown as MeetingPlaceRecommendationVoteRepository,
+    meetingAccessService as unknown as MeetingAccessService,
   )
 
   return {
@@ -107,6 +112,7 @@ function createMeetingService() {
     meetingRepository,
     courseCandidateRepository,
     voteRepository,
+    meetingAccessService,
   }
 }
 
@@ -151,6 +157,7 @@ describe('MeetingService', () => {
       dataSource,
       participantRepository,
       recommendationRepository,
+      meetingAccessService,
     } = createMeetingService()
     const meetingType = {
       id: 'type-1',
@@ -237,6 +244,7 @@ describe('MeetingService', () => {
 
     participantRepository.findOne.mockResolvedValue(guest)
     participantRepository.find.mockResolvedValue([host, guest])
+    meetingAccessService.findParticipant.mockResolvedValue(guest)
     recommendationRepository.find.mockResolvedValue([])
     const stepRepository = {
       find: jest.fn().mockResolvedValue([
@@ -605,83 +613,25 @@ describe('MeetingService', () => {
   })
 
   describe('getMeetingStatus', () => {
-    it('accessToken이 빈 문자열이면 DB 조회 없이 401을 던진다', async () => {
-      const { service, participantRepository, meetingRepository } =
-        createMeetingService()
-
-      const promise = service.getMeetingStatus('1', '')
-
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
-      await expect(promise).rejects.toThrow(
-        '모임 참여자 토큰이 유효하지 않습니다.',
+    it('참여자 검증에 실패하면 그대로 전파한다', async () => {
+      const { service, meetingAccessService } = createMeetingService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
       )
-      expect(participantRepository.findOne).not.toHaveBeenCalled()
-      expect(meetingRepository.exists).not.toHaveBeenCalled()
-    })
-
-    it('accessToken이 공백 문자열이면 DB 조회 없이 401을 던진다', async () => {
-      const { service, participantRepository } = createMeetingService()
-
-      const promise = service.getMeetingStatus('1', '   ')
-
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
-      await expect(promise).rejects.toThrow(
-        '모임 참여자 토큰이 유효하지 않습니다.',
-      )
-      expect(participantRepository.findOne).not.toHaveBeenCalled()
-    })
-
-    it('참여자를 찾지 못했지만 모임은 존재하면 토큰 무효 401을 던진다', async () => {
-      const { service, participantRepository, meetingRepository } =
-        createMeetingService()
-      participantRepository.findOne.mockResolvedValue(null)
-      meetingRepository.exists.mockResolvedValue(true)
 
       const promise = service.getMeetingStatus('1', 'bad-token')
 
       await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
-      await expect(promise).rejects.toThrow(
-        '모임 참여자 토큰이 유효하지 않습니다.',
+      expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
+        '1',
+        'bad-token',
       )
-      expect(participantRepository.findOne).toHaveBeenCalledWith({
-        where: { meeting: { id: '1' }, accessToken: 'bad-token' },
-        relations: { user: true, meeting: true },
-      })
-      expect(meetingRepository.exists).toHaveBeenCalledWith({
-        where: { id: '1' },
-      })
-    })
-
-    it('참여자를 찾지 못하고 모임도 존재하지 않으면 404를 던진다', async () => {
-      const { service, participantRepository, meetingRepository } =
-        createMeetingService()
-      participantRepository.findOne.mockResolvedValue(null)
-      meetingRepository.exists.mockResolvedValue(false)
-
-      const promise = service.getMeetingStatus('999', 'token')
-
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
-      await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
-    })
-
-    it('accessToken 앞뒤 공백을 제거하고 조회한다', async () => {
-      const { service, participantRepository } = createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
-        meeting: { status: MeetingStatus.RecommendationCollecting },
-      })
-
-      await service.getMeetingStatus('1', '  token  ')
-
-      expect(participantRepository.findOne).toHaveBeenCalledWith({
-        where: { meeting: { id: '1' }, accessToken: 'token' },
-        relations: { user: true, meeting: true },
-      })
     })
 
     it('확정 상태가 아니면 코스 후보를 조회하지 않고 null을 반환한다', async () => {
-      const { service, participantRepository, courseCandidateRepository } =
+      const { service, meetingAccessService, courseCandidateRepository } =
         createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      meetingAccessService.findParticipant.mockResolvedValue({
         meeting: { status: MeetingStatus.CourseGenerating },
       })
 
@@ -697,9 +647,11 @@ describe('MeetingService', () => {
       MeetingStatus.CourseGenerated,
       MeetingStatus.CourseGenerationFailed,
     ])('%s 상태에서도 코스 후보를 조회하지 않는다', async (status) => {
-      const { service, participantRepository, courseCandidateRepository } =
+      const { service, meetingAccessService, courseCandidateRepository } =
         createMeetingService()
-      participantRepository.findOne.mockResolvedValue({ meeting: { status } })
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: { status },
+      })
 
       await expect(
         service.getMeetingStatus('1', 'token'),
@@ -707,26 +659,10 @@ describe('MeetingService', () => {
       expect(courseCandidateRepository.findOne).not.toHaveBeenCalled()
     })
 
-    it('참여자를 정상적으로 찾으면 모임 존재 여부를 별도로 확인하지 않는다', async () => {
-      const { service, participantRepository, meetingRepository } =
-        createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
-        meeting: { status: MeetingStatus.RecommendationCollecting },
-      })
-
-      await service.getMeetingStatus('1', 'token')
-
-      expect(meetingRepository.exists).not.toHaveBeenCalled()
-    })
-
     it('확정 상태면 isSelected 코스 후보 ID를 함께 반환한다', async () => {
-      const {
-        service,
-        participantRepository,
-        courseCandidateRepository,
-        meetingRepository,
-      } = createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      const { service, meetingAccessService, courseCandidateRepository } =
+        createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
         meeting: { status: MeetingStatus.CourseConfirmed },
       })
       courseCandidateRepository.findOne.mockResolvedValue({ id: '5' })
@@ -738,13 +674,12 @@ describe('MeetingService', () => {
       expect(courseCandidateRepository.findOne).toHaveBeenCalledWith({
         where: { meeting: { id: '1' }, isSelected: true },
       })
-      expect(meetingRepository.exists).not.toHaveBeenCalled()
     })
 
     it('확정 상태인데 선택된 코스 후보가 없으면 데이터 정합성 오류로 500을 던진다', async () => {
-      const { service, participantRepository, courseCandidateRepository } =
+      const { service, meetingAccessService, courseCandidateRepository } =
         createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      meetingAccessService.findParticipant.mockResolvedValue({
         meeting: { status: MeetingStatus.CourseConfirmed },
       })
       courseCandidateRepository.findOne.mockResolvedValue(null)
@@ -759,18 +694,20 @@ describe('MeetingService', () => {
   })
 
   describe('getMapPins', () => {
-    it('accessToken이 빈 문자열이면 DB 조회 없이 401을 던진다', async () => {
+    it('참여자 검증에 실패하면 DB 조회 없이 그대로 전파한다', async () => {
       const {
         service,
-        participantRepository,
+        meetingAccessService,
         meetingRepository,
         recommendationRepository,
       } = createMeetingService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+      )
 
       const promise = service.getMapPins('1', '')
 
       await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
-      expect(participantRepository.findOne).not.toHaveBeenCalled()
       expect(meetingRepository.findOne).not.toHaveBeenCalled()
       expect(recommendationRepository.find).not.toHaveBeenCalled()
     })
@@ -782,11 +719,11 @@ describe('MeetingService', () => {
     ])('%s 상태에서는 시작지와 공유 장소를 함께 반환한다', async (status) => {
       const {
         service,
-        participantRepository,
+        meetingAccessService,
         meetingRepository,
         recommendationRepository,
       } = createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      meetingAccessService.findParticipant.mockResolvedValue({
         meeting: { status },
       })
       meetingRepository.findOne.mockResolvedValue({
@@ -841,11 +778,11 @@ describe('MeetingService', () => {
       async (status) => {
         const {
           service,
-          participantRepository,
+          meetingAccessService,
           meetingRepository,
           recommendationRepository,
         } = createMeetingService()
-        participantRepository.findOne.mockResolvedValue({
+        meetingAccessService.findParticipant.mockResolvedValue({
           meeting: { status },
         })
 
@@ -858,9 +795,9 @@ describe('MeetingService', () => {
     )
 
     it('모임은 있지만 시작지 정보가 없으면 데이터 정합성 오류로 500을 던진다', async () => {
-      const { service, participantRepository, meetingRepository } =
+      const { service, meetingAccessService, meetingRepository } =
         createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      meetingAccessService.findParticipant.mockResolvedValue({
         meeting: { status: MeetingStatus.RecommendationCollecting },
       })
       meetingRepository.findOne.mockResolvedValue(null)
@@ -875,13 +812,16 @@ describe('MeetingService', () => {
   })
 
   describe('updatePlacePreference', () => {
-    it('accessToken이 빈 문자열이면 DB 조회 없이 401을 던진다', async () => {
+    it('참여자 검증에 실패하면 DB 조회 없이 그대로 전파한다', async () => {
       const {
         service,
-        participantRepository,
+        meetingAccessService,
         recommendationRepository,
         voteRepository,
       } = createMeetingService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+      )
 
       const promise = service.updatePlacePreference(
         '1',
@@ -891,7 +831,6 @@ describe('MeetingService', () => {
       )
 
       await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
-      expect(participantRepository.findOne).not.toHaveBeenCalled()
       expect(recommendationRepository.exists).not.toHaveBeenCalled()
       expect(voteRepository.applyPreference).not.toHaveBeenCalled()
     })
@@ -901,11 +840,11 @@ describe('MeetingService', () => {
       async (status) => {
         const {
           service,
-          participantRepository,
+          meetingAccessService,
           recommendationRepository,
           voteRepository,
         } = createMeetingService()
-        participantRepository.findOne.mockResolvedValue({
+        meetingAccessService.findParticipant.mockResolvedValue({
           id: 'participant-1',
           meeting: { status },
         })
@@ -926,11 +865,11 @@ describe('MeetingService', () => {
     it('추천 장소가 해당 모임 소속이 아니면 404를 던진다', async () => {
       const {
         service,
-        participantRepository,
+        meetingAccessService,
         recommendationRepository,
         voteRepository,
       } = createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      meetingAccessService.findParticipant.mockResolvedValue({
         id: 'participant-1',
         meeting: { status: MeetingStatus.RecommendationCollecting },
       })
@@ -953,11 +892,11 @@ describe('MeetingService', () => {
     it('검증을 통과하면 voteRepository에 위임하고 결과를 응답 형태로 반환한다', async () => {
       const {
         service,
-        participantRepository,
+        meetingAccessService,
         recommendationRepository,
         voteRepository,
       } = createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      meetingAccessService.findParticipant.mockResolvedValue({
         id: 'participant-1',
         meeting: { status: MeetingStatus.RecommendationCollecting },
       })
@@ -989,11 +928,11 @@ describe('MeetingService', () => {
     it('preference가 null이어도 그대로 voteRepository에 위임한다', async () => {
       const {
         service,
-        participantRepository,
+        meetingAccessService,
         recommendationRepository,
         voteRepository,
       } = createMeetingService()
-      participantRepository.findOne.mockResolvedValue({
+      meetingAccessService.findParticipant.mockResolvedValue({
         id: 'participant-1',
         meeting: { status: MeetingStatus.CourseGenerated },
       })
