@@ -12,7 +12,11 @@ import { CourseService } from './course.service'
 function createService() {
   const meetingAccessService = { findParticipant: jest.fn() }
   const courseCandidateRepository = { find: jest.fn(), exists: jest.fn() }
-  const commentRepository = { find: jest.fn() }
+  const commentRepository = {
+    find: jest.fn(),
+    create: jest.fn((value) => value),
+    save: jest.fn(),
+  }
   const service = new CourseService(
     meetingAccessService as never,
     courseCandidateRepository as never,
@@ -250,6 +254,118 @@ describe('CourseService', () => {
       await expect(
         service.getCourseComments('1', '2', 'token'),
       ).resolves.toEqual([])
+    })
+  })
+
+  describe('createCourseComment', () => {
+    it('참여자 검증에 실패하면 DB 조회 없이 그대로 전파한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        commentRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+      )
+
+      const promise = service.createCourseComment('1', '2', 'bad-token', {
+        content: '좋아요!',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
+      expect(commentRepository.save).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      MeetingStatus.RecommendationCollecting,
+      MeetingStatus.CourseGenerating,
+      MeetingStatus.CourseGenerationFailed,
+      MeetingStatus.CourseConfirmed,
+    ])('%s 상태에서는 DB 조회 없이 409를 던진다', async (status) => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        commentRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: 'viewer-1',
+        meeting: { status },
+      })
+
+      const promise = service.createCourseComment('1', '2', 'token', {
+        content: '좋아요!',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
+      expect(commentRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('코스 후보가 해당 모임 소속이 아니면 404를 던지고 댓글을 저장하지 않는다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        commentRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: 'viewer-1',
+        meeting: { status: MeetingStatus.CourseGenerated },
+      })
+      courseCandidateRepository.exists.mockResolvedValue(false)
+
+      const promise = service.createCourseComment('1', '2', 'token', {
+        content: '좋아요!',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
+      expect(courseCandidateRepository.exists).toHaveBeenCalledWith({
+        where: { id: '2', meeting: { id: '1' } },
+      })
+      expect(commentRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('검증을 통과하면 댓글을 저장하고 생성된 정보를 반환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        commentRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: 'viewer-1',
+        meeting: { status: MeetingStatus.CourseGenerated },
+      })
+      courseCandidateRepository.exists.mockResolvedValue(true)
+      commentRepository.save.mockResolvedValue({
+        id: 'comment-1',
+        content: '여기 코스 좋아요!',
+        createdAt: new Date('2026-08-08T12:34:56.000Z'),
+      })
+
+      await expect(
+        service.createCourseComment('1', '2', 'token', {
+          content: '여기 코스 좋아요!',
+        }),
+      ).resolves.toEqual({
+        commentId: 'comment-1',
+        content: '여기 코스 좋아요!',
+        createdAt: '2026-08-08T12:34:56.000Z',
+      })
+      expect(commentRepository.create).toHaveBeenCalledWith({
+        courseCandidate: { id: '2' },
+        participant: { id: 'viewer-1' },
+        content: '여기 코스 좋아요!',
+      })
+      expect(commentRepository.save).toHaveBeenCalledWith({
+        courseCandidate: { id: '2' },
+        participant: { id: 'viewer-1' },
+        content: '여기 코스 좋아요!',
+      })
     })
   })
 })

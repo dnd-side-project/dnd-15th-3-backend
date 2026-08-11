@@ -282,18 +282,17 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 댓글을 작성할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
   createCourseComment(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
-    @Query('accessToken') _accessToken: string,
-    @Body() _dto: CreateCourseCommentRequestDto,
-  ): never {
-    throw new NotImplementedException(
-      '코스 댓글 작성 API는 실제 데이터 연동 후 제공됩니다.',
+    @Query('accessToken') accessToken: string,
+    @Body() dto: CreateCourseCommentRequestDto,
+  ): Promise<CreateCourseCommentResponseDto> {
+    return this.courseService.createCourseComment(
+      meetingId,
+      courseCandidateId,
+      accessToken,
+      dto,
     )
   }
 
