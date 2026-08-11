@@ -168,6 +168,14 @@ describe('CourseController', () => {
       'createdAt',
     ])
 
+    const createCommentResponseSchema = document.components?.schemas
+      ?.CreateCourseCommentResponseDto as SchemaWithProperties | undefined
+    expect(Object.keys(createCommentResponseSchema?.properties ?? {})).toEqual([
+      'commentId',
+      'content',
+      'createdAt',
+    ])
+
     const createCommentRequestSchema = document.components?.schemas
       ?.CreateCourseCommentRequestDto as
       | (SchemaWithProperties & SchemaWithLengthProperties)
