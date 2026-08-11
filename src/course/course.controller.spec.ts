@@ -182,15 +182,6 @@ describe('CourseController', () => {
       true,
     )
 
-    const commentListSchema = document.components?.schemas
-      ?.CourseCommentListResponseDto as SchemaWithProperties | undefined
-    expect(Object.keys(commentListSchema?.properties ?? {})).toEqual([
-      'comments',
-      'viewerRole',
-      'viewerNickname',
-      'viewerProfileAvatarId',
-    ])
-
     const commentSchema = document.components?.schemas?.CourseCommentDto as
       | SchemaWithProperties
       | undefined

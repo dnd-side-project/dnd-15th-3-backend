@@ -37,7 +37,6 @@ import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
 import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
-import { CourseCommentListResponseDto } from './dto/course-comment-list-response.dto'
 import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
 import { CourseRouteStepDto } from './dto/course-route-step.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
@@ -217,7 +216,7 @@ export class CourseController {
       '코스 후보에 첨부된 댓글 목록을 조회합니다. ' +
       '모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다.',
   })
-  @ApiOkResponse({ type: CourseCommentListResponseDto })
+  @ApiOkResponse({ type: CourseCommentDto, isArray: true })
   @ApiBadRequestResponse({
     description: 'meetingId, courseCandidateId 형식이 올바르지 않습니다.',
   })
