@@ -3,7 +3,6 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
-import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 import {
@@ -39,12 +38,6 @@ describe('MeetingController', () => {
       NotImplementedException,
     )
     expect(() => controller.getMapPins('1', 'token')).toThrow(
-      NotImplementedException,
-    )
-    expect(() => controller.getPlaces('1', 'token')).toThrow(
-      NotImplementedException,
-    )
-    expect(() => controller.addPlace('1', 'token', { placeId: '2' })).toThrow(
       NotImplementedException,
     )
     expect(() =>
@@ -115,16 +108,6 @@ describe('MeetingController', () => {
       ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
-    const placesPath = document.paths?.['/meetings/{meetingId}/places'] as
-      | PathOperations
-      | undefined
-    expect(responseCodes(placesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
-    )
-    expect(responseCodes(placesPath?.post?.responses)).toEqual(
-      ['201', '400', '401', '404', '409', '501'].sort(),
-    )
-
     const preferencePath = document.paths?.[
       '/meetings/{meetingId}/places/{recommendationId}/preference'
     ] as PathOperations | undefined
@@ -146,9 +129,6 @@ describe('MeetingController', () => {
       ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
-    expect(document.components?.schemas?.PlaceSortOption).toMatchObject({
-      enum: Object.values(PlaceSortOption),
-    })
     expect(document.components?.schemas?.PreferenceType).toMatchObject({
       enum: Object.values(PreferenceType),
     })
@@ -175,32 +155,6 @@ describe('MeetingController', () => {
       | undefined
     expect(Object.keys(mapPinsSchema?.properties ?? {})).toEqual(
       expect.arrayContaining(['startPlace', 'sharedPlaces']),
-    )
-
-    const addPlaceRequestSchema = document.components?.schemas
-      ?.AddPlaceRequestDto as SchemaWithProperties | undefined
-    expect(Object.keys(addPlaceRequestSchema?.properties ?? {})).toEqual([
-      'placeId',
-    ])
-
-    const placeListSchema = document.components?.schemas
-      ?.MeetingPlaceRecommendationListDto as
-      | (SchemaWithProperties & SchemaWithNullableProperties)
-      | undefined
-    expect(Object.keys(placeListSchema?.properties ?? {})).toEqual([
-      'items',
-      'totalCount',
-      'appliedSort',
-      'appliedCategory',
-    ])
-    expect(placeListSchema?.properties?.appliedCategory?.nullable).toBe(true)
-
-    const placeRecommendationSchema = document.components?.schemas
-      ?.MeetingPlaceRecommendationDto as
-      | SchemaWithNullableProperties
-      | undefined
-    expect(placeRecommendationSchema?.properties?.myPreference?.nullable).toBe(
-      true,
     )
 
     const updatePreferenceRequestSchema = document.components?.schemas
