@@ -34,6 +34,12 @@ import type {
   UpdateCoursePlanRequest,
 } from './schema/meeting-request.schema'
 
+function createMeetingWithStatus(status: MeetingStatus): Meeting {
+  const meeting = new Meeting()
+  meeting.status = status
+  return meeting
+}
+
 const request: CreateMeetingRequest = {
   meetingTypeCode: MeetingTypeCode.Social,
   name: '성수 모임',
@@ -613,12 +619,6 @@ describe('MeetingService', () => {
   })
 
   describe('getMeetingStatus', () => {
-    function createMeetingWithStatus(status: MeetingStatus): Meeting {
-      const meeting = new Meeting()
-      meeting.status = status
-      return meeting
-    }
-
     it('참여자 검증에 실패하면 그대로 전파한다', async () => {
       const { service, meetingAccessService } = createMeetingService()
       meetingAccessService.findParticipant.mockRejectedValue(
@@ -730,15 +730,15 @@ describe('MeetingService', () => {
         recommendationRepository,
       } = createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status },
+        meeting: createMeetingWithStatus(status),
       })
-      meetingRepository.findOne.mockResolvedValue({
-        meetingLocation: {
-          displayName: '강남역',
-          longitude: 127.0276,
-          latitude: 37.4979,
-        },
-      })
+      const meetingWithLocation = new Meeting()
+      meetingWithLocation.meetingLocation = {
+        displayName: '강남역',
+        longitude: 127.0276,
+        latitude: 37.4979,
+      } as MeetingLocation
+      meetingRepository.findOne.mockResolvedValue(meetingWithLocation)
       recommendationRepository.find.mockResolvedValue([
         {
           place: {
@@ -789,7 +789,7 @@ describe('MeetingService', () => {
           recommendationRepository,
         } = createMeetingService()
         meetingAccessService.findParticipant.mockResolvedValue({
-          meeting: { status },
+          meeting: createMeetingWithStatus(status),
         })
 
         const promise = service.getMapPins('1', 'token')
@@ -804,7 +804,9 @@ describe('MeetingService', () => {
       const { service, meetingAccessService, meetingRepository } =
         createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status: MeetingStatus.RecommendationCollecting },
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
       })
       meetingRepository.findOne.mockResolvedValue(null)
 

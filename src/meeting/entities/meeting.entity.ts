@@ -1,3 +1,4 @@
+import { ConflictException, InternalServerErrorException } from '@nestjs/common'
 import { BaseEntity } from 'src/common/entities/base.entity'
 import { Check, Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm'
 import { MeetingStatus } from '../enums/meeting-status.enum'
@@ -47,5 +48,22 @@ export class Meeting extends BaseEntity {
 
   isConfirmed(): boolean {
     return this.status === MeetingStatus.CourseConfirmed
+  }
+
+  assertStatus(
+    allowedStatuses: readonly MeetingStatus[],
+    message: string,
+  ): void {
+    if (!allowedStatuses.includes(this.status)) {
+      throw new ConflictException(message)
+    }
+  }
+
+  assertHasLocation(): void {
+    if (!this.meetingLocation) {
+      throw new InternalServerErrorException(
+        '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+    }
   }
 }

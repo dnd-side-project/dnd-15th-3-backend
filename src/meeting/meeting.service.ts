@@ -911,8 +911,7 @@ export class MeetingService {
       meetingId,
       accessToken,
     )
-    assertMeetingStatus(
-      meeting.status,
+    meeting.assertStatus(
       MAP_PINS_VISIBLE_STATUSES,
       '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
     )
@@ -928,11 +927,12 @@ export class MeetingService {
         order: { createdAt: 'ASC' },
       }),
     ])
-    if (!meetingWithLocation?.meetingLocation) {
+    if (!meetingWithLocation) {
       throw new InternalServerErrorException(
         '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
     }
+    meetingWithLocation.assertHasLocation()
 
     return {
       startPlace: this.toStartPlacePin(meetingWithLocation.meetingLocation),
