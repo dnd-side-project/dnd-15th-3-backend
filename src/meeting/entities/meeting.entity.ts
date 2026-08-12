@@ -1,6 +1,7 @@
 import { ConflictException, InternalServerErrorException } from '@nestjs/common'
 import { BaseEntity } from 'src/common/entities/base.entity'
 import { Check, Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm'
+import { COURSE_CONFIRMABLE_STATUSES } from '../constants/meeting-status.constants'
 import { MeetingStatus } from '../enums/meeting-status.enum'
 import { MeetingLocation } from './meeting-location.entity'
 import { MeetingType } from './meeting-type.entity'
@@ -48,6 +49,19 @@ export class Meeting extends BaseEntity {
 
   isConfirmed(): boolean {
     return this.status === MeetingStatus.CourseConfirmed
+  }
+
+  confirm(): void {
+    this.assertStatus(
+      COURSE_CONFIRMABLE_STATUSES,
+      '모임이 코스 생성 완료 상태가 아니어서 코스를 확정할 수 없습니다.',
+    )
+    this.status = MeetingStatus.CourseConfirmed
+  }
+
+  setCourseImage(courseImageKey: string): void {
+    this.courseImageKey = courseImageKey
+    this.courseImageUploadedAt = new Date()
   }
 
   assertStatus(

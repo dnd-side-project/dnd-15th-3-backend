@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common'
 import { BaseEntity } from 'src/common/entities/base.entity'
 import { User } from 'src/user/entities/user.entity'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
@@ -38,4 +39,10 @@ export class MeetingParticipant extends BaseEntity {
     comment: 'Selected profile avatar identifier for this meeting',
   })
   profileAvatarId: ProfileAvatarId
+
+  assertHost(message: string): void {
+    if (this.role !== ParticipantRole.Host) {
+      throw new ForbiddenException(message)
+    }
+  }
 }

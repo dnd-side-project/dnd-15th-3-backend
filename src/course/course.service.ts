@@ -6,21 +6,15 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
-import {
-  assertAccessToken,
-  assertHost,
-  assertMeetingStatus,
-} from 'src/meeting/access/meeting-access.utils'
+import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import {
   COURSE_CANDIDATES_VISIBLE_STATUSES,
   COURSE_COMMENT_CREATABLE_STATUSES,
   COURSE_COMMENTS_VISIBLE_STATUSES,
-  COURSE_CONFIRMABLE_STATUSES,
 } from 'src/meeting/constants/meeting-status.constants'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
-import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { DataSource, Repository } from 'typeorm'
 import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
@@ -156,7 +150,7 @@ export class CourseService {
       if (!participant) {
         throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
       }
-      assertHost(participant.role, '방장만 코스를 확정할 수 있습니다.')
+      participant.assertHost('방장만 코스를 확정할 수 있습니다.')
 
       const meetingRepository = manager.getRepository(Meeting)
       const meeting = await meetingRepository
@@ -167,11 +161,7 @@ export class CourseService {
       if (!meeting) {
         throw new NotFoundException('모임을 찾을 수 없습니다.')
       }
-      assertMeetingStatus(
-        meeting.status,
-        COURSE_CONFIRMABLE_STATUSES,
-        '모임이 코스 생성 완료 상태가 아니어서 코스를 확정할 수 없습니다.',
-      )
+      meeting.confirm()
 
       const candidateRepository = manager.getRepository(CourseCandidate)
       const candidate = await candidateRepository.findOne({
@@ -180,15 +170,13 @@ export class CourseService {
       if (!candidate) {
         throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
       }
+      candidate.select()
 
-      candidate.isSelected = true
-      await candidateRepository.save(candidate)
-
-      meeting.status = MeetingStatus.CourseConfirmed
       if (request.courseImageKey) {
-        meeting.courseImageKey = request.courseImageKey
-        meeting.courseImageUploadedAt = new Date()
+        meeting.setCourseImage(request.courseImageKey)
       }
+
+      await candidateRepository.save(candidate)
       await meetingRepository.save(meeting)
 
       return {

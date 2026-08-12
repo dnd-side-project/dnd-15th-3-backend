@@ -25,6 +25,10 @@ function createParticipant(
   return Object.assign(new MeetingParticipant(), overrides)
 }
 
+function createCandidate(overrides: Partial<CourseCandidate>): CourseCandidate {
+  return Object.assign(new CourseCandidate(), overrides)
+}
+
 function createService() {
   const dataSource = { transaction: jest.fn() }
   const meetingAccessService = { findParticipant: jest.fn() }
@@ -453,9 +457,9 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue({
-        role: ParticipantRole.Member,
-      })
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Member }),
+      )
 
       const promise = service.confirmCourse('1', '2', 'token', {})
 
@@ -475,9 +479,9 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue({
-        role: ParticipantRole.Host,
-      })
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
       meetingQueryBuilder.getOne.mockResolvedValue(null)
 
       const promise = service.confirmCourse('1', '2', 'token', {})
@@ -506,10 +510,12 @@ describe('CourseService', () => {
         dataSource.transaction.mockImplementation((callback: never) =>
           (callback as (manager: unknown) => unknown)(manager),
         )
-        participantRepository.findOne.mockResolvedValue({
-          role: ParticipantRole.Host,
-        })
-        meetingQueryBuilder.getOne.mockResolvedValue({ status })
+        participantRepository.findOne.mockResolvedValue(
+          createParticipant({ role: ParticipantRole.Host }),
+        )
+        meetingQueryBuilder.getOne.mockResolvedValue(
+          createMeetingWithStatus(status),
+        )
 
         const promise = service.confirmCourse('1', '2', 'token', {})
 
@@ -529,12 +535,12 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue({
-        role: ParticipantRole.Host,
-      })
-      meetingQueryBuilder.getOne.mockResolvedValue({
-        status: MeetingStatus.CourseGenerated,
-      })
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
       candidateRepository.findOne.mockResolvedValue(null)
 
       const promise = service.confirmCourse('1', '2', 'token', {})
@@ -558,12 +564,12 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue({
-        role: ParticipantRole.Host,
-      })
-      const meeting = { status: MeetingStatus.CourseGenerated }
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
       meetingQueryBuilder.getOne.mockResolvedValue(meeting)
-      const candidate = { id: '2', isSelected: false }
+      const candidate = createCandidate({ id: '2', isSelected: false })
       candidateRepository.findOne.mockResolvedValue(candidate)
 
       await expect(
@@ -585,14 +591,11 @@ describe('CourseService', () => {
       expect(candidateRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
       })
-      expect(candidateRepository.save).toHaveBeenCalledWith({
-        id: '2',
-        isSelected: true,
-      })
-      expect(meetingRepository.save).toHaveBeenCalledWith({
-        status: MeetingStatus.CourseConfirmed,
-      })
-      expect(meeting).not.toHaveProperty('courseImageKey')
+      expect(candidate.isSelected).toBe(true)
+      expect(candidateRepository.save).toHaveBeenCalledWith(candidate)
+      expect(meeting.status).toBe(MeetingStatus.CourseConfirmed)
+      expect(meeting.courseImageKey).toBeUndefined()
+      expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
     })
 
     it('courseImageKey가 있으면 모임에 반영하고 업로드 시각을 기록한다', async () => {
@@ -607,26 +610,22 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue({
-        role: ParticipantRole.Host,
-      })
-      meetingQueryBuilder.getOne.mockResolvedValue({
-        status: MeetingStatus.CourseGenerated,
-      })
-      candidateRepository.findOne.mockResolvedValue({
-        id: '2',
-        isSelected: false,
-      })
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meetingQueryBuilder.getOne.mockResolvedValue(meeting)
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', isSelected: false }),
+      )
 
       await service.confirmCourse('1', '2', 'token', {
         courseImageKey: 'course-cards/1/5.png',
       })
 
-      expect(meetingRepository.save).toHaveBeenCalledWith({
-        status: MeetingStatus.CourseConfirmed,
-        courseImageKey: 'course-cards/1/5.png',
-        courseImageUploadedAt: expect.any(Date),
-      })
+      expect(meeting.courseImageKey).toBe('course-cards/1/5.png')
+      expect(meeting.courseImageUploadedAt).toBeInstanceOf(Date)
+      expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
     })
   })
 })
