@@ -82,8 +82,7 @@ export class CourseService {
       meetingId,
       accessToken,
     )
-    assertMeetingStatus(
-      viewer.meeting.status,
+    viewer.meeting.assertStatus(
       COURSE_COMMENTS_VISIBLE_STATUSES,
       '모임이 코스 생성 완료 상태가 아니어서 코스 댓글 목록을 조회할 수 없습니다.',
     )
@@ -100,7 +99,7 @@ export class CourseService {
       nickname: comment.participant.nickname,
       profileAvatarId: comment.participant.profileAvatarId,
       authorRole: comment.participant.role,
-      isMine: comment.participant.id === viewer.id,
+      isMine: comment.participant.equals(viewer),
       content: comment.content,
       createdAt: comment.createdAt.toISOString(),
     }))

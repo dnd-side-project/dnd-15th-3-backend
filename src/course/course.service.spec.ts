@@ -19,6 +19,12 @@ function createMeetingWithStatus(status: MeetingStatus): Meeting {
   return meeting
 }
 
+function createParticipant(
+  overrides: Partial<MeetingParticipant>,
+): MeetingParticipant {
+  return Object.assign(new MeetingParticipant(), overrides)
+}
+
 function createService() {
   const dataSource = { transaction: jest.fn() }
   const meetingAccessService = { findParticipant: jest.fn() }
@@ -184,7 +190,7 @@ describe('CourseService', () => {
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'viewer-1',
-        meeting: { status },
+        meeting: createMeetingWithStatus(status),
       })
 
       const promise = service.getCourseComments('1', '2', 'token')
@@ -203,7 +209,7 @@ describe('CourseService', () => {
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'viewer-1',
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(false)
 
@@ -226,7 +232,7 @@ describe('CourseService', () => {
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'viewer-1',
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(true)
       commentRepository.find.mockResolvedValue([
@@ -234,23 +240,23 @@ describe('CourseService', () => {
           id: 'comment-1',
           content: '여기 코스 좋아요!',
           createdAt: new Date('2026-08-08T12:34:56.000Z'),
-          participant: {
+          participant: createParticipant({
             id: 'viewer-1',
             nickname: '모모',
             profileAvatarId: ProfileAvatarId.MomoBlue,
             role: ParticipantRole.Host,
-          },
+          }),
         },
         {
           id: 'comment-2',
           content: '저도요',
           createdAt: new Date('2026-08-08T13:00:00.000Z'),
-          participant: {
+          participant: createParticipant({
             id: 'participant-2',
             nickname: '지니',
             profileAvatarId: ProfileAvatarId.MomoYellow,
             role: ParticipantRole.Member,
-          },
+          }),
         },
       ])
 
@@ -292,7 +298,7 @@ describe('CourseService', () => {
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'viewer-1',
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(true)
       commentRepository.find.mockResolvedValue([])
