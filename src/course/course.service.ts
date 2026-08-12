@@ -115,8 +115,7 @@ export class CourseService {
       meetingId,
       accessToken,
     )
-    assertMeetingStatus(
-      viewer.meeting.status,
+    viewer.meeting.assertStatus(
       COURSE_COMMENT_CREATABLE_STATUSES,
       '모임이 코스 생성 완료 상태가 아니어서 댓글을 작성할 수 없습니다.',
     )

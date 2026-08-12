@@ -344,7 +344,7 @@ describe('CourseService', () => {
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'viewer-1',
-        meeting: { status },
+        meeting: createMeetingWithStatus(status),
       })
 
       const promise = service.createCourseComment('1', '2', 'token', {
@@ -365,7 +365,7 @@ describe('CourseService', () => {
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'viewer-1',
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(false)
 
@@ -390,7 +390,7 @@ describe('CourseService', () => {
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'viewer-1',
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(true)
       commentRepository.save.mockResolvedValue({
