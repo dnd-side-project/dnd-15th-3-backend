@@ -33,10 +33,7 @@ import { PlaceSyncService } from 'src/place/sync/place-sync.service'
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
-import {
-  assertAccessToken,
-  assertMeetingStatus,
-} from './access/meeting-access.utils'
+import { assertAccessToken } from './access/meeting-access.utils'
 import {
   MAP_PINS_VISIBLE_STATUSES,
   PLACE_PREFERENCE_EDITABLE_STATUSES,
@@ -971,8 +968,7 @@ export class MeetingService {
       meetingId,
       accessToken,
     )
-    assertMeetingStatus(
-      participant.meeting.status,
+    participant.meeting.assertStatus(
       PLACE_PREFERENCE_EDITABLE_STATUSES,
       '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
     )

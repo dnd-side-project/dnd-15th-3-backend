@@ -854,7 +854,7 @@ describe('MeetingService', () => {
         } = createMeetingService()
         meetingAccessService.findParticipant.mockResolvedValue({
           id: 'participant-1',
-          meeting: { status },
+          meeting: createMeetingWithStatus(status),
         })
 
         const promise = service.updatePlacePreference(
@@ -879,7 +879,9 @@ describe('MeetingService', () => {
       } = createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'participant-1',
-        meeting: { status: MeetingStatus.RecommendationCollecting },
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
       })
       recommendationRepository.exists.mockResolvedValue(false)
 
@@ -906,7 +908,9 @@ describe('MeetingService', () => {
       } = createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'participant-1',
-        meeting: { status: MeetingStatus.RecommendationCollecting },
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
       })
       recommendationRepository.exists.mockResolvedValue(true)
       voteRepository.applyPreference.mockResolvedValue({
@@ -942,7 +946,7 @@ describe('MeetingService', () => {
       } = createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: 'participant-1',
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       recommendationRepository.exists.mockResolvedValue(true)
       voteRepository.applyPreference.mockResolvedValue({
