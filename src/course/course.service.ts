@@ -49,8 +49,7 @@ export class CourseService {
       meetingId,
       accessToken,
     )
-    assertMeetingStatus(
-      meeting.status,
+    meeting.assertStatus(
       COURSE_CANDIDATES_VISIBLE_STATUSES,
       '모임이 코스 생성 완료 상태가 아니어서 코스 후보 목록을 조회할 수 없습니다.',
     )

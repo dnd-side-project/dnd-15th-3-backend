@@ -13,6 +13,12 @@ import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
 
+function createMeetingWithStatus(status: MeetingStatus): Meeting {
+  const meeting = new Meeting()
+  meeting.status = status
+  return meeting
+}
+
 function createService() {
   const dataSource = { transaction: jest.fn() }
   const meetingAccessService = { findParticipant: jest.fn() }
@@ -95,7 +101,7 @@ describe('CourseService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status },
+        meeting: createMeetingWithStatus(status),
       })
 
       const promise = service.getCourseCandidates('1', 'token')
@@ -108,7 +114,7 @@ describe('CourseService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.find.mockResolvedValue([
         { id: 'candidate-1', order: 1 },
@@ -132,7 +138,7 @@ describe('CourseService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status: MeetingStatus.CourseGenerated },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.find.mockResolvedValue([])
 
