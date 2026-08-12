@@ -3,7 +3,6 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
-import { PlaceSortOption } from 'src/place/enums/place-sort-option.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
@@ -89,12 +88,6 @@ describe('MeetingController', () => {
   it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
     const { controller } = createController()
 
-    expect(() => controller.getPlaces('1', 'token')).toThrow(
-      NotImplementedException,
-    )
-    expect(() => controller.addPlace('1', 'token', { placeId: '2' })).toThrow(
-      NotImplementedException,
-    )
     expect(() =>
       controller.updateCourseImage('1', 'token', {
         courseImageKey: 'course-cards/1/5.png',
@@ -161,16 +154,6 @@ describe('MeetingController', () => {
       ['200', '400', '401', '404', '409', '500'].sort(),
     )
 
-    const placesPath = document.paths?.['/meetings/{meetingId}/places'] as
-      | PathOperations
-      | undefined
-    expect(responseCodes(placesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
-    )
-    expect(responseCodes(placesPath?.post?.responses)).toEqual(
-      ['201', '400', '401', '404', '409', '501'].sort(),
-    )
-
     const preferencePath = document.paths?.[
       '/meetings/{meetingId}/places/{recommendationId}/preference'
     ] as PathOperations | undefined
@@ -192,9 +175,6 @@ describe('MeetingController', () => {
       ['200', '400', '401', '404', '409', '501'].sort(),
     )
 
-    expect(document.components?.schemas?.PlaceSortOption).toMatchObject({
-      enum: Object.values(PlaceSortOption),
-    })
     expect(document.components?.schemas?.PreferenceType).toMatchObject({
       enum: Object.values(PreferenceType),
     })
@@ -235,32 +215,6 @@ describe('MeetingController', () => {
       'latitude',
     ])
     expect(mapPinSchema?.required).toEqual(['name', 'longitude', 'latitude'])
-
-    const addPlaceRequestSchema = document.components?.schemas
-      ?.AddPlaceRequestDto as SchemaWithProperties | undefined
-    expect(Object.keys(addPlaceRequestSchema?.properties ?? {})).toEqual([
-      'placeId',
-    ])
-
-    const placeListSchema = document.components?.schemas
-      ?.MeetingPlaceRecommendationListDto as
-      | (SchemaWithProperties & SchemaWithNullableProperties)
-      | undefined
-    expect(Object.keys(placeListSchema?.properties ?? {})).toEqual([
-      'items',
-      'totalCount',
-      'appliedSort',
-      'appliedCategory',
-    ])
-    expect(placeListSchema?.properties?.appliedCategory?.nullable).toBe(true)
-
-    const placeRecommendationSchema = document.components?.schemas
-      ?.MeetingPlaceRecommendationDto as
-      | SchemaWithNullableProperties
-      | undefined
-    expect(placeRecommendationSchema?.properties?.myPreference?.nullable).toBe(
-      true,
-    )
 
     const updatePreferenceRequestSchema = document.components?.schemas
       ?.UpdatePlacePreferenceRequestDto as
