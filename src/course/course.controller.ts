@@ -457,18 +457,17 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서(아직 후보가 없거나 이미 확정됨) 코스를 확정할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
   confirmCourse(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
-    @Query('accessToken') _accessToken: string,
-    @Body() _dto: ConfirmCourseRequestDto,
-  ): never {
-    throw new NotImplementedException(
-      '최종 코스 확정 API는 실제 데이터 연동 후 제공됩니다.',
+    @Query('accessToken') accessToken: string,
+    @Body() dto: ConfirmCourseRequestDto,
+  ): Promise<MeetingStatusResponseDto> {
+    return this.courseService.confirmCourse(
+      meetingId,
+      courseCandidateId,
+      accessToken,
+      dto,
     )
   }
 }

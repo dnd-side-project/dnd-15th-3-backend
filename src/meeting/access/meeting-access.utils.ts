@@ -1,5 +1,10 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common'
+import {
+  ConflictException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { MeetingStatus } from '../enums/meeting-status.enum'
+import { ParticipantRole } from '../enums/participant-role.enum'
 
 export function assertAccessToken(accessToken: string): void {
   if (!accessToken?.trim()) {
@@ -14,5 +19,11 @@ export function assertMeetingStatus(
 ): void {
   if (!allowedStatuses.includes(status)) {
     throw new ConflictException(message)
+  }
+}
+
+export function assertHost(role: ParticipantRole, message: string): void {
+  if (role !== ParticipantRole.Host) {
+    throw new ForbiddenException(message)
   }
 }

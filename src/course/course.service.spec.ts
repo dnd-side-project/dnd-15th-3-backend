@@ -1,15 +1,20 @@
 import {
   ConflictException,
+  ForbiddenException,
   InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common'
+import { Meeting } from 'src/meeting/entities/meeting.entity'
+import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseService } from './course.service'
+import { CourseCandidate } from './entities/course-candidate.entity'
 
 function createService() {
+  const dataSource = { transaction: jest.fn() }
   const meetingAccessService = { findParticipant: jest.fn() }
   const courseCandidateRepository = { find: jest.fn(), exists: jest.fn() }
   const commentRepository = {
@@ -18,6 +23,7 @@ function createService() {
     save: jest.fn(),
   }
   const service = new CourseService(
+    dataSource as never,
     meetingAccessService as never,
     courseCandidateRepository as never,
     commentRepository as never,
@@ -25,9 +31,43 @@ function createService() {
 
   return {
     service,
+    dataSource,
     meetingAccessService,
     courseCandidateRepository,
     commentRepository,
+  }
+}
+
+function createConfirmTransactionMocks() {
+  const participantRepository = { findOne: jest.fn() }
+  const meetingQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    setLock: jest.fn().mockReturnThis(),
+    getOne: jest.fn(),
+  }
+  const meetingRepository = {
+    createQueryBuilder: jest.fn(() => meetingQueryBuilder),
+    save: jest.fn().mockImplementation((value) => value),
+  }
+  const candidateRepository = {
+    findOne: jest.fn(),
+    save: jest.fn().mockImplementation((value) => value),
+  }
+  const repositories = new Map<unknown, unknown>([
+    [MeetingParticipant, participantRepository],
+    [Meeting, meetingRepository],
+    [CourseCandidate, candidateRepository],
+  ])
+  const manager = {
+    getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
+  }
+
+  return {
+    manager,
+    participantRepository,
+    meetingQueryBuilder,
+    meetingRepository,
+    candidateRepository,
   }
 }
 
@@ -365,6 +405,215 @@ describe('CourseService', () => {
         courseCandidate: { id: '2' },
         participant: { id: 'viewer-1' },
         content: '여기 코스 좋아요!',
+      })
+    })
+  })
+
+  describe('confirmCourse', () => {
+    it('accessToken이 빈 문자열이면 트랜잭션 없이 401을 던진다', async () => {
+      const { service, dataSource } = createService()
+
+      const promise = service.confirmCourse('1', '2', '', {})
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(dataSource.transaction).not.toHaveBeenCalled()
+    })
+
+    it('참여자를 찾지 못하면 401을 던지고 아무것도 변경하지 않는다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, candidateRepository } =
+        createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.confirmCourse('1', '2', 'token', {})
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(candidateRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('참여자가 방장이 아니면 403을 던지고 아무것도 변경하지 않는다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, candidateRepository } =
+        createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue({
+        role: ParticipantRole.Member,
+      })
+
+      const promise = service.confirmCourse('1', '2', 'token', {})
+
+      await expect(promise).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(promise).rejects.toThrow('방장만 코스를 확정할 수 있습니다.')
+      expect(candidateRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('모임을 찾지 못하면 404를 던지고 후보를 조회하지 않는다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+      } = createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue({
+        role: ParticipantRole.Host,
+      })
+      meetingQueryBuilder.getOne.mockResolvedValue(null)
+
+      const promise = service.confirmCourse('1', '2', 'token', {})
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
+      expect(candidateRepository.findOne).not.toHaveBeenCalled()
+      expect(candidateRepository.save).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      MeetingStatus.RecommendationCollecting,
+      MeetingStatus.CourseGenerating,
+      MeetingStatus.CourseGenerationFailed,
+      MeetingStatus.CourseConfirmed,
+    ])(
+      '모임이 %s 상태이면 409를 던지고 후보를 조회하지 않는다',
+      async (status) => {
+        const { service, dataSource } = createService()
+        const {
+          manager,
+          participantRepository,
+          meetingQueryBuilder,
+          candidateRepository,
+        } = createConfirmTransactionMocks()
+        dataSource.transaction.mockImplementation((callback: never) =>
+          (callback as (manager: unknown) => unknown)(manager),
+        )
+        participantRepository.findOne.mockResolvedValue({
+          role: ParticipantRole.Host,
+        })
+        meetingQueryBuilder.getOne.mockResolvedValue({ status })
+
+        const promise = service.confirmCourse('1', '2', 'token', {})
+
+        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        expect(candidateRepository.findOne).not.toHaveBeenCalled()
+      },
+    )
+
+    it('코스 후보가 해당 모임 소속이 아니면 404를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+      } = createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue({
+        role: ParticipantRole.Host,
+      })
+      meetingQueryBuilder.getOne.mockResolvedValue({
+        status: MeetingStatus.CourseGenerated,
+      })
+      candidateRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.confirmCourse('1', '2', 'token', {})
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
+      expect(candidateRepository.findOne).toHaveBeenCalledWith({
+        where: { id: '2', meeting: { id: '1' } },
+      })
+    })
+
+    it('검증을 통과하면 코스 후보를 확정하고 모임 상태를 전환한다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        meetingRepository,
+        candidateRepository,
+      } = createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue({
+        role: ParticipantRole.Host,
+      })
+      const meeting = { status: MeetingStatus.CourseGenerated }
+      meetingQueryBuilder.getOne.mockResolvedValue(meeting)
+      const candidate = { id: '2', isSelected: false }
+      candidateRepository.findOne.mockResolvedValue(candidate)
+
+      await expect(
+        service.confirmCourse('1', '2', 'token', {}),
+      ).resolves.toEqual({
+        status: MeetingStatus.CourseConfirmed,
+        confirmedCourseCandidateId: '2',
+      })
+      expect(participantRepository.findOne).toHaveBeenCalledWith({
+        where: { meeting: { id: '1' }, accessToken: 'token' },
+      })
+      expect(meetingQueryBuilder.where).toHaveBeenCalledWith(
+        'meeting.id = :meetingId',
+        { meetingId: '1' },
+      )
+      expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+      )
+      expect(candidateRepository.findOne).toHaveBeenCalledWith({
+        where: { id: '2', meeting: { id: '1' } },
+      })
+      expect(candidateRepository.save).toHaveBeenCalledWith({
+        id: '2',
+        isSelected: true,
+      })
+      expect(meetingRepository.save).toHaveBeenCalledWith({
+        status: MeetingStatus.CourseConfirmed,
+      })
+      expect(meeting).not.toHaveProperty('courseImageKey')
+    })
+
+    it('courseImageKey가 있으면 모임에 반영하고 업로드 시각을 기록한다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        meetingRepository,
+        candidateRepository,
+      } = createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue({
+        role: ParticipantRole.Host,
+      })
+      meetingQueryBuilder.getOne.mockResolvedValue({
+        status: MeetingStatus.CourseGenerated,
+      })
+      candidateRepository.findOne.mockResolvedValue({
+        id: '2',
+        isSelected: false,
+      })
+
+      await service.confirmCourse('1', '2', 'token', {
+        courseImageKey: 'course-cards/1/5.png',
+      })
+
+      expect(meetingRepository.save).toHaveBeenCalledWith({
+        status: MeetingStatus.CourseConfirmed,
+        courseImageKey: 'course-cards/1/5.png',
+        courseImageUploadedAt: expect.any(Date),
       })
     })
   })

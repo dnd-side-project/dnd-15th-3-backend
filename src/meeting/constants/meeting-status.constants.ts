@@ -23,3 +23,7 @@ export const COURSE_COMMENTS_VISIBLE_STATUSES: readonly MeetingStatus[] = [
 export const COURSE_COMMENT_CREATABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.CourseGenerated,
 ]
+
+export const COURSE_CONFIRMABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.CourseGenerated,
+]
