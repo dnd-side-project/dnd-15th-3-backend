@@ -613,6 +613,12 @@ describe('MeetingService', () => {
   })
 
   describe('getMeetingStatus', () => {
+    function createMeetingWithStatus(status: MeetingStatus): Meeting {
+      const meeting = new Meeting()
+      meeting.status = status
+      return meeting
+    }
+
     it('참여자 검증에 실패하면 그대로 전파한다', async () => {
       const { service, meetingAccessService } = createMeetingService()
       meetingAccessService.findParticipant.mockRejectedValue(
@@ -632,7 +638,7 @@ describe('MeetingService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status: MeetingStatus.CourseGenerating },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerating),
       })
 
       await expect(service.getMeetingStatus('1', 'token')).resolves.toEqual({
@@ -650,7 +656,7 @@ describe('MeetingService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status },
+        meeting: createMeetingWithStatus(status),
       })
 
       await expect(
@@ -663,7 +669,7 @@ describe('MeetingService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status: MeetingStatus.CourseConfirmed },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseConfirmed),
       })
       courseCandidateRepository.findOne.mockResolvedValue({ id: '5' })
 
@@ -680,7 +686,7 @@ describe('MeetingService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        meeting: { status: MeetingStatus.CourseConfirmed },
+        meeting: createMeetingWithStatus(MeetingStatus.CourseConfirmed),
       })
       courseCandidateRepository.findOne.mockResolvedValue(null)
 

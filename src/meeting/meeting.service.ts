@@ -603,10 +603,9 @@ export class MeetingService {
       accessToken,
     )
 
-    const confirmedCourseCandidateId =
-      meeting.status === MeetingStatus.CourseConfirmed
-        ? await this.findConfirmedCourseCandidateId(meetingId)
-        : null
+    const confirmedCourseCandidateId = meeting.isConfirmed()
+      ? await this.findConfirmedCourseCandidateId(meetingId)
+      : null
 
     return { status: meeting.status, confirmedCourseCandidateId }
   }

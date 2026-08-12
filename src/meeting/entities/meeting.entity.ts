@@ -44,4 +44,8 @@ export class Meeting extends BaseEntity {
 
   @Column({ nullable: true })
   courseImageUploadedAt: Date
+
+  isConfirmed(): boolean {
+    return this.status === MeetingStatus.CourseConfirmed
+  }
 }
