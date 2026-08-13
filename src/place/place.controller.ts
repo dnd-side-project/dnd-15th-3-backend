@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Controller,
   Get,
-  NotImplementedException,
   Param,
   Query,
 } from '@nestjs/common'
@@ -151,16 +150,10 @@ export class PlaceController {
   @ApiBadRequestResponse({ description: 'placeId 형식이 올바르지 않습니다.' })
   @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
   @ApiNotFoundResponse({ description: '장소를 찾을 수 없습니다.' })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
-  getPlaceDetail(
+  async getPlaceDetail(
     @Param('placeId', BigIntStringPipe) placeId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new NotImplementedException(
-      '장소 상세 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    @Query('accessToken') accessToken: string,
+  ): Promise<PlaceSearchResultDto> {
+    return await this.placeService.getPlaceDetail(placeId, accessToken)
   }
 }

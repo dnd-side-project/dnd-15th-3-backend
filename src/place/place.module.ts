@@ -3,7 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { KakaoModule } from 'src/kakao/kakao.module'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
+import { StorageModule } from 'src/storage/storage.module'
 import { Place } from './entities/place.entity'
+import { PlaceImage } from './entities/place-image.entity'
 import { PlaceSyncCoverage } from './entities/place-sync-coverage.entity'
 import { PlaceSyncJob } from './entities/place-sync-job.entity'
 import { PlaceSyncTileLease } from './entities/place-sync-tile-lease.entity'
@@ -18,10 +20,12 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
 @Module({
   imports: [
     KakaoModule,
+    StorageModule,
     TypeOrmModule.forFeature([
       MeetingLocation,
       MeetingParticipant,
       Place,
+      PlaceImage,
       PlaceSyncCoverage,
       PlaceSyncJob,
       PlaceSyncTileLease,
