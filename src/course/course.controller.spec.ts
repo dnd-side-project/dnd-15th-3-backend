@@ -219,7 +219,7 @@ describe('CourseController', () => {
       '/meetings/{meetingId}/courses/{courseCandidateId}'
     ] as PathOperations | undefined
     expect(responseCodes(courseDetailPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409'].sort(),
+      ['200', '400', '401', '404', '409', '500'].sort(),
     )
 
     const courseCommentsPath = document.paths?.[

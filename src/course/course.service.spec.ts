@@ -265,6 +265,32 @@ describe('CourseService', () => {
       expect(courseCandidatePlaceRepository.find).not.toHaveBeenCalled()
     })
 
+    it('코스 후보는 있는데 경로가 하나도 없으면 데이터 정합성 오류로 500을 던진다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        courseCandidatePlaceRepository,
+        placeImageRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      })
+      courseCandidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      courseCandidatePlaceRepository.find.mockResolvedValue([])
+
+      const promise = service.getCourseDetail('1', '2', 'token')
+
+      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toThrow(
+        '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+      expect(placeImageRepository.find).not.toHaveBeenCalled()
+    })
+
     it('경로와 총 이동 거리를 순서대로 반환하고, 여러 구간의 거리를 합산하며, 마지막 장소의 이동 시간은 null로 반환한다', async () => {
       const {
         service,

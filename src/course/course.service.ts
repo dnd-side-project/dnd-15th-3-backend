@@ -116,6 +116,11 @@ export class CourseService {
       },
       order: { order: 'ASC' },
     })
+    if (steps.length === 0) {
+      throw new InternalServerErrorException(
+        '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+    }
 
     const primaryImageUrls = await this.findPrimaryImageUrls(
       steps.map((step) => step.meetingPlaceRecommendation.place.id),

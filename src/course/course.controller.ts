@@ -180,6 +180,10 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태도 확정 상태도 아니어서 코스 상세를 조회할 수 없습니다.',
   })
+  @ApiInternalServerErrorResponse({
+    description:
+      '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
+  })
   getCourseDetail(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
