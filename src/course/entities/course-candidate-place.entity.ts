@@ -1,10 +1,13 @@
 import { BaseEntity } from 'src/common/entities/base.entity'
-import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm'
+import { Check, Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm'
 import { CourseCandidate } from './course-candidate.entity'
 import { MeetingPlaceRecommendation } from './meeting-place-recommendation.entity'
 
 @Entity()
 @Unique(['courseCandidate', 'order'])
+@Check(`"travel_time_to_next" >= 0`)
+@Check(`"distance_to_next_meters" >= 0`)
+@Check(`("travel_time_to_next" IS NULL) = ("distance_to_next_meters" IS NULL)`)
 export class CourseCandidatePlace extends BaseEntity {
   @ManyToOne(() => CourseCandidate, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'course_candidate_id' })
@@ -19,4 +22,7 @@ export class CourseCandidatePlace extends BaseEntity {
 
   @Column({ nullable: true, comment: 'Unit: seconds' })
   travelTimeToNext: number
+
+  @Column({ nullable: true, comment: 'Unit: meter' })
+  distanceToNextMeters: number
 }
