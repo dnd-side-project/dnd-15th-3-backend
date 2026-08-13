@@ -267,6 +267,7 @@ describe('CourseController', () => {
       'latitude',
       'walkDurationToNextMin',
     ])
+    expect(routeStepSchema?.properties?.primaryImageUrl?.nullable).toBe(true)
     expect(routeStepSchema?.properties?.walkDurationToNextMin?.nullable).toBe(
       true,
     )

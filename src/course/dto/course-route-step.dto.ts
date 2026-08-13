@@ -39,10 +39,11 @@ export class CourseRouteStepDto {
 
   @ApiProperty({
     description: '대표 사진 URL. 없으면 카테고리별 기본 이미지를 사용',
+    type: 'string',
     example: 'https://...',
-    required: false,
+    nullable: true,
   })
-  primaryImageUrl?: string
+  primaryImageUrl!: string | null
 
   @ApiProperty({ description: '경도', example: 128.7514 })
   longitude!: number
