@@ -34,7 +34,6 @@ export class PlaceSearchResultDto {
   @ApiProperty({
     description: '미리보기 사이트 링크',
     example: 'https://...',
-    required: false,
   })
   previewUrl!: string
 }
