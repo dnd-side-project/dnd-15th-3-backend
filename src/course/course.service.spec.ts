@@ -291,84 +291,87 @@ describe('CourseService', () => {
       expect(placeImageRepository.find).not.toHaveBeenCalled()
     })
 
-    it('경로와 총 이동 거리를 순서대로 반환하고, 여러 구간의 거리를 합산하며, 마지막 장소의 이동 시간은 null로 반환한다', async () => {
-      const {
-        service,
-        meetingAccessService,
-        courseCandidateRepository,
-        courseCandidatePlaceRepository,
-        placeImageRepository,
-        storageService,
-      } = createService()
-      meetingAccessService.findParticipant.mockResolvedValue({
-        id: '1',
-        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
-      })
-      courseCandidateRepository.findOne.mockResolvedValue(
-        createCandidate({ id: '2', name: '뚜벅이 코스' }),
-      )
-      courseCandidatePlaceRepository.find.mockResolvedValue([
-        {
-          order: 1,
-          travelTimeToNext: 480,
-          distanceToNextMeters: 600,
-          meetingPlaceRecommendation: {
-            id: '10',
-            place: {
-              id: '1',
-              name: '성수 카페 모모',
-              address: '서울 성동구 성수이로 1',
-              longitude: 127.0557,
-              latitude: 37.5446,
-              category: { name: '카페', slug: 'cafe' },
+    it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(
+      '%s 상태면 경로와 총 이동 거리를 순서대로 반환하고, 여러 구간의 거리를 합산하며, 마지막 장소의 이동 시간은 null로 반환한다',
+      async (status) => {
+        const {
+          service,
+          meetingAccessService,
+          courseCandidateRepository,
+          courseCandidatePlaceRepository,
+          placeImageRepository,
+          storageService,
+        } = createService()
+        meetingAccessService.findParticipant.mockResolvedValue({
+          id: '1',
+          meeting: createMeetingWithStatus(status),
+        })
+        courseCandidateRepository.findOne.mockResolvedValue(
+          createCandidate({ id: '2', name: '뚜벅이 코스' }),
+        )
+        courseCandidatePlaceRepository.find.mockResolvedValue([
+          {
+            order: 1,
+            travelTimeToNext: 480,
+            distanceToNextMeters: 600,
+            meetingPlaceRecommendation: {
+              id: '10',
+              place: {
+                id: '1',
+                name: '성수 카페 모모',
+                address: '서울 성동구 성수이로 1',
+                longitude: 127.0557,
+                latitude: 37.5446,
+                category: { name: '카페', slug: 'cafe' },
+              },
             },
           },
-        },
-        {
-          order: 2,
-          travelTimeToNext: 600,
-          distanceToNextMeters: 900,
-          meetingPlaceRecommendation: {
-            id: '11',
-            place: {
-              id: '2',
-              name: '성수 맛집',
-              address: '서울 성동구 성수이로 2',
-              longitude: 127.0558,
-              latitude: 37.5447,
-              category: { name: '음식점', slug: 'restaurant' },
+          {
+            order: 2,
+            travelTimeToNext: 600,
+            distanceToNextMeters: 900,
+            meetingPlaceRecommendation: {
+              id: '11',
+              place: {
+                id: '2',
+                name: '성수 맛집',
+                address: '서울 성동구 성수이로 2',
+                longitude: 127.0558,
+                latitude: 37.5447,
+                category: { name: '음식점', slug: 'restaurant' },
+              },
             },
           },
-        },
-        {
-          order: 3,
-          travelTimeToNext: null,
-          distanceToNextMeters: null,
-          meetingPlaceRecommendation: {
-            id: '12',
-            place: {
-              id: '3',
-              name: '성수 술집',
-              address: '서울 성동구 성수이로 3',
-              longitude: 127.0559,
-              latitude: 37.5448,
-              category: { name: '술집', slug: 'bar' },
+          {
+            order: 3,
+            travelTimeToNext: null,
+            distanceToNextMeters: null,
+            meetingPlaceRecommendation: {
+              id: '12',
+              place: {
+                id: '3',
+                name: '성수 술집',
+                address: '서울 성동구 성수이로 3',
+                longitude: 127.0559,
+                latitude: 37.5448,
+                category: { name: '술집', slug: 'bar' },
+              },
             },
           },
-        },
-      ])
-      placeImageRepository.find.mockResolvedValue([
-        {
-          place: { id: '1' },
-          mediaAsset: { objectKey: 'places/1/first.jpg' },
-        },
-      ])
-      storageService.getPresignedDownloadUrl.mockResolvedValue(
-        'https://signed.example.com/first.jpg',
-      )
+        ])
+        placeImageRepository.find.mockResolvedValue([
+          {
+            place: { id: '1' },
+            mediaAsset: { objectKey: 'places/1/first.jpg' },
+          },
+        ])
+        storageService.getPresignedDownloadUrl.mockResolvedValue(
+          'https://signed.example.com/first.jpg',
+        )
 
-      await expect(service.getCourseDetail('1', '2', 'token')).resolves.toEqual(
-        {
+        await expect(
+          service.getCourseDetail('1', '2', 'token'),
+        ).resolves.toEqual({
           courseName: '뚜벅이 코스',
           totalDistanceKm: 1.5,
           totalCount: 3,
@@ -413,16 +416,16 @@ describe('CourseService', () => {
               walkDurationToNextMin: null,
             },
           ],
-        },
-      )
-      expect(courseCandidatePlaceRepository.find).toHaveBeenCalledWith({
-        where: { courseCandidate: { id: '2' } },
-        relations: {
-          meetingPlaceRecommendation: { place: { category: true } },
-        },
-        order: { order: 'ASC' },
-      })
-    })
+        })
+        expect(courseCandidatePlaceRepository.find).toHaveBeenCalledWith({
+          where: { courseCandidate: { id: '2' } },
+          relations: {
+            meetingPlaceRecommendation: { place: { category: true } },
+          },
+          order: { order: 'ASC' },
+        })
+      },
+    )
   })
 
   describe('getCourseComments', () => {
