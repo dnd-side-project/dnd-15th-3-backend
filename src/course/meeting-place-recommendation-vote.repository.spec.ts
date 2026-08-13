@@ -36,15 +36,15 @@ describe('MeetingPlaceRecommendationVoteRepository', () => {
     ])
 
     const result = await repository.applyPreference(
-      'recommendation-1',
-      'participant-1',
+      '1',
+      '1',
       PreferenceType.Like,
     )
 
     expect(voteRepository.upsert).toHaveBeenCalledWith(
       {
-        recommendation: { id: 'recommendation-1' },
-        participant: { id: 'participant-1' },
+        recommendation: { id: '1' },
+        participant: { id: '1' },
         preference: PreferenceType.Like,
         updatedAt: expect.any(Date),
       },
@@ -57,15 +57,11 @@ describe('MeetingPlaceRecommendationVoteRepository', () => {
   it('preference가 null이면 삭제하고 upsert는 호출하지 않는다', async () => {
     const { repository, voteRepository } = createRepository([])
 
-    const result = await repository.applyPreference(
-      'recommendation-1',
-      'participant-1',
-      null,
-    )
+    const result = await repository.applyPreference('1', '1', null)
 
     expect(voteRepository.delete).toHaveBeenCalledWith({
-      recommendation: { id: 'recommendation-1' },
-      participant: { id: 'participant-1' },
+      recommendation: { id: '1' },
+      participant: { id: '1' },
     })
     expect(voteRepository.upsert).not.toHaveBeenCalled()
     expect(result).toEqual({ likeCount: 0, dislikeCount: 0 })
@@ -78,14 +74,14 @@ describe('MeetingPlaceRecommendationVoteRepository', () => {
     ])
 
     const result = await repository.applyPreference(
-      'recommendation-1',
-      'participant-1',
+      '1',
+      '1',
       PreferenceType.Dislike,
     )
 
     expect(queryBuilder.where).toHaveBeenCalledWith(
       'vote.recommendation = :recommendationId',
-      { recommendationId: 'recommendation-1' },
+      { recommendationId: '1' },
     )
     expect(result).toEqual({ likeCount: 5, dislikeCount: 2 })
   })

@@ -8,9 +8,64 @@ export type PreferenceCounts = {
   dislikeCount: number
 }
 
+export type PreferenceSummary = PreferenceCounts & {
+  myPreference: PreferenceType | null
+}
+
+type RawPreferenceSummaryRow = {
+  recommendationId: string
+  likeCount: string
+  dislikeCount: string
+  myPreference: PreferenceType | null
+}
+
 @Injectable()
 export class MeetingPlaceRecommendationVoteRepository {
   constructor(private readonly dataSource: DataSource) {}
+
+  async getPreferenceSummaries(
+    recommendationIds: readonly string[],
+    viewerId: string,
+  ): Promise<Map<string, PreferenceSummary>> {
+    if (recommendationIds.length === 0) {
+      return new Map()
+    }
+
+    const rows = await this.dataSource
+      .getRepository(MeetingPlaceRecommendationVote)
+      .createQueryBuilder('vote')
+      .select('vote.recommendation', 'recommendationId')
+      .addSelect('COUNT(*) FILTER (WHERE vote.preference = :like)', 'likeCount')
+      .addSelect(
+        'COUNT(*) FILTER (WHERE vote.preference = :dislike)',
+        'dislikeCount',
+      )
+      .addSelect(
+        'MAX(CASE WHEN vote.participant = :viewerId THEN vote.preference::text END)',
+        'myPreference',
+      )
+      .where('vote.recommendation IN (:...recommendationIds)', {
+        recommendationIds,
+      })
+      .setParameters({
+        like: PreferenceType.Like,
+        dislike: PreferenceType.Dislike,
+        viewerId,
+      })
+      .groupBy('vote.recommendation')
+      .getRawMany<RawPreferenceSummaryRow>()
+
+    return new Map(
+      rows.map((row) => [
+        row.recommendationId,
+        {
+          likeCount: Number(row.likeCount),
+          dislikeCount: Number(row.dislikeCount),
+          myPreference: row.myPreference,
+        },
+      ]),
+    )
+  }
 
   applyPreference(
     recommendationId: string,

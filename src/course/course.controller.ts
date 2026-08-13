@@ -342,19 +342,18 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 제외된 장소 목록을 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
-  getExcludedPlaces(
+  async getExcludedPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
-    @Query('accessToken') _accessToken: string,
+    @Query('accessToken') accessToken: string,
     @Query('category', new ParseEnumPipe(CategorySlug, { optional: true }))
     category?: CategorySlug,
-  ): never {
-    throw new NotImplementedException(
-      '제외된 장소 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
+  ): Promise<ExcludedPlaceListResponseDto> {
+    return await this.courseService.getExcludedPlaces(
+      meetingId,
+      courseCandidateId,
+      accessToken,
+      category,
     )
   }
 

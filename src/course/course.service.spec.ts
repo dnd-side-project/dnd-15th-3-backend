@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
@@ -12,6 +13,7 @@ import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
+import { PreferenceType } from './enums/preference-type.enum'
 
 function createMeetingWithStatus(status: MeetingStatus): Meeting {
   const meeting = new Meeting()
@@ -32,25 +34,41 @@ function createCandidate(overrides: Partial<CourseCandidate>): CourseCandidate {
 function createService() {
   const dataSource = { transaction: jest.fn() }
   const meetingAccessService = { findParticipant: jest.fn() }
+  const voteRepository = {
+    getPreferenceSummaries: jest.fn().mockResolvedValue(new Map()),
+  }
+  const recommendationRepository = {
+    findExcludedFromCourse: jest.fn().mockResolvedValue([]),
+  }
+  const storageService = { getPresignedDownloadUrl: jest.fn() }
   const courseCandidateRepository = { find: jest.fn(), exists: jest.fn() }
   const commentRepository = {
     find: jest.fn(),
     create: jest.fn((value) => value),
     save: jest.fn(),
   }
+  const placeImageRepository = { find: jest.fn().mockResolvedValue([]) }
   const service = new CourseService(
     dataSource as never,
     meetingAccessService as never,
+    voteRepository as never,
+    recommendationRepository as never,
+    storageService as never,
     courseCandidateRepository as never,
     commentRepository as never,
+    placeImageRepository as never,
   )
 
   return {
     service,
     dataSource,
     meetingAccessService,
+    voteRepository,
+    recommendationRepository,
+    storageService,
     courseCandidateRepository,
     commentRepository,
+    placeImageRepository,
   }
 }
 
@@ -127,14 +145,14 @@ describe('CourseService', () => {
         meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.find.mockResolvedValue([
-        { id: 'candidate-1', order: 1 },
-        { id: 'candidate-2', order: 2 },
+        { id: '1', order: 1 },
+        { id: '2', order: 2 },
       ])
 
       await expect(service.getCourseCandidates('1', 'token')).resolves.toEqual({
         courseCandidates: [
-          { courseCandidateId: 'candidate-1', order: 1 },
-          { courseCandidateId: 'candidate-2', order: 2 },
+          { courseCandidateId: '1', order: 1 },
+          { courseCandidateId: '2', order: 2 },
         ],
         totalCount: 2,
       })
@@ -193,7 +211,7 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'viewer-1',
+        id: '1',
         meeting: createMeetingWithStatus(status),
       })
 
@@ -212,7 +230,7 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'viewer-1',
+        id: '1',
         meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(false)
@@ -235,28 +253,28 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'viewer-1',
+        id: '1',
         meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(true)
       commentRepository.find.mockResolvedValue([
         {
-          id: 'comment-1',
+          id: '1',
           content: '여기 코스 좋아요!',
           createdAt: new Date('2026-08-08T12:34:56.000Z'),
           participant: createParticipant({
-            id: 'viewer-1',
+            id: '1',
             nickname: '모모',
             profileAvatarId: ProfileAvatarId.MomoBlue,
             role: ParticipantRole.Host,
           }),
         },
         {
-          id: 'comment-2',
+          id: '2',
           content: '저도요',
           createdAt: new Date('2026-08-08T13:00:00.000Z'),
           participant: createParticipant({
-            id: 'participant-2',
+            id: '2',
             nickname: '지니',
             profileAvatarId: ProfileAvatarId.MomoYellow,
             role: ParticipantRole.Member,
@@ -268,7 +286,7 @@ describe('CourseService', () => {
         service.getCourseComments('1', '2', 'token'),
       ).resolves.toEqual([
         {
-          commentId: 'comment-1',
+          commentId: '1',
           nickname: '모모',
           profileAvatarId: ProfileAvatarId.MomoBlue,
           authorRole: ParticipantRole.Host,
@@ -277,7 +295,7 @@ describe('CourseService', () => {
           createdAt: '2026-08-08T12:34:56.000Z',
         },
         {
-          commentId: 'comment-2',
+          commentId: '2',
           nickname: '지니',
           profileAvatarId: ProfileAvatarId.MomoYellow,
           authorRole: ParticipantRole.Member,
@@ -301,7 +319,7 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'viewer-1',
+        id: '1',
         meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(true)
@@ -347,7 +365,7 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'viewer-1',
+        id: '1',
         meeting: createMeetingWithStatus(status),
       })
 
@@ -368,7 +386,7 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'viewer-1',
+        id: '1',
         meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(false)
@@ -393,12 +411,12 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'viewer-1',
+        id: '1',
         meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
       })
       courseCandidateRepository.exists.mockResolvedValue(true)
       commentRepository.save.mockResolvedValue({
-        id: 'comment-1',
+        id: '1',
         content: '여기 코스 좋아요!',
         createdAt: new Date('2026-08-08T12:34:56.000Z'),
       })
@@ -408,20 +426,207 @@ describe('CourseService', () => {
           content: '여기 코스 좋아요!',
         }),
       ).resolves.toEqual({
-        commentId: 'comment-1',
+        commentId: '1',
         content: '여기 코스 좋아요!',
         createdAt: '2026-08-08T12:34:56.000Z',
       })
       expect(commentRepository.create).toHaveBeenCalledWith({
         courseCandidate: { id: '2' },
-        participant: { id: 'viewer-1' },
+        participant: { id: '1' },
         content: '여기 코스 좋아요!',
       })
       expect(commentRepository.save).toHaveBeenCalledWith({
         courseCandidate: { id: '2' },
-        participant: { id: 'viewer-1' },
+        participant: { id: '1' },
         content: '여기 코스 좋아요!',
       })
+    })
+  })
+
+  describe('getExcludedPlaces', () => {
+    it('참여자 검증에 실패하면 DB 조회 없이 그대로 전파한다', async () => {
+      const { service, meetingAccessService, recommendationRepository } =
+        createService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+      )
+
+      const promise = service.getExcludedPlaces(
+        '1',
+        '2',
+        'bad-token',
+        undefined,
+      )
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(
+        recommendationRepository.findExcludedFromCourse,
+      ).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      MeetingStatus.RecommendationCollecting,
+      MeetingStatus.CourseGenerating,
+      MeetingStatus.CourseGenerationFailed,
+      MeetingStatus.CourseConfirmed,
+    ])('%s 상태에서는 DB 조회 없이 409를 던진다', async (status) => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        recommendationRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(status),
+      })
+
+      const promise = service.getExcludedPlaces('1', '2', 'token', undefined)
+
+      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
+      expect(
+        recommendationRepository.findExcludedFromCourse,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('코스 후보가 해당 모임 소속이 아니면 404를 던지고 장소를 조회하지 않는다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        recommendationRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      })
+      courseCandidateRepository.exists.mockResolvedValue(false)
+
+      const promise = service.getExcludedPlaces('1', '2', 'token', undefined)
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
+      expect(
+        recommendationRepository.findExcludedFromCourse,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('제외된 장소가 없으면 투표/이미지 조회 없이 빈 목록을 반환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        voteRepository,
+        placeImageRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      })
+      courseCandidateRepository.exists.mockResolvedValue(true)
+
+      await expect(
+        service.getExcludedPlaces('1', '2', 'token', undefined),
+      ).resolves.toEqual({ items: [], totalCount: 0, appliedCategory: null })
+      expect(voteRepository.getPreferenceSummaries).toHaveBeenCalledWith(
+        [],
+        '1',
+      )
+      expect(placeImageRepository.find).not.toHaveBeenCalled()
+    })
+
+    it('카테고리 필터를 저장소 조회에 그대로 전달한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        recommendationRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      })
+      courseCandidateRepository.exists.mockResolvedValue(true)
+
+      await service.getExcludedPlaces('1', '2', 'token', CategorySlug.Cafe)
+
+      expect(
+        recommendationRepository.findExcludedFromCourse,
+      ).toHaveBeenCalledWith('1', '2', CategorySlug.Cafe)
+    })
+
+    it('제외된 장소를 좋아요/싫어요·대표 이미지와 함께 반환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        recommendationRepository,
+        voteRepository,
+        placeImageRepository,
+        storageService,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      })
+      courseCandidateRepository.exists.mockResolvedValue(true)
+      recommendationRepository.findExcludedFromCourse.mockResolvedValue([
+        {
+          id: '1',
+          place: {
+            id: '1',
+            name: '성수 카페 모모',
+            address: '서울 성동구 성수이로 1',
+            category: { name: '카페', slug: 'cafe' },
+          },
+        },
+      ])
+      voteRepository.getPreferenceSummaries.mockResolvedValue(
+        new Map([
+          [
+            '1',
+            {
+              likeCount: 3,
+              dislikeCount: 1,
+              myPreference: PreferenceType.Like,
+            },
+          ],
+        ]),
+      )
+      placeImageRepository.find.mockResolvedValue([
+        {
+          place: { id: '1' },
+          mediaAsset: { objectKey: 'places/1/first.jpg' },
+        },
+      ])
+      storageService.getPresignedDownloadUrl.mockResolvedValue(
+        'https://signed.example.com/first.jpg',
+      )
+
+      await expect(
+        service.getExcludedPlaces('1', '2', 'token', undefined),
+      ).resolves.toEqual({
+        items: [
+          {
+            recommendationId: '1',
+            category: '카페',
+            categorySlug: 'cafe',
+            name: '성수 카페 모모',
+            address: '서울 성동구 성수이로 1',
+            primaryImageUrl: 'https://signed.example.com/first.jpg',
+            likeCount: 3,
+            dislikeCount: 1,
+            myPreference: PreferenceType.Like,
+          },
+        ],
+        totalCount: 1,
+        appliedCategory: null,
+      })
+      expect(voteRepository.getPreferenceSummaries).toHaveBeenCalledWith(
+        ['1'],
+        '1',
+      )
     })
   })
 

@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import {
@@ -12,27 +13,38 @@ import {
   COURSE_COMMENT_CREATABLE_STATUSES,
   COURSE_COMMENTS_VISIBLE_STATUSES,
 } from 'src/meeting/constants/meeting-status.constants'
+import { MeetingPlaceRecommendationDto } from 'src/meeting/dto/meeting-place-recommendation.dto'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
-import { DataSource, Repository } from 'typeorm'
+import { PlaceImage } from 'src/place/entities/place-image.entity'
+import { StorageService } from 'src/storage/storage.service'
+import { DataSource, In, Repository } from 'typeorm'
 import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
 import { CreateCourseCommentResponseDto } from './dto/create-course-comment-response.dto'
+import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
+import { MeetingPlaceRecommendationRepository } from './meeting-place-recommendation.repository'
+import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recommendation-vote.repository'
 
 @Injectable()
 export class CourseService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly meetingAccessService: MeetingAccessService,
+    private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
+    private readonly recommendationRepository: MeetingPlaceRecommendationRepository,
+    private readonly storageService: StorageService,
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
     @InjectRepository(CourseCandidateComment)
     private readonly commentRepository: Repository<CourseCandidateComment>,
+    @InjectRepository(PlaceImage)
+    private readonly placeImageRepository: Repository<PlaceImage>,
   ) {}
 
   async getCourseCandidates(
@@ -184,6 +196,83 @@ export class CourseService {
         confirmedCourseCandidateId: candidate.id,
       }
     })
+  }
+
+  async getExcludedPlaces(
+    meetingId: string,
+    courseCandidateId: string,
+    accessToken: string,
+    category: CategorySlug | undefined,
+  ): Promise<ExcludedPlaceListResponseDto> {
+    const viewer = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    viewer.meeting.assertStatus(
+      COURSE_CANDIDATES_VISIBLE_STATUSES,
+      '모임이 코스 생성 완료 상태가 아니어서 제외된 장소 목록을 조회할 수 없습니다.',
+    )
+    await this.assertCourseCandidateExists(courseCandidateId, meetingId)
+
+    const recommendations =
+      await this.recommendationRepository.findExcludedFromCourse(
+        meetingId,
+        courseCandidateId,
+        category,
+      )
+    const recommendationIds = recommendations.map(
+      (recommendation) => recommendation.id,
+    )
+
+    const [preferenceSummaries, primaryImageUrls] = await Promise.all([
+      this.voteRepository.getPreferenceSummaries(recommendationIds, viewer.id),
+      this.findPrimaryImageUrls(
+        recommendations.map((recommendation) => recommendation.place.id),
+      ),
+    ])
+
+    const items: MeetingPlaceRecommendationDto[] = recommendations.map(
+      (recommendation) => {
+        const summary = preferenceSummaries.get(recommendation.id)
+        return {
+          recommendationId: recommendation.id,
+          category: recommendation.place.category.name,
+          categorySlug: recommendation.place.category.slug as CategorySlug,
+          name: recommendation.place.name,
+          address: recommendation.place.address,
+          primaryImageUrl: primaryImageUrls.get(recommendation.place.id),
+          likeCount: summary?.likeCount ?? 0,
+          dislikeCount: summary?.dislikeCount ?? 0,
+          myPreference: summary?.myPreference ?? null,
+        }
+      },
+    )
+
+    return {
+      items,
+      totalCount: items.length,
+      appliedCategory: category ?? null,
+    }
+  }
+
+  private async findPrimaryImageUrls(
+    placeIds: string[],
+  ): Promise<Map<string, string>> {
+    if (placeIds.length === 0) {
+      return new Map()
+    }
+
+    const images = await this.placeImageRepository.find({
+      where: { place: { id: In(placeIds) }, isPrimary: true },
+      relations: { place: true, mediaAsset: true },
+      select: { place: { id: true }, mediaAsset: { objectKey: true } },
+    })
+    const urls = await Promise.all(
+      images.map((image) =>
+        this.storageService.getPresignedDownloadUrl(image.mediaAsset.objectKey),
+      ),
+    )
+    return new Map(images.map((image, index) => [image.place.id, urls[index]]))
   }
 
   private async assertCourseCandidateExists(

@@ -1,6 +1,7 @@
 import { NotImplementedException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseController } from './course.controller'
@@ -11,6 +12,7 @@ function createController() {
     getCourseCandidates: jest.fn().mockResolvedValue({}),
     getCourseComments: jest.fn().mockResolvedValue([]),
     createCourseComment: jest.fn().mockResolvedValue({}),
+    getExcludedPlaces: jest.fn().mockResolvedValue({}),
     confirmCourse: jest.fn().mockResolvedValue({}),
   } as unknown as CourseService
 
@@ -105,6 +107,26 @@ describe('CourseController', () => {
     )
   })
 
+  it('제외된 장소 목록 조회는 CourseService에 위임한다', async () => {
+    const { controller, courseService } = createController()
+    const expected = {
+      items: [],
+      totalCount: 0,
+      appliedCategory: null,
+    }
+    ;(courseService.getExcludedPlaces as jest.Mock).mockResolvedValue(expected)
+
+    await expect(
+      controller.getExcludedPlaces('1', '2', 'token', CategorySlug.Cafe),
+    ).resolves.toEqual(expected)
+    expect(courseService.getExcludedPlaces).toHaveBeenCalledWith(
+      '1',
+      '2',
+      'token',
+      CategorySlug.Cafe,
+    )
+  })
+
   it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
     const { controller } = createController()
 
@@ -112,9 +134,6 @@ describe('CourseController', () => {
       NotImplementedException,
     )
     expect(() => controller.getCourseDetail('1', '2', 'token')).toThrow(
-      NotImplementedException,
-    )
-    expect(() => controller.getExcludedPlaces('1', '2', 'token')).toThrow(
       NotImplementedException,
     )
     expect(() =>
@@ -132,6 +151,7 @@ describe('CourseController', () => {
             getCourseCandidates: jest.fn(),
             getCourseComments: jest.fn(),
             createCourseComment: jest.fn(),
+            getExcludedPlaces: jest.fn(),
             confirmCourse: jest.fn(),
           },
         },
@@ -183,7 +203,7 @@ describe('CourseController', () => {
       '/meetings/{meetingId}/courses/{courseCandidateId}/excluded-places'
     ] as PathOperations | undefined
     expect(responseCodes(excludedPlacesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409'].sort(),
     )
 
     const confirmationPath = document.paths?.[
