@@ -1085,6 +1085,7 @@ describe('MeetingService', () => {
       expect(placeRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2' },
         relations: { category: true },
+        select: { latitude: true, longitude: true, category: { id: true } },
       })
       expect(placeSearchRepository.findSimilar).toHaveBeenCalledWith(
         '1',
@@ -1126,6 +1127,7 @@ describe('MeetingService', () => {
       expect(recommendationRepository.find).toHaveBeenCalledWith({
         where: { meeting: { id: '1' } },
         relations: { place: true },
+        select: { place: { id: true } },
       })
       expect(placeSearchRepository.findSimilar).toHaveBeenCalledWith(
         '1',
@@ -1215,6 +1217,14 @@ describe('MeetingService', () => {
       ])
       expect(placeRepository.find).toHaveBeenCalledWith({
         where: { id: In(['3', '4']) },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          latitude: true,
+          longitude: true,
+          previewUrl: true,
+        },
       })
     })
   })

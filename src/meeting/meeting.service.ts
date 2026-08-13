@@ -1020,10 +1020,12 @@ export class MeetingService {
       this.placeRepository.findOne({
         where: { id: placeId },
         relations: { category: true },
+        select: { latitude: true, longitude: true, category: { id: true } },
       }),
       this.recommendationRepository.find({
         where: { meeting: { id: meetingId } },
         relations: { place: true },
+        select: { place: { id: true } },
       }),
     ])
     if (!place) {
@@ -1047,7 +1049,17 @@ export class MeetingService {
     const padIds = displayedIds.slice(0, limit - similar.length)
     const padding =
       padIds.length > 0
-        ? await this.placeRepository.find({ where: { id: In(padIds) } })
+        ? await this.placeRepository.find({
+            where: { id: In(padIds) },
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              latitude: true,
+              longitude: true,
+              previewUrl: true,
+            },
+          })
         : []
 
     const candidates = [...similar, ...padding]
@@ -1077,6 +1089,10 @@ export class MeetingService {
     const images = await this.placeImageRepository.find({
       where: { place: { id: In(placeIds) }, isPrimary: true },
       relations: { place: true, mediaAsset: true },
+      select: {
+        place: { id: true },
+        mediaAsset: { objectKey: true },
+      },
     })
     const urls = await Promise.all(
       images.map((image) =>
