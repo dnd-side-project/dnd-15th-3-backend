@@ -265,7 +265,7 @@ describe('CourseService', () => {
       expect(courseCandidatePlaceRepository.find).not.toHaveBeenCalled()
     })
 
-    it('경로와 총 이동 거리를 순서대로 반환하고 마지막 장소의 이동 시간은 null로 반환한다', async () => {
+    it('경로와 총 이동 거리를 순서대로 반환하고, 여러 구간의 거리를 합산하며, 마지막 장소의 이동 시간은 null로 반환한다', async () => {
       const {
         service,
         meetingAccessService,
@@ -300,8 +300,8 @@ describe('CourseService', () => {
         },
         {
           order: 2,
-          travelTimeToNext: null,
-          distanceToNextMeters: null,
+          travelTimeToNext: 600,
+          distanceToNextMeters: 900,
           meetingPlaceRecommendation: {
             id: '11',
             place: {
@@ -311,6 +311,22 @@ describe('CourseService', () => {
               longitude: 127.0558,
               latitude: 37.5447,
               category: { name: '음식점', slug: 'restaurant' },
+            },
+          },
+        },
+        {
+          order: 3,
+          travelTimeToNext: null,
+          distanceToNextMeters: null,
+          meetingPlaceRecommendation: {
+            id: '12',
+            place: {
+              id: '3',
+              name: '성수 술집',
+              address: '서울 성동구 성수이로 3',
+              longitude: 127.0559,
+              latitude: 37.5448,
+              category: { name: '술집', slug: 'bar' },
             },
           },
         },
@@ -328,8 +344,8 @@ describe('CourseService', () => {
       await expect(service.getCourseDetail('1', '2', 'token')).resolves.toEqual(
         {
           courseName: '뚜벅이 코스',
-          totalDistanceKm: 0.6,
-          totalCount: 2,
+          totalDistanceKm: 1.5,
+          totalCount: 3,
           route: [
             {
               recommendationId: '10',
@@ -355,6 +371,19 @@ describe('CourseService', () => {
               primaryImageUrl: null,
               longitude: 127.0558,
               latitude: 37.5447,
+              walkDurationToNextMin: 10,
+            },
+            {
+              recommendationId: '12',
+              placeId: '3',
+              order: 3,
+              name: '성수 술집',
+              category: '술집',
+              categorySlug: 'bar',
+              address: '서울 성동구 성수이로 3',
+              primaryImageUrl: null,
+              longitude: 127.0559,
+              latitude: 37.5448,
               walkDurationToNextMin: null,
             },
           ],
