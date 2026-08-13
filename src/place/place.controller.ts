@@ -133,7 +133,8 @@ export class PlaceController {
   @Get(':placeId')
   @ApiOperation({
     summary: '장소 상세 조회',
-    description: '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다.',
+    description:
+      '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다. 모임 상태와 무관하게 조회 가능합니다.',
   })
   @ApiParam({
     name: 'placeId',
