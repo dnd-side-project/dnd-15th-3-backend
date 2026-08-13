@@ -36,6 +36,6 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
     PlaceSyncService,
     PlaceSyncWorker,
   ],
-  exports: [PlaceSyncService],
+  exports: [PlaceSyncService, PlaceRepository],
 })
 export class PlaceModule {}

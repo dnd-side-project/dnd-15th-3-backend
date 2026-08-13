@@ -6,7 +6,9 @@ import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { Place } from 'src/place/entities/place.entity'
+import { PlaceImage } from 'src/place/entities/place-image.entity'
 import { PlaceModule } from 'src/place/place.module'
+import { StorageModule } from 'src/storage/storage.module'
 import { User } from 'src/user/entities/user.entity'
 import { MeetingAccessModule } from './access/meeting-access.module'
 import { Meeting } from './entities/meeting.entity'
@@ -24,6 +26,7 @@ import { MeetingService } from './meeting.service'
     PlaceModule,
     CourseModule,
     MeetingAccessModule,
+    StorageModule,
     TypeOrmModule.forFeature([
       Category,
       CourseCandidate,
@@ -34,6 +37,7 @@ import { MeetingService } from './meeting.service'
       MeetingType,
       MeetingPlaceRecommendation,
       Place,
+      PlaceImage,
       User,
     ]),
   ],

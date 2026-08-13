@@ -26,6 +26,7 @@ function createController() {
     getMeetingStatus: jest.fn().mockResolvedValue({}),
     getMapPins: jest.fn().mockResolvedValue({}),
     updatePlacePreference: jest.fn().mockResolvedValue({}),
+    getSimilarPlaces: jest.fn().mockResolvedValue([]),
   } as unknown as MeetingService
 
   return {
@@ -85,6 +86,34 @@ describe('MeetingController', () => {
     )
   })
 
+  it('비슷한 장소 추천은 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = [
+      {
+        id: '10',
+        categoryId: '1',
+        name: '성수 카페 모모',
+        address: '서울 성동구 성수이로 1',
+        latitude: 37.5446,
+        longitude: 127.0557,
+        primaryImageUrl: null,
+        previewUrl: null,
+      },
+    ]
+    ;(meetingService.getSimilarPlaces as jest.Mock).mockResolvedValue(expected)
+
+    await expect(
+      controller.getSimilarPlaces('1', '2', 'token', ['3', '4'], 5),
+    ).resolves.toEqual(expected)
+    expect(meetingService.getSimilarPlaces).toHaveBeenCalledWith(
+      '1',
+      '2',
+      'token',
+      ['3', '4'],
+      5,
+    )
+  })
+
   it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
     const { controller } = createController()
 
@@ -92,12 +121,6 @@ describe('MeetingController', () => {
       controller.updateCourseImage('1', 'token', {
         courseImageKey: 'course-cards/1/5.png',
       }),
-    ).toThrow(NotImplementedException)
-    expect(() => controller.getSimilarPlaces('1', '2', 'token')).toThrow(
-      NotImplementedException,
-    )
-    expect(() =>
-      controller.getSimilarPlaces('1', '2', 'token', ['3', '4'], 5),
     ).toThrow(NotImplementedException)
   })
 
@@ -119,6 +142,7 @@ describe('MeetingController', () => {
             getMeetingStatus: jest.fn(),
             getMapPins: jest.fn(),
             updatePlacePreference: jest.fn(),
+            getSimilarPlaces: jest.fn(),
           },
         },
       ],
@@ -172,7 +196,7 @@ describe('MeetingController', () => {
       '/meetings/{meetingId}/places/{placeId}/similar'
     ] as PathOperations | undefined
     expect(responseCodes(similarPlacesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409'].sort(),
     )
 
     expect(document.components?.schemas?.PreferenceType).toMatchObject({
@@ -261,6 +285,9 @@ describe('MeetingController', () => {
     expect(
       similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
     ).toBe(true)
+    expect(similarPlaceResponseSchema?.properties?.previewUrl?.nullable).toBe(
+      true,
+    )
 
     await app.close()
   })

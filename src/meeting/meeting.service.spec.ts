@@ -17,7 +17,7 @@ import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import type { PlaceSyncService } from 'src/place/sync/place-sync.service'
 import { User } from 'src/user/entities/user.entity'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
-import type { Repository } from 'typeorm'
+import { In, type Repository } from 'typeorm'
 import type { MeetingAccessService } from './access/meeting-access.service'
 import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
@@ -68,10 +68,13 @@ function createMeetingService() {
     createJobs: jest.fn().mockResolvedValue(undefined),
   }
   const participantRepository = { findOne: jest.fn(), find: jest.fn() }
-  const placeRepository = { findOne: jest.fn() }
+  const placeRepository = {
+    findOne: jest.fn(),
+    find: jest.fn().mockResolvedValue([]),
+  }
   const recommendationRepository = {
     findOne: jest.fn(),
-    find: jest.fn(),
+    find: jest.fn().mockResolvedValue([]),
     create: jest.fn((value) => value),
     save: jest.fn(),
     exists: jest.fn(),
@@ -87,11 +90,20 @@ function createMeetingService() {
   const courseCandidateRepository = {
     findOne: jest.fn(),
   }
+  const placeImageRepository = {
+    find: jest.fn().mockResolvedValue([]),
+  }
   const voteRepository = {
     applyPreference: jest.fn(),
   }
   const meetingAccessService = {
     findParticipant: jest.fn(),
+  }
+  const placeSearchRepository = {
+    findSimilar: jest.fn(),
+  }
+  const storageService = {
+    getPresignedDownloadUrl: jest.fn(),
   }
 
   const service = new MeetingService(
@@ -103,8 +115,11 @@ function createMeetingService() {
     recommendationRepository as never,
     meetingRepository as unknown as Repository<Meeting>,
     courseCandidateRepository as unknown as Repository<CourseCandidate>,
+    placeImageRepository as never,
     voteRepository as unknown as MeetingPlaceRecommendationVoteRepository,
     meetingAccessService as unknown as MeetingAccessService,
+    placeSearchRepository as never,
+    storageService as never,
   )
 
   return {
@@ -117,8 +132,11 @@ function createMeetingService() {
     dataSource,
     meetingRepository,
     courseCandidateRepository,
+    placeImageRepository,
     voteRepository,
     meetingAccessService,
+    placeSearchRepository,
+    storageService,
   }
 }
 
@@ -970,6 +988,233 @@ describe('MeetingService', () => {
         likeCount: 0,
         dislikeCount: 0,
         myPreference: null,
+      })
+    })
+  })
+
+  describe('getSimilarPlaces', () => {
+    it('참여자 검증에 실패하면 그대로 전파한다', async () => {
+      const { service, meetingAccessService } = createMeetingService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+      )
+
+      const promise = service.getSimilarPlaces(
+        '1',
+        '2',
+        'bad-token',
+        undefined,
+        5,
+      )
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+    })
+
+    it('허용되지 않은 상태면 409를 던지고 장소를 조회하지 않는다', async () => {
+      const { service, meetingAccessService, placeRepository } =
+        createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(MeetingStatus.CourseConfirmed),
+      })
+
+      const promise = service.getSimilarPlaces('1', '2', 'token', undefined, 5)
+
+      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      expect(placeRepository.findOne).not.toHaveBeenCalled()
+    })
+
+    it('기준 장소를 찾지 못하면 404를 던진다', async () => {
+      const { service, meetingAccessService, placeRepository } =
+        createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.getSimilarPlaces('1', '2', 'token', undefined, 5)
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('장소를 찾을 수 없습니다.')
+    })
+
+    it('선택한 장소의 카테고리·위치 기준으로 무작위 장소를 조회하고 응답으로 변환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        placeSearchRepository,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        category: { id: '1' },
+        latitude: 37.544,
+        longitude: 127.055,
+      })
+      placeSearchRepository.findSimilar.mockResolvedValue([
+        {
+          id: '11',
+          name: '성수 카페 2',
+          address: '서울 성동구 성수이로 2',
+          latitude: 37.5447,
+          longitude: 127.0558,
+          previewUrl: null,
+        },
+      ])
+
+      await expect(
+        service.getSimilarPlaces('1', '2', 'token', ['3', '4'], 5),
+      ).resolves.toEqual([
+        {
+          id: '11',
+          categoryId: '1',
+          name: '성수 카페 2',
+          address: '서울 성동구 성수이로 2',
+          latitude: 37.5447,
+          longitude: 127.0558,
+          primaryImageUrl: null,
+          previewUrl: null,
+        },
+      ])
+      expect(placeRepository.findOne).toHaveBeenCalledWith({
+        where: { id: '2' },
+        relations: { category: true },
+      })
+      expect(placeSearchRepository.findSimilar).toHaveBeenCalledWith(
+        '1',
+        ['2', '3', '4'],
+        37.544,
+        127.055,
+        2000,
+        5,
+      )
+    })
+
+    it('이미 모임에 추천된 장소는 후보에서 제외한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        recommendationRepository,
+        placeSearchRepository,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        category: { id: '1' },
+        latitude: 37.544,
+        longitude: 127.055,
+      })
+      recommendationRepository.find.mockResolvedValue([
+        { place: { id: '20' } },
+        { place: { id: '21' } },
+      ])
+      placeSearchRepository.findSimilar.mockResolvedValue([])
+
+      await service.getSimilarPlaces('1', '2', 'token', ['3', '4'], 5)
+
+      expect(recommendationRepository.find).toHaveBeenCalledWith({
+        where: { meeting: { id: '1' } },
+        relations: { place: true },
+      })
+      expect(placeSearchRepository.findSimilar).toHaveBeenCalledWith(
+        '1',
+        ['2', '3', '4', '20', '21'],
+        37.544,
+        127.055,
+        2000,
+        5,
+      )
+    })
+
+    it('요청 개수가 100을 초과하면 100으로 제한한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        placeSearchRepository,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        category: { id: '1' },
+        latitude: 37.544,
+        longitude: 127.055,
+      })
+      placeSearchRepository.findSimilar.mockResolvedValue([])
+
+      await service.getSimilarPlaces('1', '2', 'token', undefined, 500)
+
+      expect(placeSearchRepository.findSimilar).toHaveBeenCalledWith(
+        '1',
+        ['2'],
+        37.544,
+        127.055,
+        2000,
+        100,
+      )
+    })
+
+    it('무작위 추천이 부족하면 화면에 노출 중이던 장소로 채운다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        placeSearchRepository,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        category: { id: '1' },
+        latitude: 37.544,
+        longitude: 127.055,
+      })
+      placeSearchRepository.findSimilar.mockResolvedValue([])
+      placeRepository.find.mockResolvedValue([
+        {
+          id: '3',
+          name: '노출 중이던 장소',
+          address: '서울 성동구 성수이로 3',
+          latitude: 37.5448,
+          longitude: 127.0559,
+          previewUrl: 'https://preview',
+        },
+      ])
+
+      await expect(
+        service.getSimilarPlaces('1', '2', 'token', ['3', '4'], 2),
+      ).resolves.toEqual([
+        {
+          id: '3',
+          categoryId: '1',
+          name: '노출 중이던 장소',
+          address: '서울 성동구 성수이로 3',
+          latitude: 37.5448,
+          longitude: 127.0559,
+          primaryImageUrl: null,
+          previewUrl: 'https://preview',
+        },
+      ])
+      expect(placeRepository.find).toHaveBeenCalledWith({
+        where: { id: In(['3', '4']) },
       })
     })
   })

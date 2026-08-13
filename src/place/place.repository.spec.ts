@@ -77,4 +77,51 @@ describe('PlaceRepository', () => {
     expect(selectQuery).toContain('"category"."id" = $4')
     expect(selectParameters).toEqual([127, 37.5, 2000, '6', 20, 0])
   })
+
+  describe('findSimilar', () => {
+    it('카테고리·반경·제외 목록 조건으로 무작위 장소를 조회한다', async () => {
+      const dataSource = {
+        query: jest.fn().mockResolvedValue([
+          {
+            id: '11',
+            name: '성수 카페 2',
+            address: '서울 성동구 성수이로 2',
+            latitude: 37.5447,
+            longitude: 127.0558,
+            previewUrl: null,
+          },
+        ]),
+      }
+      const repository = new PlaceRepository(
+        dataSource as unknown as DataSource,
+      )
+
+      await expect(
+        repository.findSimilar('1', ['10', '20'], 37.544, 127.055, 2000, 5),
+      ).resolves.toEqual([
+        {
+          id: '11',
+          name: '성수 카페 2',
+          address: '서울 성동구 성수이로 2',
+          latitude: 37.5447,
+          longitude: 127.0558,
+          previewUrl: null,
+        },
+      ])
+
+      expect(dataSource.query).toHaveBeenCalledTimes(1)
+      const [selectQuery, selectParameters] = dataSource.query.mock.calls[0]
+      expect(selectQuery).toContain('ST_DWithin')
+      expect(selectQuery).toContain('geography')
+      expect(selectQuery).toContain('ORDER BY RANDOM()')
+      expect(selectParameters).toEqual([
+        '1',
+        ['10', '20'],
+        127.055,
+        37.544,
+        2000,
+        5,
+      ])
+    })
+  })
 })

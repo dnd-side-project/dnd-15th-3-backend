@@ -572,19 +572,21 @@ export class MeetingController {
     description:
       '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
   getSimilarPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('placeId', BigIntStringPipe) placeId: string,
-    @Query('accessToken') _accessToken: string,
-    @Query('excludeIds', BigIntStringArrayPipe) excludeIds?: string[],
-    @Query('size', new PositiveIntPipe(5)) size?: number,
-  ): never {
-    throw new NotImplementedException(
-      '비슷한 장소 추천 API는 실제 데이터 연동 후 제공됩니다.',
+    @Query('accessToken') accessToken: string,
+    @Query('excludeIds', BigIntStringArrayPipe) excludeIds:
+      | string[]
+      | undefined,
+    @Query('size', new PositiveIntPipe(5)) size: number,
+  ): Promise<SimilarPlaceResponseDto[]> {
+    return this.meetingService.getSimilarPlaces(
+      meetingId,
+      placeId,
+      accessToken,
+      excludeIds,
+      size,
     )
   }
 }

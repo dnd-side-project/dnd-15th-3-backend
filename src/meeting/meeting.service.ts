@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
+import { SimilarPlaceResponseDto } from 'src/catalog/dto/similar-place-response.dto'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
@@ -23,13 +24,16 @@ import { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-pla
 import { MapPinDto } from 'src/place/dto/map-pin.dto'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { Place } from 'src/place/entities/place.entity'
+import { PlaceImage } from 'src/place/entities/place-image.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
+import { PlaceRepository } from 'src/place/place.repository'
 import {
   haversineDistanceMeters,
   PLACE_SYNC_RADIUS_METERS,
 } from 'src/place/sync/place-sync.constants'
 import { PlaceSyncService } from 'src/place/sync/place-sync.service'
+import { StorageService } from 'src/storage/storage.service'
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
@@ -37,6 +41,7 @@ import { assertAccessToken } from './access/meeting-access.utils'
 import {
   MAP_PINS_VISIBLE_STATUSES,
   PLACE_PREFERENCE_EDITABLE_STATUSES,
+  SIMILAR_PLACES_RECOMMENDABLE_STATUSES,
 } from './constants/meeting-status.constants'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
@@ -61,6 +66,7 @@ import type {
 import type { AddRecommendationRequest } from './schema/recommendation-request.schema'
 
 const INVITATION_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const MAX_SIMILAR_PLACES_SIZE = 100
 
 @Injectable()
 export class MeetingService {
@@ -78,8 +84,12 @@ export class MeetingService {
     private readonly meetingRepository: Repository<Meeting>,
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
+    @InjectRepository(PlaceImage)
+    private readonly placeImageRepository: Repository<PlaceImage>,
     private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
     private readonly meetingAccessService: MeetingAccessService,
+    private readonly placeSearchRepository: PlaceRepository,
+    private readonly storageService: StorageService,
   ) {}
 
   async createMeeting(
@@ -988,5 +998,92 @@ export class MeetingService {
       )
 
     return { likeCount, dislikeCount, myPreference: preference }
+  }
+
+  async getSimilarPlaces(
+    meetingId: string,
+    placeId: string,
+    accessToken: string,
+    excludeIds: string[] | undefined,
+    size: number,
+  ): Promise<SimilarPlaceResponseDto[]> {
+    const { meeting } = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    meeting.assertStatus(
+      SIMILAR_PLACES_RECOMMENDABLE_STATUSES,
+      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
+    )
+
+    const [place, alreadyRecommended] = await Promise.all([
+      this.placeRepository.findOne({
+        where: { id: placeId },
+        relations: { category: true },
+      }),
+      this.recommendationRepository.find({
+        where: { meeting: { id: meetingId } },
+        relations: { place: true },
+      }),
+    ])
+    if (!place) {
+      throw new NotFoundException('장소를 찾을 수 없습니다.')
+    }
+
+    const limit = Math.min(size, MAX_SIMILAR_PLACES_SIZE)
+    const displayedIds = excludeIds ?? []
+    const recommendedPlaceIds = alreadyRecommended.map(
+      (recommendation) => recommendation.place.id,
+    )
+    const similar = await this.placeSearchRepository.findSimilar(
+      place.category.id,
+      [placeId, ...displayedIds, ...recommendedPlaceIds],
+      place.latitude,
+      place.longitude,
+      PLACE_SYNC_RADIUS_METERS,
+      limit,
+    )
+
+    const padIds = displayedIds.slice(0, limit - similar.length)
+    const padding =
+      padIds.length > 0
+        ? await this.placeRepository.find({ where: { id: In(padIds) } })
+        : []
+
+    const candidates = [...similar, ...padding]
+    const primaryImageUrls = await this.findPrimaryImageUrls(
+      candidates.map((candidate) => candidate.id),
+    )
+
+    return candidates.map((candidate) => ({
+      id: candidate.id,
+      categoryId: place.category.id,
+      name: candidate.name,
+      address: candidate.address,
+      latitude: candidate.latitude,
+      longitude: candidate.longitude,
+      primaryImageUrl: primaryImageUrls.get(candidate.id) ?? null,
+      previewUrl: candidate.previewUrl,
+    }))
+  }
+
+  private async findPrimaryImageUrls(
+    placeIds: string[],
+  ): Promise<Map<string, string>> {
+    if (placeIds.length === 0) {
+      return new Map()
+    }
+
+    const images = await this.placeImageRepository.find({
+      where: { place: { id: In(placeIds) }, isPrimary: true },
+      relations: { place: true, mediaAsset: true },
+    })
+    const urls = await Promise.all(
+      images.map((image) =>
+        this.storageService.getPresignedDownloadUrl(image.mediaAsset.objectKey),
+      ),
+    )
+
+    return new Map(images.map((image, index) => [image.place.id, urls[index]]))
   }
 }

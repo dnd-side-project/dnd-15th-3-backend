@@ -27,3 +27,10 @@ export const COURSE_COMMENT_CREATABLE_STATUSES: readonly MeetingStatus[] = [
 export const COURSE_CONFIRMABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.CourseGenerated,
 ]
+
+export const SIMILAR_PLACES_RECOMMENDABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.RecommendationCollecting,
+  MeetingStatus.CourseGenerating,
+  MeetingStatus.CourseGenerated,
+  MeetingStatus.CourseGenerationFailed,
+]
