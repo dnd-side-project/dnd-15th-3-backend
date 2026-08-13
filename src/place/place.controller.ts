@@ -140,14 +140,24 @@ export class PlaceController {
     description: '조회할 장소의 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여자 전용 재접속 토큰',
+    example: 'member-session-token',
+    required: true,
+  })
   @ApiOkResponse({ type: PlaceSearchResultDto })
   @ApiBadRequestResponse({ description: 'placeId 형식이 올바르지 않습니다.' })
+  @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
   @ApiNotFoundResponse({ description: '장소를 찾을 수 없습니다.' })
   @ApiResponse({
     status: 501,
     description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
   })
-  getPlaceDetail(@Param('placeId', BigIntStringPipe) placeId: string): never {
+  getPlaceDetail(
+    @Param('placeId', BigIntStringPipe) placeId: string,
+    @Query('accessToken') _accessToken: string,
+  ): never {
     throw new NotImplementedException(
       '장소 상세 조회 API는 실제 데이터 연동 후 제공됩니다.',
     )

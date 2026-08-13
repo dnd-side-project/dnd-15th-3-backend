@@ -23,13 +23,11 @@ export class PlaceSearchResultDto {
   address!: string
 
   @ApiProperty({
-    description:
-      '장소 사진 URL 목록. 첫 번째가 대표 사진입니다. 사진이 없으면 null입니다.',
+    description: '장소 사진 URL 목록. 표시 순서대로 정렬됩니다.',
     type: [String],
-    nullable: true,
     example: ['https://...', 'https://...'],
   })
-  imageUrls!: string[] | null
+  imageUrls!: string[]
 
   @ApiProperty({
     description: '미리보기 사이트 링크',

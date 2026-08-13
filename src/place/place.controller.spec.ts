@@ -14,7 +14,7 @@ describe('PlaceController', () => {
       kakaoLocal as unknown as KakaoLocalService,
     )
 
-    expect(() => controller.getPlaceDetail('1')).toThrow(
+    expect(() => controller.getPlaceDetail('1', 'token')).toThrow(
       NotImplementedException,
     )
   })
@@ -41,15 +41,21 @@ describe('PlaceController', () => {
       | undefined
     expect(placeDetailPath?.get?.responses).toHaveProperty('200')
     expect(placeDetailPath?.get?.responses).toHaveProperty('400')
+    expect(placeDetailPath?.get?.responses).toHaveProperty('401')
     expect(placeDetailPath?.get?.responses).toHaveProperty('404')
     expect(placeDetailPath?.get?.responses).toHaveProperty('501')
 
+    type SchemaWithProperties = {
+      properties?: Record<string, { type?: string; nullable?: boolean }>
+    }
     const schema = document.components?.schemas?.PlaceSearchResultDto as
-      | { properties?: Record<string, unknown> }
+      | SchemaWithProperties
       | undefined
     expect(Object.keys(schema?.properties ?? {})).toEqual(
       expect.arrayContaining(['placeId', 'category', 'name', 'address']),
     )
+    expect(schema?.properties?.imageUrls?.type).toBe('array')
+    expect(schema?.properties?.imageUrls?.nullable).not.toBe(true)
 
     await app.close()
   })
