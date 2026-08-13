@@ -7,6 +7,7 @@ import { CourseController } from './course.controller'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
+import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { MeetingPlaceRecommendationRepository } from './meeting-place-recommendation.repository'
 import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recommendation-vote.repository'
 
@@ -17,6 +18,7 @@ import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recomm
     TypeOrmModule.forFeature([
       CourseCandidate,
       CourseCandidateComment,
+      CourseCandidatePlace,
       PlaceImage,
     ]),
   ],

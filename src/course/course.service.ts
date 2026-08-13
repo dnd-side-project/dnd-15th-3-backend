@@ -12,6 +12,7 @@ import {
   COURSE_CANDIDATES_VISIBLE_STATUSES,
   COURSE_COMMENT_CREATABLE_STATUSES,
   COURSE_COMMENTS_VISIBLE_STATUSES,
+  COURSE_DETAIL_VISIBLE_STATUSES,
 } from 'src/meeting/constants/meeting-status.constants'
 import { MeetingPlaceRecommendationDto } from 'src/meeting/dto/meeting-place-recommendation.dto'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
@@ -23,13 +24,19 @@ import { DataSource, In, Repository } from 'typeorm'
 import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
+import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
 import { CreateCourseCommentResponseDto } from './dto/create-course-comment-response.dto'
 import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
+import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { MeetingPlaceRecommendationRepository } from './meeting-place-recommendation.repository'
 import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recommendation-vote.repository'
+import {
+  metersToKilometers,
+  secondsToMinutes,
+} from './utils/course-route.utils'
 
 @Injectable()
 export class CourseService {
@@ -43,6 +50,8 @@ export class CourseService {
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
     @InjectRepository(CourseCandidateComment)
     private readonly commentRepository: Repository<CourseCandidateComment>,
+    @InjectRepository(CourseCandidatePlace)
+    private readonly courseCandidatePlaceRepository: Repository<CourseCandidatePlace>,
     @InjectRepository(PlaceImage)
     private readonly placeImageRepository: Repository<PlaceImage>,
   ) {}
@@ -76,6 +85,67 @@ export class CourseService {
         order: candidate.order,
       })),
       totalCount: candidates.length,
+    }
+  }
+
+  async getCourseDetail(
+    meetingId: string,
+    courseCandidateId: string,
+    accessToken: string,
+  ): Promise<CourseDetailResponseDto> {
+    const viewer = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    viewer.meeting.assertStatus(
+      COURSE_DETAIL_VISIBLE_STATUSES,
+      '모임이 코스 생성 완료 상태도 확정 상태도 아니어서 코스 상세를 조회할 수 없습니다.',
+    )
+
+    const candidate = await this.courseCandidateRepository.findOne({
+      where: { id: courseCandidateId, meeting: { id: meetingId } },
+    })
+    if (!candidate) {
+      throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
+    }
+
+    const steps = await this.courseCandidatePlaceRepository.find({
+      where: { courseCandidate: { id: courseCandidateId } },
+      relations: {
+        meetingPlaceRecommendation: { place: { category: true } },
+      },
+      order: { order: 'ASC' },
+    })
+
+    const primaryImageUrls = await this.findPrimaryImageUrls(
+      steps.map((step) => step.meetingPlaceRecommendation.place.id),
+    )
+
+    const totalDistanceMeters = steps.reduce(
+      (sum, step) => sum + (step.distanceToNextMeters ?? 0),
+      0,
+    )
+
+    return {
+      courseName: candidate.name,
+      totalDistanceKm: metersToKilometers(totalDistanceMeters),
+      totalCount: steps.length,
+      route: steps.map((step) => {
+        const place = step.meetingPlaceRecommendation.place
+        return {
+          recommendationId: step.meetingPlaceRecommendation.id,
+          placeId: place.id,
+          order: step.order,
+          name: place.name,
+          category: place.category.name,
+          categorySlug: place.category.slug as CategorySlug,
+          address: place.address,
+          primaryImageUrl: primaryImageUrls.get(place.id) ?? null,
+          longitude: place.longitude,
+          latitude: place.latitude,
+          walkDurationToNextMin: secondsToMinutes(step.travelTimeToNext),
+        }
+      }),
     }
   }
 

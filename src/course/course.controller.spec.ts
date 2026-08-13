@@ -10,6 +10,7 @@ import { CourseService } from './course.service'
 function createController() {
   const courseService = {
     getCourseCandidates: jest.fn().mockResolvedValue({}),
+    getCourseDetail: jest.fn().mockResolvedValue({}),
     getCourseComments: jest.fn().mockResolvedValue([]),
     createCourseComment: jest.fn().mockResolvedValue({}),
     getExcludedPlaces: jest.fn().mockResolvedValue({}),
@@ -107,6 +108,40 @@ describe('CourseController', () => {
     )
   })
 
+  it('코스 상세 조회는 CourseService에 위임한다', async () => {
+    const { controller, courseService } = createController()
+    const expected = {
+      courseName: '뚜벅이 최적 코스',
+      totalDistanceKm: 2.1,
+      totalCount: 1,
+      route: [
+        {
+          recommendationId: '1',
+          placeId: '1',
+          order: 1,
+          name: '성수 카페 모모',
+          category: '카페',
+          categorySlug: CategorySlug.Cafe,
+          address: '서울 성동구 성수이로 1',
+          primaryImageUrl: null,
+          longitude: 127.0557,
+          latitude: 37.5446,
+          walkDurationToNextMin: null,
+        },
+      ],
+    }
+    ;(courseService.getCourseDetail as jest.Mock).mockResolvedValue(expected)
+
+    await expect(
+      controller.getCourseDetail('1', '2', 'token'),
+    ).resolves.toEqual(expected)
+    expect(courseService.getCourseDetail).toHaveBeenCalledWith(
+      '1',
+      '2',
+      'token',
+    )
+  })
+
   it('제외된 장소 목록 조회는 CourseService에 위임한다', async () => {
     const { controller, courseService } = createController()
     const expected = {
@@ -133,9 +168,6 @@ describe('CourseController', () => {
     expect(() => controller.generateCourse('1', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() => controller.getCourseDetail('1', '2', 'token')).toThrow(
-      NotImplementedException,
-    )
     expect(() =>
       controller.addCoursePlace('1', '2', 'token', { recommendationId: '3' }),
     ).toThrow(NotImplementedException)
@@ -149,6 +181,7 @@ describe('CourseController', () => {
           provide: CourseService,
           useValue: {
             getCourseCandidates: jest.fn(),
+            getCourseDetail: jest.fn(),
             getCourseComments: jest.fn(),
             createCourseComment: jest.fn(),
             getExcludedPlaces: jest.fn(),
@@ -186,7 +219,7 @@ describe('CourseController', () => {
       '/meetings/{meetingId}/courses/{courseCandidateId}'
     ] as PathOperations | undefined
     expect(responseCodes(courseDetailPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409'].sort(),
     )
 
     const courseCommentsPath = document.paths?.[

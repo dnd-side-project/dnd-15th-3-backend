@@ -41,11 +41,18 @@ function createService() {
     findExcludedFromCourse: jest.fn().mockResolvedValue([]),
   }
   const storageService = { getPresignedDownloadUrl: jest.fn() }
-  const courseCandidateRepository = { find: jest.fn(), exists: jest.fn() }
+  const courseCandidateRepository = {
+    find: jest.fn(),
+    exists: jest.fn(),
+    findOne: jest.fn(),
+  }
   const commentRepository = {
     find: jest.fn(),
     create: jest.fn((value) => value),
     save: jest.fn(),
+  }
+  const courseCandidatePlaceRepository = {
+    find: jest.fn().mockResolvedValue([]),
   }
   const placeImageRepository = { find: jest.fn().mockResolvedValue([]) }
   const service = new CourseService(
@@ -56,6 +63,7 @@ function createService() {
     storageService as never,
     courseCandidateRepository as never,
     commentRepository as never,
+    courseCandidatePlaceRepository as never,
     placeImageRepository as never,
   )
 
@@ -68,6 +76,7 @@ function createService() {
     storageService,
     courseCandidateRepository,
     commentRepository,
+    courseCandidatePlaceRepository,
     placeImageRepository,
   }
 }
@@ -176,6 +185,188 @@ describe('CourseService', () => {
       await expect(promise).rejects.toThrow(
         '코스 생성이 완료된 모임인데 코스 후보를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
+    })
+  })
+
+  describe('getCourseDetail', () => {
+    it('참여자 검증에 실패하면 DB 조회 없이 그대로 전파한다', async () => {
+      const { service, meetingAccessService, courseCandidateRepository } =
+        createService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+      )
+
+      const promise = service.getCourseDetail('1', '2', 'bad-token')
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(courseCandidateRepository.find).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      MeetingStatus.RecommendationCollecting,
+      MeetingStatus.CourseGenerating,
+      MeetingStatus.CourseGenerationFailed,
+    ])('%s 상태에서는 DB 조회 없이 409를 던진다', async (status) => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        courseCandidatePlaceRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(status),
+      })
+
+      const promise = service.getCourseDetail('1', '2', 'token')
+
+      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      expect(courseCandidateRepository.find).not.toHaveBeenCalled()
+      expect(courseCandidatePlaceRepository.find).not.toHaveBeenCalled()
+    })
+
+    it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(
+      '%s 상태면 코스 후보를 조회한다',
+      async (status) => {
+        const { service, meetingAccessService, courseCandidateRepository } =
+          createService()
+        meetingAccessService.findParticipant.mockResolvedValue({
+          id: '1',
+          meeting: createMeetingWithStatus(status),
+        })
+        courseCandidateRepository.findOne.mockResolvedValue(null)
+
+        const promise = service.getCourseDetail('1', '2', 'token')
+
+        await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+        expect(courseCandidateRepository.findOne).toHaveBeenCalledWith({
+          where: { id: '2', meeting: { id: '1' } },
+        })
+      },
+    )
+
+    it('코스 후보가 해당 모임 소속이 아니면 404를 던지고 경로를 조회하지 않는다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        courseCandidatePlaceRepository,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      })
+      courseCandidateRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.getCourseDetail('1', '2', 'token')
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
+      expect(courseCandidatePlaceRepository.find).not.toHaveBeenCalled()
+    })
+
+    it('경로와 총 이동 거리를 순서대로 반환하고 마지막 장소의 이동 시간은 null로 반환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        courseCandidateRepository,
+        courseCandidatePlaceRepository,
+        placeImageRepository,
+        storageService,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: '1',
+        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      })
+      courseCandidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      courseCandidatePlaceRepository.find.mockResolvedValue([
+        {
+          order: 1,
+          travelTimeToNext: 480,
+          distanceToNextMeters: 600,
+          meetingPlaceRecommendation: {
+            id: '10',
+            place: {
+              id: '1',
+              name: '성수 카페 모모',
+              address: '서울 성동구 성수이로 1',
+              longitude: 127.0557,
+              latitude: 37.5446,
+              category: { name: '카페', slug: 'cafe' },
+            },
+          },
+        },
+        {
+          order: 2,
+          travelTimeToNext: null,
+          distanceToNextMeters: null,
+          meetingPlaceRecommendation: {
+            id: '11',
+            place: {
+              id: '2',
+              name: '성수 맛집',
+              address: '서울 성동구 성수이로 2',
+              longitude: 127.0558,
+              latitude: 37.5447,
+              category: { name: '음식점', slug: 'restaurant' },
+            },
+          },
+        },
+      ])
+      placeImageRepository.find.mockResolvedValue([
+        {
+          place: { id: '1' },
+          mediaAsset: { objectKey: 'places/1/first.jpg' },
+        },
+      ])
+      storageService.getPresignedDownloadUrl.mockResolvedValue(
+        'https://signed.example.com/first.jpg',
+      )
+
+      await expect(service.getCourseDetail('1', '2', 'token')).resolves.toEqual(
+        {
+          courseName: '뚜벅이 코스',
+          totalDistanceKm: 0.6,
+          totalCount: 2,
+          route: [
+            {
+              recommendationId: '10',
+              placeId: '1',
+              order: 1,
+              name: '성수 카페 모모',
+              category: '카페',
+              categorySlug: 'cafe',
+              address: '서울 성동구 성수이로 1',
+              primaryImageUrl: 'https://signed.example.com/first.jpg',
+              longitude: 127.0557,
+              latitude: 37.5446,
+              walkDurationToNextMin: 8,
+            },
+            {
+              recommendationId: '11',
+              placeId: '2',
+              order: 2,
+              name: '성수 맛집',
+              category: '음식점',
+              categorySlug: 'restaurant',
+              address: '서울 성동구 성수이로 2',
+              primaryImageUrl: null,
+              longitude: 127.0558,
+              latitude: 37.5447,
+              walkDurationToNextMin: null,
+            },
+          ],
+        },
+      )
+      expect(courseCandidatePlaceRepository.find).toHaveBeenCalledWith({
+        where: { courseCandidate: { id: '2' } },
+        relations: {
+          meetingPlaceRecommendation: { place: { category: true } },
+        },
+        order: { order: 'ASC' },
+      })
     })
   })
 
