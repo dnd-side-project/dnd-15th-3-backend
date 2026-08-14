@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotImplementedException,
   Param,
   ParseEnumPipe,
   Post,
@@ -30,6 +29,9 @@ import {
 } from '@nestjs/swagger'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
@@ -87,17 +89,15 @@ export class CourseController {
     description:
       '모임이 코스 생성 중이거나 이미 코스가 생성 완료·확정된 상태여서 다시 생성할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   generateCourse(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') _accessToken: string,
   ): never {
-    throw new NotImplementedException(
-      'AI 코스 생성 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Get(':meetingId/courses')
@@ -128,17 +128,15 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 코스 후보 목록을 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   getCourseCandidates(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') _accessToken: string,
   ): never {
-    throw new NotImplementedException(
-      '코스 후보 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Get(':meetingId/courses/:courseCandidateId')
@@ -179,18 +177,16 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태도 확정 상태도 아니어서 코스 상세를 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   getCourseDetail(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
     @Query('accessToken') _accessToken: string,
   ): never {
-    throw new NotImplementedException(
-      '코스 상세 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Get(':meetingId/courses/:courseCandidateId/comments')
@@ -230,18 +226,16 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 코스 댓글 목록을 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   getCourseComments(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
     @Query('accessToken') _accessToken: string,
   ): never {
-    throw new NotImplementedException(
-      '코스 댓글 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Post(':meetingId/courses/:courseCandidateId/comments')
@@ -283,19 +277,17 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 댓글을 작성할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   createCourseComment(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
     @Query('accessToken') _accessToken: string,
     @Body() _dto: CreateCourseCommentRequestDto,
   ): never {
-    throw new NotImplementedException(
-      '코스 댓글 작성 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Get(':meetingId/courses/:courseCandidateId/excluded-places')
@@ -344,10 +336,10 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 제외된 장소 목록을 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   getExcludedPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
@@ -355,9 +347,7 @@ export class CourseController {
     @Query('category', new ParseEnumPipe(CategorySlug, { optional: true }))
     category?: CategorySlug,
   ): never {
-    throw new NotImplementedException(
-      '제외된 장소 목록 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Post(':meetingId/courses/:courseCandidateId/places')
@@ -405,19 +395,17 @@ export class CourseController {
       '모임이 코스 생성 완료 상태가 아니거나, 이미 코스에 포함된 장소이거나, ' +
       `코스에 이미 장소가 ${MAX_COURSE_STEPS}개 있어서 추가할 수 없습니다.`,
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   addCoursePlace(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
     @Query('accessToken') _accessToken: string,
     @Body() _dto: AddCoursePlaceRequestDto,
   ): never {
-    throw new NotImplementedException(
-      '코스 장소 추가 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Put(':meetingId/courses/:courseCandidateId/places')
@@ -521,18 +509,16 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서(아직 후보가 없거나 이미 확정됨) 코스를 확정할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   confirmCourse(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
     @Query('accessToken') _accessToken: string,
     @Body() _dto: ConfirmCourseRequestDto,
   ): never {
-    throw new NotImplementedException(
-      '최종 코스 확정 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 }

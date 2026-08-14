@@ -8,6 +8,8 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { CommonException } from '../common/exception/common.exception'
+import { CommonErrorCode } from '../common/exception/common-error-code'
 import type { Env } from '../config/env'
 
 @Injectable()
@@ -64,7 +66,7 @@ export class StorageService {
   async getPublicUrl(key: string): Promise<string> {
     const endpoint = this.s3Client.config.endpoint
     if (!endpoint) {
-      throw new Error('S3 endpoint is not configured')
+      throw new CommonException(CommonErrorCode.serviceUnavailable)
     }
     const resolved = await endpoint()
     const baseUrl = `${resolved.protocol}//${resolved.hostname}${

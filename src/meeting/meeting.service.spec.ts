@@ -1,4 +1,3 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common'
 import type { ConfigService } from '@nestjs/config'
 import { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
@@ -14,6 +13,7 @@ import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
+import { MeetingErrorCode } from './exception/meeting-error-code'
 import { MeetingService } from './meeting.service'
 import type {
   CreateMeetingRequest,
@@ -330,7 +330,7 @@ describe('MeetingService', () => {
         categorySlugs: [CategorySlug.Cafe],
         version: 2,
       }),
-    ).rejects.toBeInstanceOf(ForbiddenException)
+    ).rejects.toMatchObject({ errorCode: MeetingErrorCode.hostOnly })
   })
 
   it('모임·기준 위치·코스·호스트 참여자·수집 작업을 하나의 transaction에서 만든다', async () => {
@@ -573,6 +573,8 @@ describe('MeetingService', () => {
       service.addRecommendation('meeting-1', 'participant-token', {
         placeId: 'place-1',
       }),
-    ).rejects.toBeInstanceOf(ConflictException)
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.recommendationAlreadyExists,
+    })
   })
 })

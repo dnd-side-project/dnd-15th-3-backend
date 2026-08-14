@@ -1,17 +1,11 @@
 import { randomBytes } from 'node:crypto'
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-  ServiceUnavailableException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { Category } from 'src/category/entities/category.entity'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { type Env } from 'src/config/env'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
@@ -35,6 +29,8 @@ import { MeetingLocation } from './entities/meeting-location.entity'
 import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
 import { ParticipantRole } from './enums/participant-role.enum'
+import { MeetingException } from './exception/meeting.exception'
+import { MeetingErrorCode } from './exception/meeting-error-code'
 import type {
   CreateMeetingRequest,
   InvitationPreviewRequest,
@@ -72,7 +68,7 @@ export class MeetingService {
       }
     }
 
-    throw new ServiceUnavailableException('초대 코드를 발급하지 못했습니다.')
+    throw new MeetingException(MeetingErrorCode.invitationCodeIssuanceFailed)
   }
 
   private createMeetingInTransaction(request: CreateMeetingRequest): Promise<{
@@ -94,16 +90,14 @@ export class MeetingService {
         where: { code: request.meetingTypeCode },
       })
       if (!meetingType) {
-        throw new NotFoundException('모임 유형을 찾을 수 없습니다.')
+        throw new MeetingException(MeetingErrorCode.meetingTypeNotFound)
       }
 
       const categories = await categoryRepository.find({
         where: { slug: In(request.categorySlugs) },
       })
       if (categories.length !== new Set(request.categorySlugs).size) {
-        throw new BadRequestException(
-          '존재하지 않는 코스 카테고리가 포함되어 있습니다.',
-        )
+        throw new MeetingException(MeetingErrorCode.invalidCourseCategory)
       }
       const categoriesBySlug = new Map(
         categories.map((category) => [category.slug, category]),
@@ -182,7 +176,7 @@ export class MeetingService {
       relations: { meetingLocation: true },
     })
     if (!meeting || !meeting.meetingLocation) {
-      throw new NotFoundException('유효한 초대 코드를 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.invitationNotFound)
     }
 
     return this.toInvitationResponse(meeting)
@@ -202,7 +196,7 @@ export class MeetingService {
           relations: { meetingType: true, meetingLocation: true },
         })
         if (!meeting || !meeting.meetingLocation) {
-          throw new NotFoundException('유효한 초대 코드를 찾을 수 없습니다.')
+          throw new MeetingException(MeetingErrorCode.invitationNotFound)
         }
 
         const user = await this.findOrCreateUser(manager, request.userKey)
@@ -217,7 +211,7 @@ export class MeetingService {
             where: { meeting: { id: meeting.id }, nickname: request.nickname },
           })
           if (nicknameInUse) {
-            throw new ConflictException('이미 사용 중인 닉네임입니다.')
+            throw new MeetingException(MeetingErrorCode.nicknameAlreadyInUse)
           }
 
           await manager.query(
@@ -237,7 +231,7 @@ export class MeetingService {
             where: { meeting: { id: meeting.id }, user: { id: user.id } },
           })
           if (!participant) {
-            throw new ConflictException('이미 사용 중인 닉네임입니다.')
+            throw new MeetingException(MeetingErrorCode.nicknameAlreadyInUse)
           }
         } else {
           if (participant.nickname !== request.nickname) {
@@ -248,7 +242,7 @@ export class MeetingService {
               },
             })
             if (nicknameInUse && nicknameInUse.id !== participant.id) {
-              throw new ConflictException('이미 사용 중인 닉네임입니다.')
+              throw new MeetingException(MeetingErrorCode.nicknameAlreadyInUse)
             }
           }
           participant.nickname = request.nickname
@@ -263,7 +257,7 @@ export class MeetingService {
       })
     } catch (error) {
       if (this.isUniqueViolation(error)) {
-        throw new ConflictException('이미 사용 중인 닉네임입니다.')
+        throw new MeetingException(MeetingErrorCode.nicknameAlreadyInUse)
       }
       throw error
     }
@@ -298,7 +292,7 @@ export class MeetingService {
       }),
     ])
     if (!meeting) {
-      throw new NotFoundException('모임을 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.notFound)
     }
 
     return this.toCoursePlanResponse(meeting, steps)
@@ -321,10 +315,10 @@ export class MeetingService {
         },
       })
       if (!participant) {
-        throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+        throw new CommonException(CommonErrorCode.authenticationFailed)
       }
       if (participant.role !== ParticipantRole.Host) {
-        throw new ForbiddenException('방장만 코스 계획을 수정할 수 있습니다.')
+        throw new MeetingException(MeetingErrorCode.hostOnly)
       }
 
       const categoryRepository = manager.getRepository(Category)
@@ -332,9 +326,7 @@ export class MeetingService {
         where: { slug: In(request.categorySlugs) },
       })
       if (categories.length !== new Set(request.categorySlugs).size) {
-        throw new BadRequestException(
-          '존재하지 않는 코스 카테고리가 포함되어 있습니다.',
-        )
+        throw new MeetingException(MeetingErrorCode.invalidCourseCategory)
       }
 
       const meetingRepository = manager.getRepository(Meeting)
@@ -344,12 +336,10 @@ export class MeetingService {
         .setLock('pessimistic_write')
         .getOne()
       if (!meeting) {
-        throw new NotFoundException('모임을 찾을 수 없습니다.')
+        throw new MeetingException(MeetingErrorCode.notFound)
       }
       if (meeting.courseVersion !== request.version) {
-        throw new ConflictException(
-          '오래된 코스 계획입니다. 최신 계획을 다시 조회하세요.',
-        )
+        throw new MeetingException(MeetingErrorCode.staleCoursePlan)
       }
 
       const stepRepository = manager.getRepository(CourseCategoryStep)
@@ -398,12 +388,10 @@ export class MeetingService {
         },
       })
       if (!participant) {
-        throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+        throw new CommonException(CommonErrorCode.authenticationFailed)
       }
       if (participant.role !== ParticipantRole.Host) {
-        throw new ForbiddenException(
-          '방장만 첫 만남 위치를 변경할 수 있습니다.',
-        )
+        throw new MeetingException(MeetingErrorCode.hostOnly)
       }
 
       const locationRepository = manager.getRepository(MeetingLocation)
@@ -414,7 +402,7 @@ export class MeetingService {
         .setLock('pessimistic_write')
         .getOne()
       if (!location) {
-        throw new NotFoundException('모임 기준 위치를 찾을 수 없습니다.')
+        throw new MeetingException(MeetingErrorCode.locationNotFound)
       }
 
       const nextVersion = location.syncVersion + 1
@@ -473,7 +461,7 @@ export class MeetingService {
       where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
     })
     if (!participant) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
 
     const [location, place] = await Promise.all([
@@ -486,10 +474,10 @@ export class MeetingService {
       }),
     ])
     if (!location) {
-      throw new NotFoundException('모임 기준 위치를 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.locationNotFound)
     }
     if (!place) {
-      throw new NotFoundException('장소를 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.placeNotFound)
     }
 
     const categoryStep = await this.dataSource
@@ -501,9 +489,7 @@ export class MeetingService {
         },
       })
     if (!categoryStep) {
-      throw new BadRequestException(
-        '현재 모임에서 선택한 코스 카테고리의 장소만 추가할 수 있습니다.',
-      )
+      throw new MeetingException(MeetingErrorCode.placeCategoryMismatch)
     }
 
     if (
@@ -514,16 +500,14 @@ export class MeetingService {
         place.longitude,
       ) > PLACE_SYNC_RADIUS_METERS
     ) {
-      throw new BadRequestException(
-        '모임 기준 위치에서 2km 이내의 장소만 추가할 수 있습니다.',
-      )
+      throw new MeetingException(MeetingErrorCode.placeOutsideRange)
     }
 
     const existing = await this.recommendationRepository.findOne({
       where: { meeting: { id: meetingId }, place: { id: request.placeId } },
     })
     if (existing) {
-      throw new ConflictException('이미 모임에 추가된 장소입니다.')
+      throw new MeetingException(MeetingErrorCode.recommendationAlreadyExists)
     }
 
     let recommendation: MeetingPlaceRecommendation
@@ -537,7 +521,7 @@ export class MeetingService {
       )
     } catch (error) {
       if (this.isUniqueViolation(error)) {
-        throw new ConflictException('이미 모임에 추가된 장소입니다.')
+        throw new MeetingException(MeetingErrorCode.recommendationAlreadyExists)
       }
       throw error
     }
@@ -555,7 +539,7 @@ export class MeetingService {
       where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
     })
     if (!participant) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
 
     const recommendations = await this.recommendationRepository.find({
@@ -582,7 +566,7 @@ export class MeetingService {
       relations: { user: true },
     })
     if (!participant) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
     return participant
   }
@@ -597,7 +581,7 @@ export class MeetingService {
       relations: { meetingType: true, meetingLocation: true },
     })
     if (!meeting || !meeting.meetingLocation) {
-      throw new NotFoundException('모임을 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.notFound)
     }
 
     const [participants, steps, recommendations] = await Promise.all([
@@ -622,7 +606,7 @@ export class MeetingService {
       (participant) => participant.role === ParticipantRole.Host,
     )
     if (!host?.user) {
-      throw new NotFoundException('모임 방장 정보를 찾을 수 없습니다.')
+      throw new Error('모임 방장 정보를 찾을 수 없습니다.')
     }
 
     return {
@@ -717,9 +701,12 @@ export class MeetingService {
   private normalizeInvitationCode(accessToken: string): string {
     const normalized = accessToken.trim().toUpperCase()
     if (!/^[A-Z0-9]{6}$/.test(normalized)) {
-      throw new BadRequestException(
-        '초대 코드는 6자리 영문 대문자·숫자여야 합니다.',
-      )
+      throw new CommonException(CommonErrorCode.validationError, [
+        {
+          field: 'invitationCode',
+          reason: '6자리 영문 대문자·숫자여야 합니다.',
+        },
+      ])
     }
     return normalized
   }
@@ -753,7 +740,7 @@ export class MeetingService {
 
   private assertAccessToken(accessToken: string): void {
     if (!accessToken?.trim()) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
   }
 

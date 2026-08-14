@@ -1,6 +1,6 @@
-import { ServiceUnavailableException } from '@nestjs/common'
 import type { ConfigService } from '@nestjs/config'
 import type { Env } from 'src/config/env'
+import { PlaceErrorCode } from '../exception/place-error-code'
 import { GooglePlacesProvider } from './google-places.provider'
 
 function createProvider(apiKey = 'google-key') {
@@ -76,7 +76,7 @@ describe('GooglePlacesProvider', () => {
         radiusMeters: 750,
         providerTypes: ['cafe'],
       }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException)
+    ).rejects.toMatchObject({ errorCode: PlaceErrorCode.providerUnavailable })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

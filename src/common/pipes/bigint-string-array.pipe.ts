@@ -1,9 +1,6 @@
-import {
-  ArgumentMetadata,
-  BadRequestException,
-  Injectable,
-  PipeTransform,
-} from '@nestjs/common'
+import { ArgumentMetadata, Injectable, PipeTransform } from '@nestjs/common'
+import { CommonException } from '../exception/common.exception'
+import { CommonErrorCode } from '../exception/common-error-code'
 import {
   BIGINT_STRING_PATTERN,
   INVALID_FORMAT_REASON,
@@ -27,9 +24,9 @@ export class BigIntStringArrayPipe
       (item) => !BIGINT_STRING_PATTERN.test(item),
     )
     if (hasInvalidItem) {
-      throw new BadRequestException({
-        fieldErrors: [{ field: metadata.data, reason: INVALID_FORMAT_REASON }],
-      })
+      throw new CommonException(CommonErrorCode.validationError, [
+        { field: metadata.data ?? 'request', reason: INVALID_FORMAT_REASON },
+      ])
     }
 
     return items

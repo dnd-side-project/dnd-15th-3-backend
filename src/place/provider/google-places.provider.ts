@@ -1,12 +1,10 @@
-import {
-  BadGatewayException,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { Env } from 'src/config/env'
 import { z } from 'zod'
 import { PlaceSource } from '../enums/place-source.enum'
+import { PlaceException } from '../exception/place.exception'
+import { PlaceErrorCode } from '../exception/place-error-code'
 import type {
   PlaceProvider,
   PlaceProviderPlace,
@@ -50,9 +48,7 @@ export class GooglePlacesProvider implements PlaceProvider {
       .trim()
 
     if (!apiKey) {
-      throw new ServiceUnavailableException(
-        'Google Places API 키가 설정되지 않았습니다.',
-      )
+      throw new PlaceException(PlaceErrorCode.providerUnavailable)
     }
 
     const body = {
@@ -91,31 +87,23 @@ export class GooglePlacesProvider implements PlaceProvider {
         signal: AbortSignal.timeout(GOOGLE_REQUEST_TIMEOUT_MS),
       })
     } catch {
-      throw new BadGatewayException(
-        'Google Places Nearby Search API를 호출하지 못했습니다.',
-      )
+      throw new PlaceException(PlaceErrorCode.providerRequestFailed)
     }
 
     if (!response.ok) {
-      throw new BadGatewayException(
-        `Google Places Nearby Search API가 ${response.status} 상태를 반환했습니다.`,
-      )
+      throw new PlaceException(PlaceErrorCode.providerRequestFailed)
     }
 
     let bodyJson: unknown
     try {
       bodyJson = await response.json()
     } catch {
-      throw new BadGatewayException(
-        'Google Places Nearby Search API 응답을 읽을 수 없습니다.',
-      )
+      throw new PlaceException(PlaceErrorCode.invalidProviderResponse)
     }
 
     const parsedResponse = googleNearbySearchResponseSchema.safeParse(bodyJson)
     if (!parsedResponse.success) {
-      throw new BadGatewayException(
-        'Google Places Nearby Search API 응답 형식이 올바르지 않습니다.',
-      )
+      throw new PlaceException(PlaceErrorCode.invalidProviderResponse)
     }
 
     const places = parsedResponse.data.places.map((place) => ({
