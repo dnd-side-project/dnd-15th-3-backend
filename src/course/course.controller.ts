@@ -8,6 +8,7 @@ import {
   Param,
   ParseEnumPipe,
   Post,
+  Put,
   Query,
 } from '@nestjs/common'
 import {
@@ -40,6 +41,7 @@ import { CourseRouteStepDto } from './dto/course-route-step.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
 import { CreateCourseCommentResponseDto } from './dto/create-course-comment-response.dto'
 import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
+import { UpdateCoursePlacesRequestDto } from './dto/update-course-places-request.dto'
 
 @ApiTags('코스')
 @Controller('meetings')
@@ -416,6 +418,68 @@ export class CourseController {
   ): never {
     throw new NotImplementedException(
       '코스 장소 추가 API는 실제 데이터 연동 후 제공됩니다.',
+    )
+  }
+
+  @Put(':meetingId/courses/:courseCandidateId/places')
+  @ApiParam({
+    name: 'meetingId',
+    description: '모임 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiParam({
+    name: 'courseCandidateId',
+    description: '코스 후보 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '코스를 수정할 방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
+  @ApiOperation({
+    summary: '코스 전체 수정',
+    description:
+      '코스를 구성할 장소 추천 ID 전체 목록으로 코스를 통째로 교체합니다. ' +
+      '변경되지 않는 장소도 포함해 유지할 전체 목록을 보내야 하며, 배열 순서 그대로 코스에 반영됩니다. ' +
+      '방장만 호출할 수 있고, 모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다. ' +
+      `코스는 최대 ${MAX_COURSE_STEPS}개의 장소로 구성되며, 목록에 같은 장소 추천 ID가 중복되면 요청이 거부됩니다.`,
+  })
+  @ApiBody({ type: UpdateCoursePlacesRequestDto })
+  @ApiOkResponse({
+    description: '코스 수정 성공',
+    type: CourseDetailResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'meetingId, courseCandidateId 형식이 올바르지 않거나, recommendationIds가 비어 있거나, ' +
+      `${MAX_COURSE_STEPS}개를 초과하거나, 같은 ID가 중복됩니다.`,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'accessToken이 없거나 유효하지 않습니다.',
+  })
+  @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
+  @ApiNotFoundResponse({
+    description:
+      '모임, 코스 후보 또는 장소 추천 중 존재하지 않는 항목이 있습니다.',
+  })
+  @ApiConflictResponse({
+    description:
+      '모임이 코스 생성 완료 상태가 아니어서 코스를 수정할 수 없습니다.',
+  })
+  @ApiResponse({
+    status: 501,
+    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  })
+  updateCoursePlaces(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
+    @Query('accessToken') _accessToken: string,
+    @Body() _dto: UpdateCoursePlacesRequestDto,
+  ): never {
+    throw new NotImplementedException(
+      '코스 전체 수정 API는 실제 데이터 연동 후 제공됩니다.',
     )
   }
 
