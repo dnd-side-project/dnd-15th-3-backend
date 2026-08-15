@@ -606,7 +606,7 @@ export class MeetingService {
       (participant) => participant.role === ParticipantRole.Host,
     )
     if (!host?.user) {
-      throw new Error('모임 방장 정보를 찾을 수 없습니다.')
+      throw new CommonException(CommonErrorCode.internalServerError)
     }
 
     return {
@@ -730,7 +730,9 @@ export class MeetingService {
     const user = await manager.getRepository(User).findOne({
       where: { userKey },
     })
-    if (!user) throw new Error('사용자 생성 후 사용자를 조회하지 못했습니다.')
+    if (!user) {
+      throw new CommonException(CommonErrorCode.internalServerError)
+    }
     return user
   }
 

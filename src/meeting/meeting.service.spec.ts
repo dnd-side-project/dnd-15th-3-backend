@@ -1,6 +1,8 @@
 import type { ConfigService } from '@nestjs/config'
 import { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { Env } from 'src/config/env'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
@@ -575,6 +577,83 @@ describe('MeetingService', () => {
       }),
     ).rejects.toMatchObject({
       errorCode: MeetingErrorCode.recommendationAlreadyExists,
+    })
+  })
+
+  it('손상된 모임의 방장 정보를 노출하지 않고 공통 내부 오류로 처리한다', async () => {
+    const {
+      service,
+      dataSource,
+      participantRepository,
+      recommendationRepository,
+    } = createMeetingService()
+    const meeting = {
+      id: 'meeting-1',
+      accessToken: 'ABC234',
+      name: '성수 모임',
+      date: '2026-08-23',
+      time: '12:00',
+      meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
+      meetingLocation: {
+        id: 'location-1',
+        displayName: '강남역',
+        address: '서울 강남구',
+        latitude: 37.5,
+        longitude: 127,
+        externalAddressId: null,
+        syncVersion: 1,
+      },
+    }
+
+    participantRepository.findOne.mockResolvedValue({
+      id: 'participant-viewer',
+      accessToken: 'viewer-token',
+      role: ParticipantRole.Member,
+      user: { id: 'user-viewer' },
+    })
+    participantRepository.find.mockResolvedValue([])
+    recommendationRepository.find.mockResolvedValue([])
+    dataSource.getRepository.mockImplementation((entity) => {
+      if (entity === Meeting) {
+        return { findOne: jest.fn().mockResolvedValue(meeting) }
+      }
+      if (entity === CourseCategoryStep) {
+        return { find: jest.fn().mockResolvedValue([]) }
+      }
+      return undefined
+    })
+
+    await expect(
+      service.getMeetingDetail('meeting-1', 'viewer-token'),
+    ).rejects.toMatchObject({
+      errorCode: CommonErrorCode.internalServerError,
+    })
+  })
+
+  it('사용자 upsert 뒤 조회가 실패하면 공통 내부 오류로 처리한다', async () => {
+    const { service } = createMeetingService()
+    const manager = {
+      query: jest.fn().mockResolvedValue([]),
+      getRepository: jest.fn().mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(null),
+      }),
+    }
+
+    await expect(
+      (
+        service as unknown as {
+          findOrCreateUser: (manager: unknown, userKey: string) => Promise<User>
+        }
+      ).findOrCreateUser(manager, 'device-1'),
+    ).rejects.toBeInstanceOf(CommonException)
+    await expect(
+      (
+        service as unknown as {
+          findOrCreateUser: (manager: unknown, userKey: string) => Promise<User>
+        }
+      ).findOrCreateUser(manager, 'device-1'),
+    ).rejects.toMatchObject({
+      errorCode: CommonErrorCode.internalServerError,
     })
   })
 })
