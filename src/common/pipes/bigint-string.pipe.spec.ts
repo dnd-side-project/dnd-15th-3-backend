@@ -1,21 +1,27 @@
 import { ArgumentMetadata, BadRequestException } from '@nestjs/common'
-import { BigIntStringPipe } from './bigint-string.pipe'
+import { BigIntStringPipe, INVALID_FORMAT_REASON } from './bigint-string.pipe'
 
 describe('BigIntStringPipe', () => {
   const pipe = new BigIntStringPipe()
   const metadata: ArgumentMetadata = { type: 'param', data: 'meetingId' }
 
-  it('숫자로만 이루어진 문자열이면 그대로 반환한다', () => {
+  it('1 이상이고 앞자리에 0이 없는 숫자 문자열이면 그대로 반환한다', () => {
+    expect(pipe.transform('1', metadata)).toBe('1')
     expect(pipe.transform('123', metadata)).toBe('123')
-  })
-
-  it('0이면 그대로 반환한다', () => {
-    expect(pipe.transform('0', metadata)).toBe('0')
   })
 
   it('JS number 정밀도를 넘는 큰 값도 string 그대로 반환한다', () => {
     const huge = '99999999999999999999'
     expect(pipe.transform(huge, metadata)).toBe(huge)
+  })
+
+  it('0이면 BadRequestException을 던진다', () => {
+    expect(() => pipe.transform('0', metadata)).toThrow(BadRequestException)
+  })
+
+  it('앞자리에 0이 있으면 BadRequestException을 던진다', () => {
+    expect(() => pipe.transform('01', metadata)).toThrow(BadRequestException)
+    expect(() => pipe.transform('007', metadata)).toThrow(BadRequestException)
   })
 
   it('빈 문자열이면 BadRequestException을 던진다', () => {
@@ -53,9 +59,7 @@ describe('BigIntStringPipe', () => {
       pipe.transform('abc', metadata)
     } catch (error) {
       expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [
-          { field: 'meetingId', reason: '숫자 형식이어야 합니다.' },
-        ],
+        fieldErrors: [{ field: 'meetingId', reason: INVALID_FORMAT_REASON }],
       })
     }
   })
@@ -66,7 +70,7 @@ describe('BigIntStringPipe', () => {
       pipe.transform('abc', { type: 'param', data: 'courseId' })
     } catch (error) {
       expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [{ field: 'courseId', reason: '숫자 형식이어야 합니다.' }],
+        fieldErrors: [{ field: 'courseId', reason: INVALID_FORMAT_REASON }],
       })
     }
   })

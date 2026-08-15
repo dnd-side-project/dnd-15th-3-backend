@@ -1,4 +1,5 @@
 import { ArgumentMetadata, BadRequestException } from '@nestjs/common'
+import { INVALID_FORMAT_REASON } from './bigint-string.pipe'
 import { BigIntStringArrayPipe } from './bigint-string-array.pipe'
 
 describe('BigIntStringArrayPipe', () => {
@@ -53,6 +54,16 @@ describe('BigIntStringArrayPipe', () => {
     expect(() => pipe.transform('1,-2', metadata)).toThrow(BadRequestException)
   })
 
+  it('0이 섞여 있으면 BadRequestException을 던진다', () => {
+    expect(() => pipe.transform('1,0,2', metadata)).toThrow(BadRequestException)
+  })
+
+  it('앞자리에 0이 있는 값이 섞여 있으면 BadRequestException을 던진다', () => {
+    expect(() => pipe.transform('1,007,2', metadata)).toThrow(
+      BadRequestException,
+    )
+  })
+
   it('소수점이 섞여 있으면 BadRequestException을 던진다', () => {
     expect(() => pipe.transform('1,2.5', metadata)).toThrow(BadRequestException)
   })
@@ -63,9 +74,7 @@ describe('BigIntStringArrayPipe', () => {
       pipe.transform('1,abc', metadata)
     } catch (error) {
       expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [
-          { field: 'excludeIds', reason: '숫자 형식이어야 합니다.' },
-        ],
+        fieldErrors: [{ field: 'excludeIds', reason: INVALID_FORMAT_REASON }],
       })
     }
   })
@@ -76,7 +85,7 @@ describe('BigIntStringArrayPipe', () => {
       pipe.transform('1,abc', { type: 'query', data: 'placeIds' })
     } catch (error) {
       expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [{ field: 'placeIds', reason: '숫자 형식이어야 합니다.' }],
+        fieldErrors: [{ field: 'placeIds', reason: INVALID_FORMAT_REASON }],
       })
     }
   })
