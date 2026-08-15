@@ -31,6 +31,7 @@ import type { Place } from 'src/place/entities/place.entity'
 import { PlaceImage } from 'src/place/entities/place-image.entity'
 import { StorageService } from 'src/storage/storage.service'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
+import { CourseRepository } from './course.repository'
 import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
 import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
@@ -71,6 +72,7 @@ export class CourseService {
     @InjectRepository(PlaceImage)
     private readonly placeImageRepository: Repository<PlaceImage>,
     private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
+    private readonly courseRepository: CourseRepository,
   ) {}
 
   async getCourseCandidates(
@@ -227,12 +229,10 @@ export class CourseService {
       }
       participant.assertHost('방장만 코스를 확정할 수 있습니다.')
 
-      const meetingRepository = manager.getRepository(Meeting)
-      const meeting = await meetingRepository
-        .createQueryBuilder('meeting')
-        .where('meeting.id = :meetingId', { meetingId })
-        .setLock('pessimistic_write')
-        .getOne()
+      const meeting = await this.courseRepository.lockMeeting(
+        manager,
+        meetingId,
+      )
       if (!meeting) {
         throw new NotFoundException('모임을 찾을 수 없습니다.')
       }
@@ -252,7 +252,7 @@ export class CourseService {
       }
 
       await candidateRepository.save(candidate)
-      await meetingRepository.save(meeting)
+      await manager.getRepository(Meeting).save(meeting)
 
       return {
         status: meeting.status,
@@ -440,12 +440,7 @@ export class CourseService {
     allowedStatuses: readonly MeetingStatus[],
     statusErrorMessage: string,
   ): Promise<Meeting> {
-    const meeting = await manager
-      .getRepository(Meeting)
-      .createQueryBuilder('meeting')
-      .where('meeting.id = :meetingId', { meetingId })
-      .setLock('pessimistic_write')
-      .getOne()
+    const meeting = await this.courseRepository.lockMeeting(manager, meetingId)
     if (!meeting) {
       throw new NotFoundException('모임을 찾을 수 없습니다.')
     }
@@ -629,14 +624,9 @@ export class CourseService {
     meetingId: string,
     categories: Category[],
   ): Promise<void> {
-    const categoryStepRepository = manager.getRepository(CourseCategoryStep)
-    await categoryStepRepository
-      .createQueryBuilder()
-      .delete()
-      .from(CourseCategoryStep)
-      .where('meeting_id = :meetingId', { meetingId })
-      .execute()
+    await this.courseRepository.deleteCourseCategorySteps(manager, meetingId)
 
+    const categoryStepRepository = manager.getRepository(CourseCategoryStep)
     await categoryStepRepository.save(
       categories.map((category, index) =>
         categoryStepRepository.create({
@@ -661,14 +651,12 @@ export class CourseService {
     const places = recommendations.map((recommendation) => recommendation.place)
     const legs = await this.getWalkingLegsOrThrow(places)
 
-    const placeRepository = manager.getRepository(CourseCandidatePlace)
-    await placeRepository
-      .createQueryBuilder()
-      .delete()
-      .from(CourseCandidatePlace)
-      .where('course_candidate_id = :courseCandidateId', { courseCandidateId })
-      .execute()
+    await this.courseRepository.deleteCourseCandidatePlaces(
+      manager,
+      courseCandidateId,
+    )
 
+    const placeRepository = manager.getRepository(CourseCandidatePlace)
     const newSteps = await placeRepository.save(
       recommendations.map((recommendation, index) =>
         placeRepository.create({
