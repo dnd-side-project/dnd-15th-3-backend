@@ -171,6 +171,11 @@ describe('CourseController', () => {
     expect(() =>
       controller.addCoursePlace('1', '2', 'token', { recommendationId: '3' }),
     ).toThrow(NotImplementedException)
+    expect(() =>
+      controller.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['3', '4'],
+      }),
+    ).toThrow(NotImplementedException)
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -199,6 +204,7 @@ describe('CourseController', () => {
     type PathOperations = {
       get?: { responses?: Record<string, unknown> }
       post?: { responses?: Record<string, unknown> }
+      put?: { responses?: Record<string, unknown> }
     }
 
     function responseCodes(responses?: Record<string, unknown>) {
@@ -251,6 +257,9 @@ describe('CourseController', () => {
     ] as PathOperations | undefined
     expect(responseCodes(coursePlacesPath?.post?.responses)).toEqual(
       ['201', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+    expect(responseCodes(coursePlacesPath?.put?.responses)).toEqual(
+      ['200', '400', '401', '403', '404', '409', '501'].sort(),
     )
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
@@ -354,6 +363,12 @@ describe('CourseController', () => {
     expect(Object.keys(addCoursePlaceRequestSchema?.properties ?? {})).toEqual([
       'recommendationId',
     ])
+
+    const updateCoursePlacesRequestSchema = document.components?.schemas
+      ?.UpdateCoursePlacesRequestDto as SchemaWithProperties | undefined
+    expect(
+      Object.keys(updateCoursePlacesRequestSchema?.properties ?? {}),
+    ).toEqual(['recommendationIds'])
 
     await app.close()
   })
