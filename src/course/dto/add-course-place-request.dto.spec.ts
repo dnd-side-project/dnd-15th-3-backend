@@ -12,6 +12,30 @@ describe('AddCoursePlaceRequestDto', () => {
     expect(await validate(dto)).toHaveLength(0)
   })
 
+  it('0이면 실패한다', async () => {
+    const dto = plainToInstance(AddCoursePlaceRequestDto, {
+      recommendationId: '0',
+    })
+
+    const errors = await validate(dto)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].constraints).toMatchObject({
+      matches: INVALID_FORMAT_REASON,
+    })
+  })
+
+  it('앞자리에 0이 있으면 실패한다', async () => {
+    const dto = plainToInstance(AddCoursePlaceRequestDto, {
+      recommendationId: '007',
+    })
+
+    const errors = await validate(dto)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].constraints).toMatchObject({
+      matches: INVALID_FORMAT_REASON,
+    })
+  })
+
   it('숫자가 아닌 문자열이면 실패한다', async () => {
     const dto = plainToInstance(AddCoursePlaceRequestDto, {
       recommendationId: 'abc',

@@ -7,10 +7,10 @@ import {
   Matches,
 } from 'class-validator'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
-
-const POSITIVE_INTEGER_STRING_PATTERN = /^[1-9]\d*$/
-const ID_NOT_POSITIVE_INTEGER_REASON =
-  'ID는 1 이상의 숫자여야 하며 앞자리에 0이 올 수 없습니다.'
+import {
+  BIGINT_STRING_PATTERN,
+  INVALID_FORMAT_REASON,
+} from 'src/common/pipes/bigint-string.pipe'
 
 export class UpdateCoursePlacesRequestDto {
   @ApiProperty({
@@ -28,9 +28,9 @@ export class UpdateCoursePlacesRequestDto {
   @ArrayMaxSize(MAX_COURSE_STEPS)
   @ArrayUnique()
   @IsString({ each: true })
-  @Matches(POSITIVE_INTEGER_STRING_PATTERN, {
+  @Matches(BIGINT_STRING_PATTERN, {
     each: true,
-    message: ID_NOT_POSITIVE_INTEGER_REASON,
+    message: INVALID_FORMAT_REASON,
   })
   recommendationIds!: string[]
 }
