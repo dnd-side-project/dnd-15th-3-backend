@@ -37,6 +37,10 @@ export const COURSE_PLACE_ADDABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.CourseGenerated,
 ]
 
+export const COURSE_PLACES_REPLACEABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.CourseGenerated,
+]
+
 export const SIMILAR_PLACES_RECOMMENDABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.RecommendationCollecting,
   MeetingStatus.CourseGenerating,

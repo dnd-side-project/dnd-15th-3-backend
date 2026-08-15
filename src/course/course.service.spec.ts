@@ -169,6 +169,66 @@ function createAddPlaceTransactionMocks() {
   }
 }
 
+function createDeleteQueryBuilder() {
+  return {
+    delete: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    execute: jest.fn().mockResolvedValue(undefined),
+  }
+}
+
+function createUpdatePlacesTransactionMocks() {
+  const participantRepository = { findOne: jest.fn() }
+  const meetingQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    setLock: jest.fn().mockReturnThis(),
+    getOne: jest.fn(),
+  }
+  const meetingRepository = {
+    createQueryBuilder: jest.fn(() => meetingQueryBuilder),
+    save: jest.fn().mockImplementation((value) => value),
+  }
+  const candidateRepository = { findOne: jest.fn() }
+  const recommendationRepository = { find: jest.fn() }
+  const placeDeleteQueryBuilder = createDeleteQueryBuilder()
+  const placeRepository = {
+    createQueryBuilder: jest.fn(() => placeDeleteQueryBuilder),
+    save: jest.fn().mockImplementation((value) => value),
+    create: jest.fn().mockImplementation((value) => value),
+  }
+  const categoryDeleteQueryBuilder = createDeleteQueryBuilder()
+  const categoryStepRepository = {
+    createQueryBuilder: jest.fn(() => categoryDeleteQueryBuilder),
+    save: jest.fn().mockImplementation((value) => value),
+    create: jest.fn().mockImplementation((value) => value),
+  }
+  const repositories = new Map<unknown, unknown>([
+    [MeetingParticipant, participantRepository],
+    [Meeting, meetingRepository],
+    [CourseCandidate, candidateRepository],
+    [MeetingPlaceRecommendation, recommendationRepository],
+    [CourseCandidatePlace, placeRepository],
+    [CourseCategoryStep, categoryStepRepository],
+  ])
+  const manager = {
+    getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
+  }
+
+  return {
+    manager,
+    participantRepository,
+    meetingQueryBuilder,
+    meetingRepository,
+    candidateRepository,
+    recommendationRepository,
+    placeRepository,
+    placeDeleteQueryBuilder,
+    categoryStepRepository,
+    categoryDeleteQueryBuilder,
+  }
+}
+
 function createRecommendation(overrides: {
   id: string
   longitude: number
@@ -1216,9 +1276,7 @@ describe('CourseService', () => {
       })
 
       await expect(promise).rejects.toBeInstanceOf(ForbiddenException)
-      await expect(promise).rejects.toThrow(
-        '방장만 코스에 장소를 추가할 수 있습니다.',
-      )
+      await expect(promise).rejects.toThrow('방장만 코스를 편집할 수 있습니다.')
       expect(placeRepository.save).not.toHaveBeenCalled()
     })
 
@@ -1514,7 +1572,7 @@ describe('CourseService', () => {
 
       await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
       await expect(promise).rejects.toThrow(
-        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       )
       await expect(promise).rejects.not.toThrow(
         '카카오 REST API 키가 설정되지 않았습니다.',
@@ -1575,7 +1633,7 @@ describe('CourseService', () => {
 
       await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
       await expect(promise).rejects.toThrow(
-        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       )
       expect(errorSpy).toHaveBeenCalled()
       expect(placeRepository.save).not.toHaveBeenCalled()
@@ -1760,6 +1818,473 @@ describe('CourseService', () => {
       expect(categoryStepRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ order: 1 }),
       )
+    })
+  })
+
+  describe('updateCoursePlaces', () => {
+    it('accessToken이 빈 문자열이면 트랜잭션 없이 401을 던진다', async () => {
+      const { service, dataSource } = createService()
+
+      const promise = service.updateCoursePlaces('1', '2', '', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(dataSource.transaction).not.toHaveBeenCalled()
+    })
+
+    it('참여자를 찾지 못하면 401을 던지고 아무것도 변경하지 않는다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, placeRepository } =
+        createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(placeRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('참여자가 방장이 아니면 403을 던지고 아무것도 변경하지 않는다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, placeRepository } =
+        createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Member }),
+      )
+
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(promise).rejects.toThrow('방장만 코스를 편집할 수 있습니다.')
+      expect(placeRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('모임을 찾지 못하면 404를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, meetingQueryBuilder } =
+        createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(null)
+
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
+    })
+
+    it.each([
+      MeetingStatus.RecommendationCollecting,
+      MeetingStatus.CourseGenerating,
+      MeetingStatus.CourseGenerationFailed,
+      MeetingStatus.CourseConfirmed,
+    ])(
+      '모임이 %s 상태이면 409를 던지고 코스 후보를 조회하지 않는다',
+      async (status) => {
+        const { service, dataSource } = createService()
+        const {
+          manager,
+          participantRepository,
+          meetingQueryBuilder,
+          candidateRepository,
+        } = createUpdatePlacesTransactionMocks()
+        dataSource.transaction.mockImplementation((callback: never) =>
+          (callback as (manager: unknown) => unknown)(manager),
+        )
+        participantRepository.findOne.mockResolvedValue(
+          createParticipant({ role: ParticipantRole.Host }),
+        )
+        meetingQueryBuilder.getOne.mockResolvedValue(
+          createMeetingWithStatus(status),
+        )
+
+        const promise = service.updateCoursePlaces('1', '2', 'token', {
+          recommendationIds: ['10', '20'],
+        })
+
+        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        expect(candidateRepository.findOne).not.toHaveBeenCalled()
+      },
+    )
+
+    it('코스 후보가 해당 모임 소속이 아니면 404를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+      } = createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
+      expect(recommendationRepository.find).not.toHaveBeenCalled()
+    })
+
+    it('요청한 장소 추천 중 존재하지 않는 것이 있으면 404를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      // 10만 찾아지고 20은 존재하지 않는 상황
+      recommendationRepository.find.mockResolvedValue([
+        createRecommendation({ id: '10', longitude: 127.0, latitude: 37.5 }),
+      ])
+
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('장소 추천을 찾을 수 없습니다.')
+      expect(placeRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('카카오 API 호출이 실패하면 클라이언트에는 일반화된 500을 반환한다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.find.mockResolvedValue([
+        createRecommendation({ id: '10', longitude: 127.0, latitude: 37.5 }),
+        createRecommendation({ id: '20', longitude: 127.1, latitude: 37.51 }),
+      ])
+      kakaoWalkingCourseService.getWalkingCourse.mockRejectedValue(
+        new ServiceUnavailableException(
+          '카카오 REST API 키가 설정되지 않았습니다.',
+        ),
+      )
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation()
+
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toThrow(
+        '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      )
+      expect(errorSpy).toHaveBeenCalled()
+      expect(placeRepository.save).not.toHaveBeenCalled()
+      errorSpy.mockRestore()
+    })
+
+    it('카카오 응답 status가 OK가 아니면 클라이언트에는 일반화된 500을 반환한다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.find.mockResolvedValue([
+        createRecommendation({ id: '10', longitude: 127.0, latitude: 37.5 }),
+        createRecommendation({ id: '20', longitude: 127.1, latitude: 37.51 }),
+      ])
+      kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue({
+        status: 'ROUTE_RESULT_NOT_FOUND',
+      })
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation()
+
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      expect(errorSpy).toHaveBeenCalled()
+      expect(placeRepository.save).not.toHaveBeenCalled()
+      errorSpy.mockRestore()
+    })
+
+    it('검증을 통과하면 기존 장소·카테고리 스텝을 전부 삭제하고 요청 순서대로 다시 채우며 코스 버전을 한 번만 올린다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        meetingRepository,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+        placeDeleteQueryBuilder,
+        categoryStepRepository,
+        categoryDeleteQueryBuilder,
+      } = createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meeting.courseVersion = 5
+      meetingQueryBuilder.getOne.mockResolvedValue(meeting)
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      const recommendation10 = createRecommendation({
+        id: '10',
+        longitude: 127.0,
+        latitude: 37.5,
+        categoryName: '카페',
+        categorySlug: 'cafe',
+      })
+      const recommendation20 = createRecommendation({
+        id: '20',
+        longitude: 127.1,
+        latitude: 37.51,
+        categoryName: '음식점',
+        categorySlug: 'restaurant',
+      })
+      recommendationRepository.find.mockResolvedValue([
+        recommendation20,
+        recommendation10,
+      ])
+      kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue(
+        createWalkingCourseResponse(300, 450),
+      )
+
+      const result = await service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10', '20'],
+      })
+
+      expect(kakaoWalkingCourseService.getWalkingCourse).toHaveBeenCalledTimes(
+        1,
+      )
+      expect(kakaoWalkingCourseService.getWalkingCourse).toHaveBeenCalledWith({
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        start_x: '127',
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        start_y: '37.5',
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        end_x: '127.1',
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        end_y: '37.51',
+      })
+      expect(placeDeleteQueryBuilder.delete).toHaveBeenCalled()
+      expect(placeDeleteQueryBuilder.where).toHaveBeenCalledWith(
+        'course_candidate_id = :courseCandidateId',
+        { courseCandidateId: '2' },
+      )
+      expect(categoryDeleteQueryBuilder.delete).toHaveBeenCalled()
+      expect(categoryDeleteQueryBuilder.where).toHaveBeenCalledWith(
+        'meeting_id = :meetingId',
+        { meetingId: '1' },
+      )
+      expect(placeRepository.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          order: 1,
+          travelTimeToNext: 300,
+          distanceToNextMeters: 450,
+        }),
+        expect.objectContaining({
+          order: 2,
+          travelTimeToNext: null,
+          distanceToNextMeters: null,
+        }),
+      ])
+      expect(categoryStepRepository.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          order: 1,
+          category: recommendation10.place.category,
+        }),
+        expect.objectContaining({
+          order: 2,
+          category: recommendation20.place.category,
+        }),
+      ])
+      expect(meeting.courseVersion).toBe(6)
+      expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
+      expect(result).toEqual({
+        courseName: '뚜벅이 코스',
+        totalDistanceKm: 0.5,
+        totalCount: 2,
+        route: [
+          {
+            recommendationId: '10',
+            placeId: 'place-10',
+            order: 1,
+            name: '장소 10',
+            category: '카페',
+            categorySlug: 'cafe',
+            address: '주소 10',
+            primaryImageUrl: null,
+            longitude: 127.0,
+            latitude: 37.5,
+            walkDurationToNextMin: 5,
+          },
+          {
+            recommendationId: '20',
+            placeId: 'place-20',
+            order: 2,
+            name: '장소 20',
+            category: '음식점',
+            categorySlug: 'restaurant',
+            address: '주소 20',
+            primaryImageUrl: null,
+            longitude: 127.1,
+            latitude: 37.51,
+            walkDurationToNextMin: null,
+          },
+        ],
+      })
+    })
+
+    it('수정한 장소가 1개면 카카오 API를 호출하지 않고 이동 시간·거리 없이 저장한다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        meetingRepository,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+        categoryStepRepository,
+      } = createUpdatePlacesTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meeting.courseVersion = 1
+      meetingQueryBuilder.getOne.mockResolvedValue(meeting)
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      const recommendation10 = createRecommendation({
+        id: '10',
+        longitude: 127.0,
+        latitude: 37.5,
+      })
+      recommendationRepository.find.mockResolvedValue([recommendation10])
+
+      const result = await service.updateCoursePlaces('1', '2', 'token', {
+        recommendationIds: ['10'],
+      })
+
+      expect(kakaoWalkingCourseService.getWalkingCourse).not.toHaveBeenCalled()
+      expect(placeRepository.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          order: 1,
+          travelTimeToNext: null,
+          distanceToNextMeters: null,
+        }),
+      ])
+      expect(categoryStepRepository.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          order: 1,
+          category: recommendation10.place.category,
+        }),
+      ])
+      expect(meeting.courseVersion).toBe(2)
+      expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
+      expect(result).toEqual({
+        courseName: '뚜벅이 코스',
+        totalDistanceKm: 0,
+        totalCount: 1,
+        route: [
+          {
+            recommendationId: '10',
+            placeId: 'place-10',
+            order: 1,
+            name: '장소 10',
+            category: '카페',
+            categorySlug: 'cafe',
+            address: '주소 10',
+            primaryImageUrl: null,
+            longitude: 127.0,
+            latitude: 37.5,
+            walkDurationToNextMin: null,
+          },
+        ],
+      })
     })
   })
 })

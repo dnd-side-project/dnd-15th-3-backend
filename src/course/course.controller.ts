@@ -471,18 +471,21 @@ export class CourseController {
     description:
       '모임이 코스 생성 완료 상태가 아니어서 코스를 수정할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  @ApiInternalServerErrorResponse({
+    description:
+      '코스를 수정하는 중 서버 내부 오류가 발생했습니다(도보 경로 조회 실패 등).',
   })
   updateCoursePlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
-    @Query('accessToken') _accessToken: string,
-    @Body() _dto: UpdateCoursePlacesRequestDto,
-  ): never {
-    throw new NotImplementedException(
-      '코스 전체 수정 API는 실제 데이터 연동 후 제공됩니다.',
+    @Query('accessToken') accessToken: string,
+    @Body() dto: UpdateCoursePlacesRequestDto,
+  ): Promise<CourseDetailResponseDto> {
+    return this.courseService.updateCoursePlaces(
+      meetingId,
+      courseCandidateId,
+      accessToken,
+      dto,
     )
   }
 

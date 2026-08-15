@@ -20,11 +20,13 @@ import {
   COURSE_COMMENTS_VISIBLE_STATUSES,
   COURSE_DETAIL_VISIBLE_STATUSES,
   COURSE_PLACE_ADDABLE_STATUSES,
+  COURSE_PLACES_REPLACEABLE_STATUSES,
 } from 'src/meeting/constants/meeting-status.constants'
 import { MeetingPlaceRecommendationDto } from 'src/meeting/dto/meeting-place-recommendation.dto'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
+import type { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import type { Place } from 'src/place/entities/place.entity'
 import { PlaceImage } from 'src/place/entities/place-image.entity'
 import { StorageService } from 'src/storage/storage.service'
@@ -37,6 +39,7 @@ import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
 import { CreateCourseCommentResponseDto } from './dto/create-course-comment-response.dto'
 import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
+import { UpdateCoursePlacesRequestDto } from './dto/update-course-places-request.dto'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
@@ -331,9 +334,11 @@ export class CourseService {
           meetingId,
           normalizedAccessToken,
         )
-        const meeting = await this.lockAddablePlaceMeetingOrThrow(
+        const meeting = await this.lockMeetingOrThrow(
           manager,
           meetingId,
+          COURSE_PLACE_ADDABLE_STATUSES,
+          '모임이 코스 생성 완료 상태가 아니어서 코스에 장소를 추가할 수 없습니다.',
         )
         const candidate = await this.loadCourseCandidateOrThrow(
           manager,
@@ -366,6 +371,53 @@ export class CourseService {
     return this.buildCourseDetailResponse(candidate, steps)
   }
 
+  async updateCoursePlaces(
+    meetingId: string,
+    courseCandidateId: string,
+    accessToken: string,
+    request: UpdateCoursePlacesRequestDto,
+  ): Promise<CourseDetailResponseDto> {
+    assertAccessToken(accessToken)
+    const normalizedAccessToken = accessToken.trim()
+
+    const { candidate, steps } = await this.dataSource.transaction(
+      async (manager) => {
+        await this.assertHostParticipant(
+          manager,
+          meetingId,
+          normalizedAccessToken,
+        )
+        const meeting = await this.lockMeetingOrThrow(
+          manager,
+          meetingId,
+          COURSE_PLACES_REPLACEABLE_STATUSES,
+          '모임이 코스 생성 완료 상태가 아니어서 코스를 수정할 수 없습니다.',
+        )
+        const candidate = await this.loadCourseCandidateOrThrow(
+          manager,
+          meetingId,
+          courseCandidateId,
+        )
+        const recommendations = await this.loadRecommendationsInOrderOrThrow(
+          manager,
+          meetingId,
+          request.recommendationIds,
+        )
+
+        const updatedSteps = await this.replaceCoursePlaces(manager, {
+          meeting,
+          meetingId,
+          courseCandidateId,
+          recommendations,
+        })
+
+        return { candidate, steps: updatedSteps }
+      },
+    )
+
+    return this.buildCourseDetailResponse(candidate, steps)
+  }
+
   private async assertHostParticipant(
     manager: EntityManager,
     meetingId: string,
@@ -379,12 +431,14 @@ export class CourseService {
     if (!participant) {
       throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
     }
-    participant.assertHost('방장만 코스에 장소를 추가할 수 있습니다.')
+    participant.assertHost('방장만 코스를 편집할 수 있습니다.')
   }
 
-  private async lockAddablePlaceMeetingOrThrow(
+  private async lockMeetingOrThrow(
     manager: EntityManager,
     meetingId: string,
+    allowedStatuses: readonly MeetingStatus[],
+    statusErrorMessage: string,
   ): Promise<Meeting> {
     const meeting = await manager
       .getRepository(Meeting)
@@ -395,10 +449,7 @@ export class CourseService {
     if (!meeting) {
       throw new NotFoundException('모임을 찾을 수 없습니다.')
     }
-    meeting.assertStatus(
-      COURSE_PLACE_ADDABLE_STATUSES,
-      '모임이 코스 생성 완료 상태가 아니어서 코스에 장소를 추가할 수 없습니다.',
-    )
+    meeting.assertStatus(allowedStatuses, statusErrorMessage)
     return meeting
   }
 
@@ -536,6 +587,117 @@ export class CourseService {
     )
   }
 
+  private async loadRecommendationsInOrderOrThrow(
+    manager: EntityManager,
+    meetingId: string,
+    recommendationIds: string[],
+  ): Promise<MeetingPlaceRecommendation[]> {
+    const recommendations = await manager
+      .getRepository(MeetingPlaceRecommendation)
+      .find({
+        where: { id: In(recommendationIds), meeting: { id: meetingId } },
+        relations: { place: { category: true } },
+      })
+    const recommendationsById = new Map(
+      recommendations.map((recommendation) => [
+        recommendation.id,
+        recommendation,
+      ]),
+    )
+    const ordered = recommendationIds.map((id) => recommendationsById.get(id))
+    if (ordered.some((recommendation) => !recommendation)) {
+      throw new NotFoundException('장소 추천을 찾을 수 없습니다.')
+    }
+    return ordered as MeetingPlaceRecommendation[]
+  }
+
+  private async getWalkingLegsOrThrow(
+    places: Place[],
+  ): Promise<Array<{ totalTime: number; totalDistance: number } | null>> {
+    const legs = await Promise.all(
+      places
+        .slice(0, -1)
+        .map((place, index) =>
+          this.getWalkingCourseOrThrow(place, places[index + 1]),
+        ),
+    )
+    return [...legs, null]
+  }
+
+  private async replaceCourseCategorySteps(
+    manager: EntityManager,
+    meetingId: string,
+    categories: Category[],
+  ): Promise<void> {
+    const categoryStepRepository = manager.getRepository(CourseCategoryStep)
+    await categoryStepRepository
+      .createQueryBuilder()
+      .delete()
+      .from(CourseCategoryStep)
+      .where('meeting_id = :meetingId', { meetingId })
+      .execute()
+
+    await categoryStepRepository.save(
+      categories.map((category, index) =>
+        categoryStepRepository.create({
+          meeting: { id: meetingId } as Meeting,
+          category,
+          order: index + 1,
+        }),
+      ),
+    )
+  }
+
+  private async replaceCoursePlaces(
+    manager: EntityManager,
+    params: {
+      meeting: Meeting
+      meetingId: string
+      courseCandidateId: string
+      recommendations: MeetingPlaceRecommendation[]
+    },
+  ): Promise<CourseCandidatePlace[]> {
+    const { meeting, meetingId, courseCandidateId, recommendations } = params
+    const places = recommendations.map((recommendation) => recommendation.place)
+    const legs = await this.getWalkingLegsOrThrow(places)
+
+    const placeRepository = manager.getRepository(CourseCandidatePlace)
+    await placeRepository
+      .createQueryBuilder()
+      .delete()
+      .from(CourseCandidatePlace)
+      .where('course_candidate_id = :courseCandidateId', { courseCandidateId })
+      .execute()
+
+    const newSteps = await placeRepository.save(
+      recommendations.map((recommendation, index) =>
+        placeRepository.create({
+          courseCandidate: { id: courseCandidateId } as CourseCandidate,
+          meetingPlaceRecommendation: {
+            id: recommendation.id,
+          } as MeetingPlaceRecommendation,
+          order: index + 1,
+          travelTimeToNext: legs[index]?.totalTime ?? null,
+          distanceToNextMeters: legs[index]?.totalDistance ?? null,
+        }),
+      ),
+    )
+    newSteps.forEach((step, index) => {
+      step.meetingPlaceRecommendation = recommendations[index]
+    })
+
+    await this.replaceCourseCategorySteps(
+      manager,
+      meetingId,
+      recommendations.map((recommendation) => recommendation.place.category),
+    )
+
+    meeting.bumpCourseVersion()
+    await manager.getRepository(Meeting).save(meeting)
+
+    return newSteps
+  }
+
   private async getWalkingCourseOrThrow(
     origin: Place,
     destination: Place,
@@ -558,7 +720,7 @@ export class CourseService {
         error instanceof Error ? error.stack : error,
       )
       throw new InternalServerErrorException(
-        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       )
     }
 
@@ -568,7 +730,7 @@ export class CourseService {
           `origin=(${origin.longitude}, ${origin.latitude}) destination=(${destination.longitude}, ${destination.latitude})`,
       )
       throw new InternalServerErrorException(
-        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       )
     }
 
