@@ -405,18 +405,22 @@ export class CourseController {
       '모임이 코스 생성 완료 상태가 아니거나, 이미 코스에 포함된 장소이거나, ' +
       `코스에 이미 장소가 ${MAX_COURSE_STEPS}개 있어서 추가할 수 없습니다.`,
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
+  @ApiInternalServerErrorResponse({
+    description:
+      '코스에 장소를 추가하는 중 서버 내부 오류가 발생했습니다(코스 경로 데이터 정합성 오류, ' +
+      '도보 경로 조회 실패 등).',
   })
   addCoursePlace(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('courseCandidateId', BigIntStringPipe) courseCandidateId: string,
-    @Query('accessToken') _accessToken: string,
-    @Body() _dto: AddCoursePlaceRequestDto,
-  ): never {
-    throw new NotImplementedException(
-      '코스 장소 추가 API는 실제 데이터 연동 후 제공됩니다.',
+    @Query('accessToken') accessToken: string,
+    @Body() dto: AddCoursePlaceRequestDto,
+  ): Promise<CourseDetailResponseDto> {
+    return this.courseService.addCoursePlace(
+      meetingId,
+      courseCandidateId,
+      accessToken,
+      dto,
     )
   }
 

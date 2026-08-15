@@ -15,6 +15,7 @@ function createController() {
     createCourseComment: jest.fn().mockResolvedValue({}),
     getExcludedPlaces: jest.fn().mockResolvedValue({}),
     confirmCourse: jest.fn().mockResolvedValue({}),
+    addCoursePlace: jest.fn().mockResolvedValue({}),
   } as unknown as CourseService
 
   return {
@@ -162,15 +163,34 @@ describe('CourseController', () => {
     )
   })
 
+  it('코스 장소 추가는 CourseService에 위임한다', async () => {
+    const { controller, courseService } = createController()
+    const expected = {
+      courseName: '뚜벅이 최적 코스',
+      totalDistanceKm: 2.3,
+      totalCount: 2,
+      route: [],
+    }
+    ;(courseService.addCoursePlace as jest.Mock).mockResolvedValue(expected)
+    const dto = { recommendationId: '3' }
+
+    await expect(
+      controller.addCoursePlace('1', '2', 'token', dto),
+    ).resolves.toEqual(expected)
+    expect(courseService.addCoursePlace).toHaveBeenCalledWith(
+      '1',
+      '2',
+      'token',
+      dto,
+    )
+  })
+
   it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
     const { controller } = createController()
 
     expect(() => controller.generateCourse('1', 'token')).toThrow(
       NotImplementedException,
     )
-    expect(() =>
-      controller.addCoursePlace('1', '2', 'token', { recommendationId: '3' }),
-    ).toThrow(NotImplementedException)
     expect(() =>
       controller.updateCoursePlaces('1', '2', 'token', {
         recommendationIds: ['3', '4'],
@@ -191,6 +211,7 @@ describe('CourseController', () => {
             createCourseComment: jest.fn(),
             getExcludedPlaces: jest.fn(),
             confirmCourse: jest.fn(),
+            addCoursePlace: jest.fn(),
           },
         },
       ],
@@ -256,7 +277,7 @@ describe('CourseController', () => {
       '/meetings/{meetingId}/courses/{courseCandidateId}/places'
     ] as PathOperations | undefined
     expect(responseCodes(coursePlacesPath?.post?.responses)).toEqual(
-      ['201', '400', '401', '403', '404', '409', '501'].sort(),
+      ['201', '400', '401', '403', '404', '409', '500'].sort(),
     )
     expect(responseCodes(coursePlacesPath?.put?.responses)).toEqual(
       ['200', '400', '401', '403', '404', '409', '501'].sort(),

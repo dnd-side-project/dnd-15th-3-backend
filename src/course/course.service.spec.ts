@@ -2,7 +2,9 @@ import {
   ConflictException,
   ForbiddenException,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
@@ -13,6 +15,9 @@ import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
+import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
+import { CourseCategoryStep } from './entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from './entities/meeting-place-recommendation.entity'
 import { PreferenceType } from './enums/preference-type.enum'
 
 function createMeetingWithStatus(status: MeetingStatus): Meeting {
@@ -55,6 +60,7 @@ function createService() {
     find: jest.fn().mockResolvedValue([]),
   }
   const placeImageRepository = { find: jest.fn().mockResolvedValue([]) }
+  const kakaoWalkingCourseService = { getWalkingCourse: jest.fn() }
   const service = new CourseService(
     dataSource as never,
     meetingAccessService as never,
@@ -65,6 +71,7 @@ function createService() {
     commentRepository as never,
     courseCandidatePlaceRepository as never,
     placeImageRepository as never,
+    kakaoWalkingCourseService as never,
   )
 
   return {
@@ -78,6 +85,7 @@ function createService() {
     commentRepository,
     courseCandidatePlaceRepository,
     placeImageRepository,
+    kakaoWalkingCourseService,
   }
 }
 
@@ -111,6 +119,86 @@ function createConfirmTransactionMocks() {
     meetingQueryBuilder,
     meetingRepository,
     candidateRepository,
+  }
+}
+
+function createAddPlaceTransactionMocks() {
+  const participantRepository = { findOne: jest.fn() }
+  const meetingQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    setLock: jest.fn().mockReturnThis(),
+    getOne: jest.fn(),
+  }
+  const meetingRepository = {
+    createQueryBuilder: jest.fn(() => meetingQueryBuilder),
+    save: jest.fn().mockImplementation((value) => value),
+  }
+  const candidateRepository = { findOne: jest.fn() }
+  const recommendationRepository = { findOne: jest.fn() }
+  const placeRepository = {
+    find: jest.fn(),
+    save: jest.fn().mockImplementation((value) => value),
+    create: jest.fn().mockImplementation((value) => value),
+  }
+  const categoryStepRepository = {
+    find: jest.fn().mockResolvedValue([]),
+    save: jest.fn().mockImplementation((value) => value),
+    create: jest.fn().mockImplementation((value) => value),
+  }
+  const repositories = new Map<unknown, unknown>([
+    [MeetingParticipant, participantRepository],
+    [Meeting, meetingRepository],
+    [CourseCandidate, candidateRepository],
+    [MeetingPlaceRecommendation, recommendationRepository],
+    [CourseCandidatePlace, placeRepository],
+    [CourseCategoryStep, categoryStepRepository],
+  ])
+  const manager = {
+    getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
+  }
+
+  return {
+    manager,
+    participantRepository,
+    meetingQueryBuilder,
+    meetingRepository,
+    candidateRepository,
+    recommendationRepository,
+    placeRepository,
+    categoryStepRepository,
+  }
+}
+
+function createRecommendation(overrides: {
+  id: string
+  longitude: number
+  latitude: number
+  categoryName?: string
+  categorySlug?: string
+}) {
+  return {
+    id: overrides.id,
+    place: {
+      id: `place-${overrides.id}`,
+      name: `장소 ${overrides.id}`,
+      address: `주소 ${overrides.id}`,
+      longitude: overrides.longitude,
+      latitude: overrides.latitude,
+      category: {
+        name: overrides.categoryName ?? '카페',
+        slug: overrides.categorySlug ?? 'cafe',
+      },
+    },
+  }
+}
+
+function createWalkingCourseResponse(totalTime: number, totalDistance: number) {
+  return {
+    status: 'OK' as const,
+    route: {
+      properties: { totalTime, totalDistance },
+      legs: [{ properties: { time: totalTime, distance: totalDistance } }],
+    },
   }
 }
 
@@ -1080,6 +1168,598 @@ describe('CourseService', () => {
       expect(meeting.courseImageKey).toBe('course-cards/1/5.png')
       expect(meeting.courseImageUploadedAt).toBeInstanceOf(Date)
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
+    })
+  })
+
+  describe('addCoursePlace', () => {
+    it('accessToken이 빈 문자열이면 트랜잭션 없이 401을 던진다', async () => {
+      const { service, dataSource } = createService()
+
+      const promise = service.addCoursePlace('1', '2', '', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(dataSource.transaction).not.toHaveBeenCalled()
+    })
+
+    it('참여자를 찾지 못하면 401을 던지고 아무것도 변경하지 않는다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, placeRepository } =
+        createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(placeRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('참여자가 방장이 아니면 403을 던지고 아무것도 변경하지 않는다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, placeRepository } =
+        createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Member }),
+      )
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(promise).rejects.toThrow(
+        '방장만 코스에 장소를 추가할 수 있습니다.',
+      )
+      expect(placeRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('모임을 찾지 못하면 404를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const { manager, participantRepository, meetingQueryBuilder } =
+        createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(null)
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
+    })
+
+    it.each([
+      MeetingStatus.RecommendationCollecting,
+      MeetingStatus.CourseGenerating,
+      MeetingStatus.CourseGenerationFailed,
+      MeetingStatus.CourseConfirmed,
+    ])(
+      '모임이 %s 상태이면 409를 던지고 코스 후보를 조회하지 않는다',
+      async (status) => {
+        const { service, dataSource } = createService()
+        const {
+          manager,
+          participantRepository,
+          meetingQueryBuilder,
+          candidateRepository,
+        } = createAddPlaceTransactionMocks()
+        dataSource.transaction.mockImplementation((callback: never) =>
+          (callback as (manager: unknown) => unknown)(manager),
+        )
+        participantRepository.findOne.mockResolvedValue(
+          createParticipant({ role: ParticipantRole.Host }),
+        )
+        meetingQueryBuilder.getOne.mockResolvedValue(
+          createMeetingWithStatus(status),
+        )
+
+        const promise = service.addCoursePlace('1', '2', 'token', {
+          recommendationId: '20',
+        })
+
+        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        expect(candidateRepository.findOne).not.toHaveBeenCalled()
+      },
+    )
+
+    it('코스 후보가 해당 모임 소속이 아니면 404를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
+      expect(recommendationRepository.findOne).not.toHaveBeenCalled()
+    })
+
+    it('장소 추천을 찾지 못하면 404를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.findOne.mockResolvedValue(null)
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toThrow('장소 추천을 찾을 수 없습니다.')
+      expect(placeRepository.find).not.toHaveBeenCalled()
+    })
+
+    it('코스 경로가 하나도 없으면 데이터 정합성 오류로 500을 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.findOne.mockResolvedValue(
+        createRecommendation({ id: '20', longitude: 127.06, latitude: 37.55 }),
+      )
+      placeRepository.find.mockResolvedValue([])
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toThrow(
+        '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+    })
+
+    it('이미 코스에 포함된 장소면 409를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.findOne.mockResolvedValue(
+        createRecommendation({ id: '20', longitude: 127.06, latitude: 37.55 }),
+      )
+      placeRepository.find.mockResolvedValue([
+        {
+          order: 1,
+          meetingPlaceRecommendation: createRecommendation({
+            id: '20',
+            longitude: 127.0,
+            latitude: 37.5,
+          }),
+        },
+      ])
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toThrow('이미 코스에 포함된 장소입니다.')
+    })
+
+    it('코스에 이미 최대 개수만큼 장소가 있으면 409를 던진다', async () => {
+      const { service, dataSource } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.findOne.mockResolvedValue(
+        createRecommendation({ id: '20', longitude: 127.06, latitude: 37.55 }),
+      )
+      placeRepository.find.mockResolvedValue(
+        Array.from({ length: 6 }, (_, index) => ({
+          order: index + 1,
+          meetingPlaceRecommendation: createRecommendation({
+            id: `${index + 1}`,
+            longitude: 127.0 + index,
+            latitude: 37.5 + index,
+          }),
+        })),
+      )
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toThrow(
+        '코스에 이미 장소가 6개 있어서 추가할 수 없습니다.',
+      )
+    })
+
+    it('카카오 API 호출이 실패하면 클라이언트에는 일반화된 500을 반환한다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.findOne.mockResolvedValue(
+        createRecommendation({ id: '20', longitude: 127.06, latitude: 37.55 }),
+      )
+      placeRepository.find.mockResolvedValue([
+        {
+          order: 1,
+          meetingPlaceRecommendation: createRecommendation({
+            id: '10',
+            longitude: 127.0,
+            latitude: 37.5,
+          }),
+        },
+      ])
+      const kakaoError = new ServiceUnavailableException(
+        '카카오 REST API 키가 설정되지 않았습니다.',
+      )
+      kakaoWalkingCourseService.getWalkingCourse.mockRejectedValue(kakaoError)
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation()
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toThrow(
+        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      )
+      await expect(promise).rejects.not.toThrow(
+        '카카오 REST API 키가 설정되지 않았습니다.',
+      )
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        kakaoError.stack,
+      )
+      expect(placeRepository.save).not.toHaveBeenCalled()
+      errorSpy.mockRestore()
+    })
+
+    it('카카오 응답 status가 OK가 아니면 클라이언트에는 일반화된 500을 반환한다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.findOne.mockResolvedValue(
+        createRecommendation({ id: '20', longitude: 127.06, latitude: 37.55 }),
+      )
+      placeRepository.find.mockResolvedValue([
+        {
+          order: 1,
+          meetingPlaceRecommendation: createRecommendation({
+            id: '10',
+            longitude: 127.0,
+            latitude: 37.5,
+          }),
+        },
+      ])
+      kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue({
+        status: 'ROUTE_RESULT_NOT_FOUND',
+      })
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation()
+
+      const promise = service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toThrow(
+        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      )
+      expect(errorSpy).toHaveBeenCalled()
+      expect(placeRepository.save).not.toHaveBeenCalled()
+      errorSpy.mockRestore()
+    })
+
+    it('검증을 통과하면 마지막 장소의 이동 시간·거리를 갱신하고 새 장소를 코스 맨 뒤에 추가하며 카테고리 스텝과 코스 버전을 갱신한다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        meetingRepository,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+        categoryStepRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meeting.courseVersion = 3
+      meetingQueryBuilder.getOne.mockResolvedValue(meeting)
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      const newRecommendation = createRecommendation({
+        id: '20',
+        longitude: 127.1,
+        latitude: 37.51,
+        categoryName: '음식점',
+        categorySlug: 'restaurant',
+      })
+      recommendationRepository.findOne.mockResolvedValue(newRecommendation)
+      const lastStep = {
+        order: 1,
+        travelTimeToNext: null,
+        distanceToNextMeters: null,
+        meetingPlaceRecommendation: createRecommendation({
+          id: '10',
+          longitude: 127.0,
+          latitude: 37.5,
+        }),
+      }
+      placeRepository.find.mockResolvedValue([lastStep])
+      categoryStepRepository.find.mockResolvedValue([{ order: 2 }])
+      kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue(
+        createWalkingCourseResponse(300, 450),
+      )
+
+      const result = await service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      expect(participantRepository.findOne).toHaveBeenCalledWith({
+        where: { meeting: { id: '1' }, accessToken: 'token' },
+      })
+      expect(meetingQueryBuilder.where).toHaveBeenCalledWith(
+        'meeting.id = :meetingId',
+        { meetingId: '1' },
+      )
+      expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+      )
+      expect(candidateRepository.findOne).toHaveBeenCalledWith({
+        where: { id: '2', meeting: { id: '1' } },
+      })
+      expect(kakaoWalkingCourseService.getWalkingCourse).toHaveBeenCalledWith({
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        start_x: '127',
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        start_y: '37.5',
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        end_x: '127.1',
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        end_y: '37.51',
+      })
+      expect(lastStep.travelTimeToNext).toBe(300)
+      expect(lastStep.distanceToNextMeters).toBe(450)
+      expect(placeRepository.save).toHaveBeenCalledWith(lastStep)
+      expect(placeRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          courseCandidate: { id: '2' },
+          order: 2,
+        }),
+      )
+      expect(categoryStepRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          meeting: { id: '1' },
+          category: newRecommendation.place.category,
+          order: 3,
+        }),
+      )
+      expect(meeting.courseVersion).toBe(4)
+      expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
+      expect(result).toEqual({
+        courseName: '뚜벅이 코스',
+        totalDistanceKm: 0.5,
+        totalCount: 2,
+        route: [
+          {
+            recommendationId: '10',
+            placeId: 'place-10',
+            order: 1,
+            name: '장소 10',
+            category: '카페',
+            categorySlug: 'cafe',
+            address: '주소 10',
+            primaryImageUrl: null,
+            longitude: 127.0,
+            latitude: 37.5,
+            walkDurationToNextMin: 5,
+          },
+          {
+            recommendationId: '20',
+            placeId: 'place-20',
+            order: 2,
+            name: '장소 20',
+            category: '음식점',
+            categorySlug: 'restaurant',
+            address: '주소 20',
+            primaryImageUrl: null,
+            longitude: 127.1,
+            latitude: 37.51,
+            walkDurationToNextMin: null,
+          },
+        ],
+      })
+    })
+
+    it('기존 카테고리 스텝이 없으면 1번부터 시작한다', async () => {
+      const { service, dataSource, kakaoWalkingCourseService } = createService()
+      const {
+        manager,
+        participantRepository,
+        meetingQueryBuilder,
+        candidateRepository,
+        recommendationRepository,
+        placeRepository,
+        categoryStepRepository,
+      } = createAddPlaceTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      meetingQueryBuilder.getOne.mockResolvedValue(
+        createMeetingWithStatus(MeetingStatus.CourseGenerated),
+      )
+      candidateRepository.findOne.mockResolvedValue(
+        createCandidate({ id: '2', name: '뚜벅이 코스' }),
+      )
+      recommendationRepository.findOne.mockResolvedValue(
+        createRecommendation({ id: '20', longitude: 127.1, latitude: 37.51 }),
+      )
+      placeRepository.find.mockResolvedValue([
+        {
+          order: 1,
+          travelTimeToNext: null,
+          distanceToNextMeters: null,
+          meetingPlaceRecommendation: createRecommendation({
+            id: '10',
+            longitude: 127.0,
+            latitude: 37.5,
+          }),
+        },
+      ])
+      categoryStepRepository.find.mockResolvedValue([])
+      kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue(
+        createWalkingCourseResponse(300, 450),
+      )
+
+      await service.addCoursePlace('1', '2', 'token', {
+        recommendationId: '20',
+      })
+
+      expect(categoryStepRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ order: 1 }),
+      )
     })
   })
 })

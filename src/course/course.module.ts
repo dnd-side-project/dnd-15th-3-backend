@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { KakaoModule } from 'src/kakao/kakao.module'
 import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
 import { PlaceImage } from 'src/place/entities/place-image.entity'
 import { StorageModule } from 'src/storage/storage.module'
@@ -15,6 +16,7 @@ import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recomm
   imports: [
     MeetingAccessModule,
     StorageModule,
+    KakaoModule,
     TypeOrmModule.forFeature([
       CourseCandidate,
       CourseCandidateComment,

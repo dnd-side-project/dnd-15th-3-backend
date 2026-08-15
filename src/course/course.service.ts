@@ -1,11 +1,17 @@
 import {
+  ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { MAX_COURSE_STEPS } from 'src/category/category.constants'
+import type { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
+import type { KakaoWalkingCourseResponse } from 'src/kakao/schema/walking-course-response.schema'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import {
@@ -13,14 +19,17 @@ import {
   COURSE_COMMENT_CREATABLE_STATUSES,
   COURSE_COMMENTS_VISIBLE_STATUSES,
   COURSE_DETAIL_VISIBLE_STATUSES,
+  COURSE_PLACE_ADDABLE_STATUSES,
 } from 'src/meeting/constants/meeting-status.constants'
 import { MeetingPlaceRecommendationDto } from 'src/meeting/dto/meeting-place-recommendation.dto'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
+import type { Place } from 'src/place/entities/place.entity'
 import { PlaceImage } from 'src/place/entities/place-image.entity'
 import { StorageService } from 'src/storage/storage.service'
-import { DataSource, In, Repository } from 'typeorm'
+import { DataSource, type EntityManager, In, Repository } from 'typeorm'
+import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
 import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
@@ -31,6 +40,8 @@ import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
+import { CourseCategoryStep } from './entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from './entities/meeting-place-recommendation.entity'
 import { MeetingPlaceRecommendationRepository } from './meeting-place-recommendation.repository'
 import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recommendation-vote.repository'
 import {
@@ -40,6 +51,8 @@ import {
 
 @Injectable()
 export class CourseService {
+  private readonly logger = new Logger(CourseService.name)
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly meetingAccessService: MeetingAccessService,
@@ -54,6 +67,7 @@ export class CourseService {
     private readonly courseCandidatePlaceRepository: Repository<CourseCandidatePlace>,
     @InjectRepository(PlaceImage)
     private readonly placeImageRepository: Repository<PlaceImage>,
+    private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
   ) {}
 
   async getCourseCandidates(
@@ -122,36 +136,7 @@ export class CourseService {
       )
     }
 
-    const primaryImageUrls = await this.findPrimaryImageUrls(
-      steps.map((step) => step.meetingPlaceRecommendation.place.id),
-    )
-
-    const totalDistanceMeters = steps.reduce(
-      (sum, step) => sum + (step.distanceToNextMeters ?? 0),
-      0,
-    )
-
-    return {
-      courseName: candidate.name,
-      totalDistanceKm: metersToKilometers(totalDistanceMeters),
-      totalCount: steps.length,
-      route: steps.map((step) => {
-        const place = step.meetingPlaceRecommendation.place
-        return {
-          recommendationId: step.meetingPlaceRecommendation.id,
-          placeId: place.id,
-          order: step.order,
-          name: place.name,
-          category: place.category.name,
-          categorySlug: place.category.slug as CategorySlug,
-          address: place.address,
-          primaryImageUrl: primaryImageUrls.get(place.id) ?? null,
-          longitude: place.longitude,
-          latitude: place.latitude,
-          walkDurationToNextMin: secondsToMinutes(step.travelTimeToNext),
-        }
-      }),
-    }
+    return this.buildCourseDetailResponse(candidate, steps)
   }
 
   async getCourseComments(
@@ -330,6 +315,269 @@ export class CourseService {
     }
   }
 
+  async addCoursePlace(
+    meetingId: string,
+    courseCandidateId: string,
+    accessToken: string,
+    request: AddCoursePlaceRequestDto,
+  ): Promise<CourseDetailResponseDto> {
+    assertAccessToken(accessToken)
+    const normalizedAccessToken = accessToken.trim()
+
+    const { candidate, steps } = await this.dataSource.transaction(
+      async (manager) => {
+        await this.assertHostParticipant(
+          manager,
+          meetingId,
+          normalizedAccessToken,
+        )
+        const meeting = await this.lockAddablePlaceMeetingOrThrow(
+          manager,
+          meetingId,
+        )
+        const candidate = await this.loadCourseCandidateOrThrow(
+          manager,
+          meetingId,
+          courseCandidateId,
+        )
+        const recommendation = await this.loadRecommendationOrThrow(
+          manager,
+          meetingId,
+          request.recommendationId,
+        )
+        const steps = await this.loadCourseStepsOrThrow(
+          manager,
+          courseCandidateId,
+        )
+        this.assertPlaceCanBeAdded(steps, recommendation.id)
+
+        const updatedSteps = await this.appendPlaceToCourse(manager, {
+          meeting,
+          meetingId,
+          courseCandidateId,
+          steps,
+          recommendation,
+        })
+
+        return { candidate, steps: updatedSteps }
+      },
+    )
+
+    return this.buildCourseDetailResponse(candidate, steps)
+  }
+
+  private async assertHostParticipant(
+    manager: EntityManager,
+    meetingId: string,
+    accessToken: string,
+  ): Promise<void> {
+    const participant = await manager
+      .getRepository(MeetingParticipant)
+      .findOne({
+        where: { meeting: { id: meetingId }, accessToken },
+      })
+    if (!participant) {
+      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+    }
+    participant.assertHost('방장만 코스에 장소를 추가할 수 있습니다.')
+  }
+
+  private async lockAddablePlaceMeetingOrThrow(
+    manager: EntityManager,
+    meetingId: string,
+  ): Promise<Meeting> {
+    const meeting = await manager
+      .getRepository(Meeting)
+      .createQueryBuilder('meeting')
+      .where('meeting.id = :meetingId', { meetingId })
+      .setLock('pessimistic_write')
+      .getOne()
+    if (!meeting) {
+      throw new NotFoundException('모임을 찾을 수 없습니다.')
+    }
+    meeting.assertStatus(
+      COURSE_PLACE_ADDABLE_STATUSES,
+      '모임이 코스 생성 완료 상태가 아니어서 코스에 장소를 추가할 수 없습니다.',
+    )
+    return meeting
+  }
+
+  private async loadCourseCandidateOrThrow(
+    manager: EntityManager,
+    meetingId: string,
+    courseCandidateId: string,
+  ): Promise<CourseCandidate> {
+    const candidate = await manager.getRepository(CourseCandidate).findOne({
+      where: { id: courseCandidateId, meeting: { id: meetingId } },
+    })
+    if (!candidate) {
+      throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
+    }
+    return candidate
+  }
+
+  private async loadRecommendationOrThrow(
+    manager: EntityManager,
+    meetingId: string,
+    recommendationId: string,
+  ): Promise<MeetingPlaceRecommendation> {
+    const recommendation = await manager
+      .getRepository(MeetingPlaceRecommendation)
+      .findOne({
+        where: { id: recommendationId, meeting: { id: meetingId } },
+        relations: { place: { category: true } },
+      })
+    if (!recommendation) {
+      throw new NotFoundException('장소 추천을 찾을 수 없습니다.')
+    }
+    return recommendation
+  }
+
+  private async loadCourseStepsOrThrow(
+    manager: EntityManager,
+    courseCandidateId: string,
+  ): Promise<CourseCandidatePlace[]> {
+    const steps = await manager.getRepository(CourseCandidatePlace).find({
+      where: { courseCandidate: { id: courseCandidateId } },
+      relations: {
+        meetingPlaceRecommendation: { place: { category: true } },
+      },
+      order: { order: 'ASC' },
+    })
+    if (steps.length === 0) {
+      throw new InternalServerErrorException(
+        '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+    }
+    return steps
+  }
+
+  private assertPlaceCanBeAdded(
+    steps: CourseCandidatePlace[],
+    recommendationId: string,
+  ): void {
+    const alreadyIncluded = steps.some(
+      (step) => step.meetingPlaceRecommendation.id === recommendationId,
+    )
+    if (alreadyIncluded) {
+      throw new ConflictException('이미 코스에 포함된 장소입니다.')
+    }
+    if (steps.length >= MAX_COURSE_STEPS) {
+      throw new ConflictException(
+        `코스에 이미 장소가 ${MAX_COURSE_STEPS}개 있어서 추가할 수 없습니다.`,
+      )
+    }
+  }
+
+  private async appendPlaceToCourse(
+    manager: EntityManager,
+    params: {
+      meeting: Meeting
+      meetingId: string
+      courseCandidateId: string
+      steps: CourseCandidatePlace[]
+      recommendation: MeetingPlaceRecommendation
+    },
+  ): Promise<CourseCandidatePlace[]> {
+    const { meeting, meetingId, courseCandidateId, steps, recommendation } =
+      params
+    const lastStep = steps[steps.length - 1]
+    const lastPlace = lastStep.meetingPlaceRecommendation.place
+    const newPlace = recommendation.place
+
+    const walkingCourse = await this.getWalkingCourseOrThrow(
+      lastPlace,
+      newPlace,
+    )
+
+    const placeRepository = manager.getRepository(CourseCandidatePlace)
+    lastStep.travelTimeToNext = walkingCourse.totalTime
+    lastStep.distanceToNextMeters = walkingCourse.totalDistance
+    await placeRepository.save(lastStep)
+
+    const newStep = await placeRepository.save(
+      placeRepository.create({
+        courseCandidate: { id: courseCandidateId } as CourseCandidate,
+        meetingPlaceRecommendation: {
+          id: recommendation.id,
+        } as MeetingPlaceRecommendation,
+        order: lastStep.order + 1,
+        travelTimeToNext: null,
+        distanceToNextMeters: null,
+      }),
+    )
+    newStep.meetingPlaceRecommendation = recommendation
+
+    await this.appendCategoryStep(manager, meetingId, newPlace.category)
+
+    meeting.courseVersion += 1
+    await manager.getRepository(Meeting).save(meeting)
+
+    return [...steps.slice(0, -1), lastStep, newStep]
+  }
+
+  private async appendCategoryStep(
+    manager: EntityManager,
+    meetingId: string,
+    category: Category,
+  ): Promise<void> {
+    const categoryStepRepository = manager.getRepository(CourseCategoryStep)
+    const existingCategorySteps = await categoryStepRepository.find({
+      where: { meeting: { id: meetingId } },
+      order: { order: 'DESC' },
+      take: 1,
+    })
+    await categoryStepRepository.save(
+      categoryStepRepository.create({
+        meeting: { id: meetingId } as Meeting,
+        category,
+        order: (existingCategorySteps[0]?.order ?? 0) + 1,
+      }),
+    )
+  }
+
+  private async getWalkingCourseOrThrow(
+    origin: Place,
+    destination: Place,
+  ): Promise<{ totalTime: number; totalDistance: number }> {
+    let walkingCourse: KakaoWalkingCourseResponse
+    try {
+      walkingCourse = await this.kakaoWalkingCourseService.getWalkingCourse({
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        start_x: String(origin.longitude),
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        start_y: String(origin.latitude),
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        end_x: String(destination.longitude),
+        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
+        end_y: String(destination.latitude),
+      })
+    } catch (error) {
+      this.logger.error(
+        `카카오 도보 경로 API 호출에 실패했습니다. origin=(${origin.longitude}, ${origin.latitude}) destination=(${destination.longitude}, ${destination.latitude})`,
+        error instanceof Error ? error.stack : error,
+      )
+      throw new InternalServerErrorException(
+        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      )
+    }
+
+    if (walkingCourse.status !== 'OK' || !walkingCourse.route) {
+      this.logger.error(
+        `두 장소 사이의 도보 경로를 찾을 수 없습니다. status=${walkingCourse.status} ` +
+          `origin=(${origin.longitude}, ${origin.latitude}) destination=(${destination.longitude}, ${destination.latitude})`,
+      )
+      throw new InternalServerErrorException(
+        '코스에 장소를 추가하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      )
+    }
+
+    return {
+      totalTime: walkingCourse.route.properties.totalTime,
+      totalDistance: walkingCourse.route.properties.totalDistance,
+    }
+  }
+
   private async findPrimaryImageUrls(
     placeIds: string[],
   ): Promise<Map<string, string>> {
@@ -359,6 +607,42 @@ export class CourseService {
     })
     if (!exists) {
       throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
+    }
+  }
+
+  private async buildCourseDetailResponse(
+    candidate: CourseCandidate,
+    steps: CourseCandidatePlace[],
+  ): Promise<CourseDetailResponseDto> {
+    const primaryImageUrls = await this.findPrimaryImageUrls(
+      steps.map((step) => step.meetingPlaceRecommendation.place.id),
+    )
+
+    const totalDistanceMeters = steps.reduce(
+      (sum, step) => sum + (step.distanceToNextMeters ?? 0),
+      0,
+    )
+
+    return {
+      courseName: candidate.name,
+      totalDistanceKm: metersToKilometers(totalDistanceMeters),
+      totalCount: steps.length,
+      route: steps.map((step) => {
+        const place = step.meetingPlaceRecommendation.place
+        return {
+          recommendationId: step.meetingPlaceRecommendation.id,
+          placeId: place.id,
+          order: step.order,
+          name: place.name,
+          category: place.category.name,
+          categorySlug: place.category.slug as CategorySlug,
+          address: place.address,
+          primaryImageUrl: primaryImageUrls.get(place.id) ?? null,
+          longitude: place.longitude,
+          latitude: place.latitude,
+          walkDurationToNextMin: secondsToMinutes(step.travelTimeToNext),
+        }
+      }),
     }
   }
 }
