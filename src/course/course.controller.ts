@@ -39,7 +39,6 @@ import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
 import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
-import { CourseRouteStepDto } from './dto/course-route-step.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
 import { CreateCourseCommentResponseDto } from './dto/create-course-comment-response.dto'
 import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
@@ -381,14 +380,14 @@ export class CourseController {
   @ApiOperation({
     summary: '코스 장소 추가',
     description:
-      '제외된 장소 목록에서 고른 장소를 코스에 바로 반영합니다. ' +
+      '제외된 장소 목록에서 고른 장소를 코스 맨 뒤에 추가합니다. 순서를 지정할 수 없고 항상 제일 마지막 장소로 반영됩니다. ' +
       '방장만 호출할 수 있고, 모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다. ' +
       `코스는 최대 ${MAX_COURSE_STEPS}개의 장소로 구성되며, 이미 ${MAX_COURSE_STEPS}개인 경우 추가할 수 없습니다.`,
   })
   @ApiBody({ type: AddCoursePlaceRequestDto })
   @ApiCreatedResponse({
     description: '장소 추가 성공',
-    type: CourseRouteStepDto,
+    type: CourseDetailResponseDto,
   })
   @ApiBadRequestResponse({
     description:
