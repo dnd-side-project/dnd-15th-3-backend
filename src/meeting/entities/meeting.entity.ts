@@ -64,6 +64,10 @@ export class Meeting extends BaseEntity {
     this.courseImageUploadedAt = new Date()
   }
 
+  bumpCourseVersion(): void {
+    this.courseVersion += 1
+  }
+
   assertStatus(
     allowedStatuses: readonly MeetingStatus[],
     message: string,

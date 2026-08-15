@@ -510,7 +510,7 @@ export class CourseService {
 
     await this.appendCategoryStep(manager, meetingId, newPlace.category)
 
-    meeting.courseVersion += 1
+    meeting.bumpCourseVersion()
     await manager.getRepository(Meeting).save(meeting)
 
     return [...steps.slice(0, -1), lastStep, newStep]
