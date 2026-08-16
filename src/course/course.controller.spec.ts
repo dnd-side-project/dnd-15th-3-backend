@@ -1,6 +1,6 @@
-import { NotImplementedException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
+import { CommonException } from 'src/common/exception/common.exception'
 import { CourseController } from './course.controller'
 
 function createController() {
@@ -12,34 +12,34 @@ describe('CourseController', () => {
     const controller = createController()
 
     expect(() => controller.generateCourse('1', 'token')).toThrow(
-      NotImplementedException,
+      CommonException,
     )
     expect(() => controller.getCourseCandidates('1', 'token')).toThrow(
-      NotImplementedException,
+      CommonException,
     )
     expect(() => controller.getCourseDetail('1', '2', 'token')).toThrow(
-      NotImplementedException,
+      CommonException,
     )
     expect(() => controller.getCourseComments('1', '2', 'token')).toThrow(
-      NotImplementedException,
+      CommonException,
     )
     expect(() =>
       controller.createCourseComment('1', '2', 'token', { content: '좋아요!' }),
-    ).toThrow(NotImplementedException)
+    ).toThrow(CommonException)
     expect(() => controller.getExcludedPlaces('1', '2', 'token')).toThrow(
-      NotImplementedException,
+      CommonException,
     )
     expect(() => controller.confirmCourse('1', '2', 'token', {})).toThrow(
-      NotImplementedException,
+      CommonException,
     )
     expect(() =>
       controller.addCoursePlace('1', '2', 'token', { recommendationId: '3' }),
-    ).toThrow(NotImplementedException)
+    ).toThrow(CommonException)
     expect(() =>
       controller.updateCoursePlaces('1', '2', 'token', {
         recommendationIds: ['3', '4'],
       }),
-    ).toThrow(NotImplementedException)
+    ).toThrow(CommonException)
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {

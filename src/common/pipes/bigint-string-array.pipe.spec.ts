@@ -1,4 +1,5 @@
-import { ArgumentMetadata, BadRequestException } from '@nestjs/common'
+import { ArgumentMetadata } from '@nestjs/common'
+import { CommonException } from '../exception/common.exception'
 import { INVALID_FORMAT_REASON } from './bigint-string.pipe'
 import { BigIntStringArrayPipe } from './bigint-string-array.pipe'
 
@@ -18,54 +19,48 @@ describe('BigIntStringArrayPipe', () => {
     expect(pipe.transform('1,2,3', metadata)).toEqual(['1', '2', '3'])
   })
 
-  it('빈 문자열이면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('', metadata)).toThrow(BadRequestException)
+  it('빈 문자열이면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('', metadata)).toThrow(CommonException)
   })
 
-  it('맨 뒤에 콤마만 있고 숫자가 없으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,2,', metadata)).toThrow(BadRequestException)
+  it('맨 뒤에 콤마만 있고 숫자가 없으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,2,', metadata)).toThrow(CommonException)
   })
 
-  it('맨 앞에 콤마만 있고 숫자가 없으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform(',1,2', metadata)).toThrow(BadRequestException)
+  it('맨 앞에 콤마만 있고 숫자가 없으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform(',1,2', metadata)).toThrow(CommonException)
   })
 
-  it('중간에 빈 값이 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,,2', metadata)).toThrow(BadRequestException)
+  it('중간에 빈 값이 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,,2', metadata)).toThrow(CommonException)
   })
 
-  it('콤마 뒤에 공백이 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1, 2, 3', metadata)).toThrow(
-      BadRequestException,
-    )
+  it('콤마 뒤에 공백이 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1, 2, 3', metadata)).toThrow(CommonException)
   })
 
-  it('콤마 앞에 공백이 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1 ,2', metadata)).toThrow(BadRequestException)
+  it('콤마 앞에 공백이 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1 ,2', metadata)).toThrow(CommonException)
   })
 
-  it('숫자가 아닌 값이 섞여 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,abc,3', metadata)).toThrow(
-      BadRequestException,
-    )
+  it('숫자가 아닌 값이 섞여 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,abc,3', metadata)).toThrow(CommonException)
   })
 
-  it('음수가 섞여 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,-2', metadata)).toThrow(BadRequestException)
+  it('음수가 섞여 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,-2', metadata)).toThrow(CommonException)
   })
 
-  it('0이 섞여 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,0,2', metadata)).toThrow(BadRequestException)
+  it('0이 섞여 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,0,2', metadata)).toThrow(CommonException)
   })
 
-  it('앞자리에 0이 있는 값이 섞여 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,007,2', metadata)).toThrow(
-      BadRequestException,
-    )
+  it('앞자리에 0이 있는 값이 섞여 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,007,2', metadata)).toThrow(CommonException)
   })
 
-  it('소수점이 섞여 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,2.5', metadata)).toThrow(BadRequestException)
+  it('소수점이 섞여 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,2.5', metadata)).toThrow(CommonException)
   })
 
   it('예외 응답에 파라미터 이름을 field로 담는다', () => {
@@ -73,9 +68,9 @@ describe('BigIntStringArrayPipe', () => {
     try {
       pipe.transform('1,abc', metadata)
     } catch (error) {
-      expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [{ field: 'excludeIds', reason: INVALID_FORMAT_REASON }],
-      })
+      expect((error as CommonException).fieldErrors).toEqual([
+        { field: 'excludeIds', reason: INVALID_FORMAT_REASON },
+      ])
     }
   })
 
@@ -84,9 +79,9 @@ describe('BigIntStringArrayPipe', () => {
     try {
       pipe.transform('1,abc', { type: 'query', data: 'placeIds' })
     } catch (error) {
-      expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [{ field: 'placeIds', reason: INVALID_FORMAT_REASON }],
-      })
+      expect((error as CommonException).fieldErrors).toEqual([
+        { field: 'placeIds', reason: INVALID_FORMAT_REASON },
+      ])
     }
   })
 })

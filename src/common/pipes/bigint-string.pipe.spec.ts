@@ -1,4 +1,5 @@
-import { ArgumentMetadata, BadRequestException } from '@nestjs/common'
+import { ArgumentMetadata } from '@nestjs/common'
+import { CommonException } from '../exception/common.exception'
 import { BigIntStringPipe, INVALID_FORMAT_REASON } from './bigint-string.pipe'
 
 describe('BigIntStringPipe', () => {
@@ -15,42 +16,42 @@ describe('BigIntStringPipe', () => {
     expect(pipe.transform(huge, metadata)).toBe(huge)
   })
 
-  it('0이면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('0', metadata)).toThrow(BadRequestException)
+  it('0이면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('0', metadata)).toThrow(CommonException)
   })
 
-  it('앞자리에 0이 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('01', metadata)).toThrow(BadRequestException)
-    expect(() => pipe.transform('007', metadata)).toThrow(BadRequestException)
+  it('앞자리에 0이 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('01', metadata)).toThrow(CommonException)
+    expect(() => pipe.transform('007', metadata)).toThrow(CommonException)
   })
 
-  it('빈 문자열이면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('', metadata)).toThrow(BadRequestException)
+  it('빈 문자열이면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('', metadata)).toThrow(CommonException)
   })
 
-  it('숫자가 아닌 문자열이면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('abc', metadata)).toThrow(BadRequestException)
+  it('숫자가 아닌 문자열이면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('abc', metadata)).toThrow(CommonException)
   })
 
-  it('숫자와 문자가 섞여 있으면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('12a', metadata)).toThrow(BadRequestException)
+  it('숫자와 문자가 섞여 있으면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('12a', metadata)).toThrow(CommonException)
   })
 
-  it('음수면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('-1', metadata)).toThrow(BadRequestException)
+  it('음수면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('-1', metadata)).toThrow(CommonException)
   })
 
-  it('소수점이 포함되면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1.5', metadata)).toThrow(BadRequestException)
+  it('소수점이 포함되면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1.5', metadata)).toThrow(CommonException)
   })
 
-  it('공백이 포함되면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform(' 1', metadata)).toThrow(BadRequestException)
-    expect(() => pipe.transform('1 ', metadata)).toThrow(BadRequestException)
+  it('공백이 포함되면 CommonException을 던진다', () => {
+    expect(() => pipe.transform(' 1', metadata)).toThrow(CommonException)
+    expect(() => pipe.transform('1 ', metadata)).toThrow(CommonException)
   })
 
-  it('쉼표가 포함되면 BadRequestException을 던진다', () => {
-    expect(() => pipe.transform('1,000', metadata)).toThrow(BadRequestException)
+  it('쉼표가 포함되면 CommonException을 던진다', () => {
+    expect(() => pipe.transform('1,000', metadata)).toThrow(CommonException)
   })
 
   it('예외 응답에 파라미터 이름을 field로 담는다', () => {
@@ -58,9 +59,9 @@ describe('BigIntStringPipe', () => {
     try {
       pipe.transform('abc', metadata)
     } catch (error) {
-      expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [{ field: 'meetingId', reason: INVALID_FORMAT_REASON }],
-      })
+      expect((error as CommonException).fieldErrors).toEqual([
+        { field: 'meetingId', reason: INVALID_FORMAT_REASON },
+      ])
     }
   })
 
@@ -69,9 +70,9 @@ describe('BigIntStringPipe', () => {
     try {
       pipe.transform('abc', { type: 'param', data: 'courseId' })
     } catch (error) {
-      expect((error as BadRequestException).getResponse()).toEqual({
-        fieldErrors: [{ field: 'courseId', reason: INVALID_FORMAT_REASON }],
-      })
+      expect((error as CommonException).fieldErrors).toEqual([
+        { field: 'courseId', reason: INVALID_FORMAT_REASON },
+      ])
     }
   })
 })
