@@ -126,6 +126,25 @@ describe('PlaceService', () => {
       expect(placeRepository.findOne).not.toHaveBeenCalled()
     })
 
+    it('accessToken 앞뒤 공백을 제거한 값으로 참여자를 조회한다', async () => {
+      const { service, participantRepository, placeRepository } =
+        createService()
+      participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+      placeRepository.findOne.mockResolvedValue({
+        id: '1',
+        name: '성수 카페 모모',
+        address: '서울 성동구 성수이로 1',
+        previewUrl: 'https://preview.example.com/1',
+        category: { name: '카페', slug: 'cafe' },
+      })
+
+      await service.getPlaceDetail('1', '  token  ')
+
+      expect(participantRepository.findOne).toHaveBeenCalledWith({
+        where: { accessToken: 'token' },
+      })
+    })
+
     it('장소를 찾을 수 없으면 404를 던진다', async () => {
       const { service, participantRepository, placeRepository } =
         createService()

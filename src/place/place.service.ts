@@ -95,7 +95,7 @@ export class PlaceService {
   ): Promise<PlaceSearchResultDto> {
     assertAccessToken(accessToken)
     const participant = await this.participantRepository.findOne({
-      where: { accessToken },
+      where: { accessToken: accessToken.trim() },
     })
     if (!participant) {
       throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
