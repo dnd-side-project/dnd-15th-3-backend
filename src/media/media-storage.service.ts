@@ -1,5 +1,7 @@
+import { Readable } from 'node:stream'
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
@@ -68,6 +70,24 @@ export class MediaStorageService {
         Key: objectKey,
       }),
     )
+  }
+
+  async downloadObject(objectKey: string): Promise<Readable> {
+    const response = await this.s3Client.send(
+      new GetObjectCommand({
+        // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+        Bucket: this.bucketName,
+        // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+        Key: objectKey,
+      }),
+    )
+
+    if (!(response.Body instanceof Readable)) {
+      throw new Error(
+        `Media object did not return a readable body: ${objectKey}`,
+      )
+    }
+    return response.Body
   }
 
   async checkHealth(): Promise<boolean> {

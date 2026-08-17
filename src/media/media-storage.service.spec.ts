@@ -1,5 +1,7 @@
+import { Readable } from 'node:stream'
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
@@ -76,6 +78,37 @@ describe('MediaStorageService', () => {
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
       Key: 'media/2026/08/id.png',
     })
+  })
+
+  it('returns an object as a Node readable stream', async () => {
+    const body = Readable.from(Buffer.from('image'))
+    mockSend.mockResolvedValue({
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Body: body,
+    })
+
+    await expect(service.downloadObject('media/2026/08/id.png')).resolves.toBe(
+      body,
+    )
+
+    const command = mockSend.mock.calls[0][0]
+    expect(command).toBeInstanceOf(GetObjectCommand)
+    expect(command.input).toMatchObject({
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Bucket: 'momo-media-test',
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Key: 'media/2026/08/id.png',
+    })
+  })
+
+  it('rejects an object response without a Node readable body', async () => {
+    mockSend.mockResolvedValue({})
+
+    await expect(
+      service.downloadObject('media/2026/08/id.png'),
+    ).rejects.toThrow(
+      'Media object did not return a readable body: media/2026/08/id.png',
+    )
   })
 
   it('reports storage health without throwing', async () => {

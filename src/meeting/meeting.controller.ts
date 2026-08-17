@@ -2,25 +2,33 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   ParseEnumPipe,
+  ParseFilePipeBuilder,
   Patch,
   Post,
   Put,
   Query,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -38,6 +46,7 @@ import { BigIntStringArrayPipe } from 'src/common/pipes/bigint-string-array.pipe
 import { PositiveIntPipe } from 'src/common/pipes/positive-int.pipe'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { AddRecommendationDto } from './dto/add-recommendation.dto'
+import { CourseImageResponseDto } from './dto/course-image-response.dto'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { CreateMeetingDto } from './dto/create-meeting.dto'
 import { InvitationPreviewRequestDto } from './dto/invitation-preview-request.dto'
@@ -51,11 +60,10 @@ import { MeetingScreenResponseDto } from './dto/meeting-screen-response.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
 import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
-import { UpdateCourseImageRequestDto } from './dto/update-course-image-request.dto'
 import { UpdateCoursePlanDto } from './dto/update-course-plan.dto'
 import { UpdatePlacePreferenceRequestDto } from './dto/update-place-preference-request.dto'
 import { MeetingErrorCode } from './exception/meeting-error-code'
-import { MeetingService } from './meeting.service'
+import { type CourseImageFile, MeetingService } from './meeting.service'
 import {
   createMeetingRequestSchema,
   invitationPreviewRequestSchema,
@@ -497,7 +505,12 @@ export class MeetingController {
   }
 
   @Put(':meetingId/course-image')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    }),
+  )
   @ApiParam({
     name: 'meetingId',
     description: '모임 ID',
@@ -505,45 +518,104 @@ export class MeetingController {
   })
   @ApiQuery({
     name: 'accessToken',
-    description: '코스 카드 이미지를 설정할 방장의 참여자 전용 재접속 토큰',
-    example: 'host-session-token',
+    description: '모임 참여자 전용 재접속 토큰',
+    example: 'member-session-token',
     required: true,
   })
   @ApiOperation({
-    summary: '코스 카드 이미지 설정',
+    summary: '코스 이미지 최초 등록',
     description:
-      '확정된 코스의 카드 뒷면에 사용할 지도 스크린샷 key를 재설정합니다. ' +
-      '코스 확정 시 이미지 업로드에 실패했거나 다시 설정하고 싶을 때 사용합니다. ' +
-      '방장만 호출할 수 있고, 모임이 코스 확정 상태일 때만 호출할 수 있습니다.',
+      '확정된 코스를 프론트엔드에서 렌더링한 이미지로 등록합니다. ' +
+      '모든 모임원이 호출할 수 있으며, 먼저 등록된 이미지는 교체하지 않습니다. ' +
+      '이미 등록되었다면 새 파일을 저장하지 않고 기존 결과를 반환합니다.',
   })
-  @ApiBody({ type: UpdateCourseImageRequestDto })
-  @ApiResponse({
-    status: HttpStatus.NO_CONTENT,
-    description: '코스 카드 이미지 설정 성공',
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOkResponse({
+    description: '최초 등록된 코스 이미지',
+    type: CourseImageResponseDto,
   })
   @ApiBadRequestResponse({
     description:
-      'meetingId 형식이 올바르지 않거나 courseImageKey가 비어 있습니다.',
+      'meetingId 형식이 올바르지 않거나 파일이 없고, 지원하지 않는 형식이거나 10 MiB를 초과합니다.',
   })
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
-  @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
   @ApiConflictResponse({
     description:
-      '모임이 코스 확정 상태가 아니어서 코스 카드 이미지를 설정할 수 없습니다.',
+      '모임이 코스 확정 상태가 아니어서 코스 이미지를 등록할 수 없습니다.',
   })
-  @ApiErrorResponse(
-    CommonErrorCode.notImplemented,
-    '실제 데이터 연동 전까지 제공되지 않는 API',
-  )
-  updateCourseImage(
+  storeCourseImage(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('accessToken') _accessToken: string,
-    @Body() _dto: UpdateCourseImageRequestDto,
-  ): never {
-    throw new CommonException(CommonErrorCode.notImplemented)
+    @Query('accessToken') accessToken: string,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: /^image\/(jpeg|png|webp)$/,
+          // MediaService performs the authoritative magic-signature check.
+          skipMagicNumbersValidation: true,
+        })
+        .addMaxSizeValidator({ maxSize: 10 * 1024 * 1024 })
+        .build({ errorHttpStatusCode: HttpStatus.BAD_REQUEST }),
+    )
+    file: CourseImageFile,
+  ): Promise<CourseImageResponseDto> {
+    return this.meetingService.storeCourseImage(meetingId, accessToken, file)
+  }
+
+  @Get(':meetingId/course-image/download')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiParam({
+    name: 'meetingId',
+    description: '모임 ID',
+    schema: { type: 'string', example: '1', pattern: '^\\d+$' },
+  })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '모임 참여자 전용 재접속 토큰',
+    example: 'member-session-token',
+    required: true,
+  })
+  @ApiOperation({
+    summary: '코스 이미지 다운로드',
+    description:
+      '모임에 참여한 사용자가 최초 등록된 코스 이미지를 첨부 파일로 다운로드합니다.',
+  })
+  @ApiProduces('image/jpeg', 'image/png', 'image/webp')
+  @ApiOkResponse({
+    description: '코스 이미지 바이너리',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiUnauthorizedResponse({
+    description: 'accessToken이 없거나 유효하지 않습니다.',
+  })
+  @ApiNotFoundResponse({
+    description: '모임 또는 등록된 코스 이미지를 찾을 수 없습니다.',
+  })
+  async downloadCourseImage(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') accessToken: string,
+  ): Promise<StreamableFile> {
+    const image = await this.meetingService.downloadCourseImage(
+      meetingId,
+      accessToken,
+    )
+    const extension =
+      image.mimeType === 'image/jpeg' ? 'jpg' : image.mimeType.split('/')[1]
+    return new StreamableFile(image.body, {
+      type: image.mimeType,
+      disposition: `attachment; filename="momo-course.${extension}"`,
+    })
   }
 
   @Get(':meetingId/places/:placeId/similar')

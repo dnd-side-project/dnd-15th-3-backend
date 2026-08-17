@@ -40,8 +40,8 @@ export class Meeting extends BaseEntity {
   courseVersion: number
 
   @Column({ nullable: true, unique: true })
-  courseImageKey: string
+  courseImageKey: string | null
 
   @Column({ nullable: true })
-  courseImageUploadedAt: Date
+  courseImageUploadedAt: Date | null
 }

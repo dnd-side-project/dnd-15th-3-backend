@@ -13,6 +13,7 @@ import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
 import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
+import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
 import { MeetingErrorCode } from './exception/meeting-error-code'
@@ -51,6 +52,14 @@ function createMeetingService() {
   const placeSyncService = {
     createJobs: jest.fn().mockResolvedValue(undefined),
   }
+  const mediaService = {
+    storePublicImage: jest.fn(),
+    getPublicUrl: jest.fn(
+      (objectKey: string) => `https://media.example/o/${objectKey}`,
+    ),
+    downloadPublicImage: jest.fn(),
+    discardStoredImage: jest.fn().mockResolvedValue(undefined),
+  }
   const participantRepository = { findOne: jest.fn(), find: jest.fn() }
   const placeRepository = { findOne: jest.fn() }
   const recommendationRepository = {
@@ -68,6 +77,7 @@ function createMeetingService() {
     config as unknown as ConfigService<Env, true>,
     dataSource as never,
     placeSyncService as unknown as PlaceSyncService,
+    mediaService as never,
     participantRepository as never,
     placeRepository as never,
     recommendationRepository as never,
@@ -77,6 +87,7 @@ function createMeetingService() {
     service,
     config,
     placeSyncService,
+    mediaService,
     participantRepository,
     placeRepository,
     recommendationRepository,
@@ -149,6 +160,8 @@ describe('MeetingService', () => {
       meetingType,
       meetingLocation: location,
       courseVersion: 1,
+      courseImageKey: 'media/course.png',
+      courseImageUploadedAt: new Date('2026-08-17T12:00:00.000Z'),
     }
     const hostUser = {
       id: 'user-host',
@@ -237,6 +250,7 @@ describe('MeetingService', () => {
     }
     await expect(service.joinMeeting(joinRequest)).resolves.toMatchObject({
       participantAccessToken: 'guest-token',
+      courseImageUrl: 'https://media.example/o/media/course.png',
       role: 'MEMBER',
       isHost: false,
       viewerParticipantId: 'participant-guest',
@@ -655,5 +669,247 @@ describe('MeetingService', () => {
     ).rejects.toMatchObject({
       errorCode: CommonErrorCode.internalServerError,
     })
+  })
+
+  it('코스 확정 후 첫 모임원의 이미지만 원자적으로 등록한다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue({
+      id: 'participant-member',
+      role: ParticipantRole.Member,
+    })
+    const meeting = {
+      id: 'meeting-1',
+      status: MeetingStatus.CourseConfirmed,
+      courseImageKey: null,
+      courseImageUploadedAt: null,
+    }
+    const execute = jest.fn().mockResolvedValue({ affected: 1 })
+    const queryBuilder = {
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute,
+    }
+    const meetingRepository = {
+      findOne: jest.fn().mockResolvedValue(meeting),
+      createQueryBuilder: jest.fn(() => queryBuilder),
+    }
+    dataSource.getRepository.mockReturnValue(meetingRepository)
+    const asset = { objectKey: 'media/2026/08/new.png' }
+    mediaService.storePublicImage.mockResolvedValue({
+      asset,
+      publicUrl: 'https://media.example/o/media/2026/08/new.png',
+    })
+
+    await expect(
+      service.storeCourseImage('meeting-1', 'member-token', {
+        buffer: Buffer.from('png'),
+        mimetype: 'image/png',
+      }),
+    ).resolves.toMatchObject({
+      imageUrl: 'https://media.example/o/media/2026/08/new.png',
+      uploadedAt: expect.any(Date),
+    })
+    expect(queryBuilder.set).toHaveBeenCalledWith({
+      courseImageKey: asset.objectKey,
+      courseImageUploadedAt: expect.any(Date),
+    })
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      'course_image_key IS NULL',
+    )
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('status = :status', {
+      status: MeetingStatus.CourseConfirmed,
+    })
+    expect(mediaService.discardStoredImage).not.toHaveBeenCalled()
+  })
+
+  it('모임원이 아니면 코스 이미지를 저장하지 않는다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue(null)
+
+    await expect(
+      service.storeCourseImage('meeting-1', 'invalid-token', {
+        buffer: Buffer.from('image'),
+        mimetype: 'image/png',
+      }),
+    ).rejects.toMatchObject({
+      errorCode: CommonErrorCode.authenticationFailed,
+    })
+    expect(dataSource.getRepository).not.toHaveBeenCalled()
+    expect(mediaService.storePublicImage).not.toHaveBeenCalled()
+  })
+
+  it('이미 등록된 코스 이미지는 새 파일로 덮어쓰지 않는다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+    const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        status: MeetingStatus.CourseConfirmed,
+        courseImageKey: 'media/winner.png',
+        courseImageUploadedAt: uploadedAt,
+      }),
+    })
+
+    await expect(
+      service.storeCourseImage('meeting-1', 'member-token', {
+        buffer: Buffer.from('another'),
+        mimetype: 'image/png',
+      }),
+    ).resolves.toEqual({
+      imageUrl: 'https://media.example/o/media/winner.png',
+      uploadedAt,
+    })
+    expect(mediaService.storePublicImage).not.toHaveBeenCalled()
+  })
+
+  it('코스 확정 전에는 코스 이미지를 저장하지 않는다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        status: MeetingStatus.CourseGenerated,
+        courseImageKey: null,
+      }),
+    })
+
+    await expect(
+      service.storeCourseImage('meeting-1', 'member-token', {
+        buffer: Buffer.from('image'),
+        mimetype: 'image/png',
+      }),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseImageStateInvalid,
+    })
+    expect(mediaService.storePublicImage).not.toHaveBeenCalled()
+  })
+
+  it('동시 업로드 경쟁에서 지면 자산을 폐기하고 승자를 반환한다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+    const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
+    const initial = {
+      id: 'meeting-1',
+      status: MeetingStatus.CourseConfirmed,
+      courseImageKey: null,
+      courseImageUploadedAt: null,
+    }
+    const winner = {
+      ...initial,
+      courseImageKey: 'media/winner.png',
+      courseImageUploadedAt: uploadedAt,
+    }
+    const queryBuilder = {
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 0 }),
+    }
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce(initial)
+        .mockResolvedValueOnce(winner),
+      createQueryBuilder: jest.fn(() => queryBuilder),
+    })
+    const losingAsset = { objectKey: 'media/loser.png' }
+    mediaService.storePublicImage.mockResolvedValue({
+      asset: losingAsset,
+      publicUrl: 'https://media.example/o/media/loser.png',
+    })
+
+    await expect(
+      service.storeCourseImage('meeting-1', 'member-token', {
+        buffer: Buffer.from('loser'),
+        mimetype: 'image/png',
+      }),
+    ).resolves.toEqual({
+      imageUrl: 'https://media.example/o/media/winner.png',
+      uploadedAt,
+    })
+    expect(mediaService.discardStoredImage).toHaveBeenCalledWith(losingAsset)
+  })
+
+  it('이미지 저장 후 모임 DB 갱신이 실패하면 자산을 보상 삭제한다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+    const queryBuilder = {
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockRejectedValue(new Error('db unavailable')),
+    }
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        status: MeetingStatus.CourseConfirmed,
+        courseImageKey: null,
+      }),
+      createQueryBuilder: jest.fn(() => queryBuilder),
+    })
+    const asset = { objectKey: 'media/orphan.png' }
+    mediaService.storePublicImage.mockResolvedValue({
+      asset,
+      publicUrl: 'https://media.example/o/media/orphan.png',
+    })
+
+    await expect(
+      service.storeCourseImage('meeting-1', 'member-token', {
+        buffer: Buffer.from('orphan'),
+        mimetype: 'image/png',
+      }),
+    ).rejects.toThrow('db unavailable')
+    expect(mediaService.discardStoredImage).toHaveBeenCalledWith(asset)
+  })
+
+  it('모임원에게만 등록된 코스 이미지 다운로드를 제공한다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        courseImageKey: 'media/course.webp',
+      }),
+    })
+    const download = { body: {}, mimeType: 'image/webp' }
+    mediaService.downloadPublicImage.mockResolvedValue(download)
+
+    await expect(
+      service.downloadCourseImage('meeting-1', 'member-token'),
+    ).resolves.toBe(download)
+    expect(mediaService.downloadPublicImage).toHaveBeenCalledWith(
+      'media/course.webp',
+    )
+  })
+
+  it('등록된 코스 이미지가 없으면 다운로드를 404로 거절한다', async () => {
+    const { service, dataSource, participantRepository, mediaService } =
+      createMeetingService()
+    participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        courseImageKey: null,
+      }),
+    })
+
+    await expect(
+      service.downloadCourseImage('meeting-1', 'member-token'),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseImageNotFound,
+    })
+    expect(mediaService.downloadPublicImage).not.toHaveBeenCalled()
   })
 })

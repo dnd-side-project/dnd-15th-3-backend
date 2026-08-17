@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { Category } from 'src/category/entities/category.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
+import { MediaModule } from 'src/media/media.module'
 import { Place } from 'src/place/entities/place.entity'
 import { PlaceModule } from 'src/place/place.module'
 import { User } from 'src/user/entities/user.entity'
@@ -18,6 +19,7 @@ import { MeetingService } from './meeting.service'
 
 @Module({
   imports: [
+    MediaModule,
     PlaceModule,
     TypeOrmModule.forFeature([
       Category,
