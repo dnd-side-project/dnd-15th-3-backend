@@ -1,9 +1,8 @@
-import {
-  BadGatewayException,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import { createValidationException } from 'src/common/exception/validation-exception.factory'
 import type { Env } from 'src/config/env'
 import type { PlaceSearchResult } from 'src/place/place.types'
 import {
@@ -26,22 +25,24 @@ export class KakaoLocalService {
   async searchAddress(
     request: KakaoLocalAddressSearchRequest,
   ): Promise<KakaoLocalAddressSearchResponse> {
-    const parsedRequest = kakaoLocalAddressSearchRequestSchema.parse(request)
+    const parsedRequest =
+      kakaoLocalAddressSearchRequestSchema.safeParse(request)
+    if (!parsedRequest.success) {
+      throw createValidationException(parsedRequest.error.issues)
+    }
     const apiKey = this.config.get('KAKAO_REST_API_KEY', { infer: true }).trim()
 
     if (!apiKey) {
-      throw new ServiceUnavailableException(
-        '카카오 REST API 키가 설정되지 않았습니다.',
-      )
+      throw new CommonException(CommonErrorCode.serviceUnavailable)
     }
 
     const url = new URL(KAKAO_LOCAL_ADDRESS_SEARCH_URL)
     url.search = new URLSearchParams({
-      query: parsedRequest.query,
+      query: parsedRequest.data.query,
       // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
-      analyze_type: parsedRequest.analyze_type,
-      page: String(parsedRequest.page),
-      size: String(parsedRequest.size),
+      analyze_type: parsedRequest.data.analyze_type,
+      page: String(parsedRequest.data.page),
+      size: String(parsedRequest.data.size),
     }).toString()
 
     let response: Response
@@ -54,31 +55,23 @@ export class KakaoLocalService {
         signal: AbortSignal.timeout(KAKAO_REQUEST_TIMEOUT_MS),
       })
     } catch {
-      throw new BadGatewayException(
-        '카카오 주소 검색 API를 호출하지 못했습니다.',
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     if (!response.ok) {
-      throw new BadGatewayException(
-        `카카오 주소 검색 API가 ${response.status} 상태를 반환했습니다.`,
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     let body: unknown
     try {
       body = await response.json()
     } catch {
-      throw new BadGatewayException(
-        '카카오 주소 검색 API 응답을 읽을 수 없습니다.',
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     const parsedResponse = kakaoLocalAddressSearchResponseSchema.safeParse(body)
     if (!parsedResponse.success) {
-      throw new BadGatewayException(
-        '카카오 주소 검색 API 응답 형식이 올바르지 않습니다.',
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     return parsedResponse.data

@@ -1,4 +1,4 @@
-import { Controller, Get, Logger } from '@nestjs/common'
+import { Controller, Get, Logger, UseFilters } from '@nestjs/common'
 import {
   ApiExcludeEndpoint,
   ApiOperation,
@@ -10,6 +10,7 @@ import {
   HealthCheckService,
   TypeOrmHealthIndicator,
 } from '@nestjs/terminus'
+import { HealthExceptionFilter } from './health-exception.filter'
 import { PostgisHealthIndicator } from './postgis.health'
 import { OciStorageHealthIndicator } from './storage.health'
 
@@ -27,6 +28,7 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @UseFilters(HealthExceptionFilter)
   @ApiOperation({ summary: '애플리케이션 상태 확인' })
   @ApiResponse({ status: 200, description: '모든 의존성이 정상입니다.' })
   @ApiResponse({

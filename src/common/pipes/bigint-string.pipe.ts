@@ -1,9 +1,6 @@
-import {
-  ArgumentMetadata,
-  BadRequestException,
-  Injectable,
-  PipeTransform,
-} from '@nestjs/common'
+import { ArgumentMetadata, Injectable, PipeTransform } from '@nestjs/common'
+import { CommonException } from '../exception/common.exception'
+import { CommonErrorCode } from '../exception/common-error-code'
 
 export const BIGINT_STRING_PATTERN = /^[1-9]\d*$/
 export const INVALID_FORMAT_REASON =
@@ -14,9 +11,9 @@ export const INVALID_FORMAT_REASON =
 export class BigIntStringPipe implements PipeTransform<string, string> {
   transform(value: string, metadata: ArgumentMetadata): string {
     if (!BIGINT_STRING_PATTERN.test(value)) {
-      throw new BadRequestException({
-        fieldErrors: [{ field: metadata.data, reason: INVALID_FORMAT_REASON }],
-      })
+      throw new CommonException(CommonErrorCode.validationError, [
+        { field: metadata.data ?? 'request', reason: INVALID_FORMAT_REASON },
+      ])
     }
     return value
   }

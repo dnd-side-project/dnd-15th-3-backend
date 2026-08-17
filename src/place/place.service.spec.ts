@@ -1,6 +1,6 @@
-import { NotFoundException } from '@nestjs/common'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import type { Repository } from 'typeorm'
+import { PlaceErrorCode } from './exception/place-error-code'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
 
@@ -47,7 +47,9 @@ describe('PlaceService', () => {
         page: 1,
         size: 20,
       }),
-    ).rejects.toBeInstanceOf(NotFoundException)
+    ).rejects.toMatchObject({
+      errorCode: PlaceErrorCode.meetingLocationNotFound,
+    })
     expect(placeRepository.findNearby).not.toHaveBeenCalled()
   })
 

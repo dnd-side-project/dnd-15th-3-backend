@@ -2,10 +2,12 @@ import { existsSync } from 'node:fs'
 import { loadEnvFile } from 'node:process'
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
+import { APP_FILTER } from '@nestjs/core'
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { CatalogModule } from './catalog/catalog.module'
+import { GlobalExceptionFilter } from './common/exception/global-exception.filter'
 import { type Env, validateEnv } from './config/env'
 import { CourseModule } from './course/course.module'
 import { createDatabaseOptions } from './database/database.options'
@@ -58,6 +60,9 @@ const infrastructureModules = [
     PlaceModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+  ],
 })
 export class AppModule {}

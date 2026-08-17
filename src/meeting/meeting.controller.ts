@@ -1,11 +1,9 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
-  NotImplementedException,
   Param,
   ParseEnumPipe,
   Patch,
@@ -31,6 +29,10 @@ import {
 import { SimilarPlaceResponseDto } from 'src/catalog/dto/similar-place-response.dto'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import { createValidationException } from 'src/common/exception/validation-exception.factory'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { BigIntStringArrayPipe } from 'src/common/pipes/bigint-string-array.pipe'
 import { PositiveIntPipe } from 'src/common/pipes/positive-int.pipe'
@@ -52,6 +54,7 @@ import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
 import { UpdateCourseImageRequestDto } from './dto/update-course-image-request.dto'
 import { UpdateCoursePlanDto } from './dto/update-course-plan.dto'
 import { UpdatePlacePreferenceRequestDto } from './dto/update-place-preference-request.dto'
+import { MeetingErrorCode } from './exception/meeting-error-code'
 import { MeetingService } from './meeting.service'
 import {
   createMeetingRequestSchema,
@@ -77,16 +80,22 @@ export class MeetingController {
     description: '모임 생성 및 방장 참여 성공',
     type: MeetingScreenResponseDto,
   })
-  @ApiBadRequestResponse({
-    description: '필수 입력값 또는 날짜/시간 형식이 올바르지 않습니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    '필수 입력값 또는 날짜/시간 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.meetingTypeNotFound,
+    '모임 유형을 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.invitationCodeIssuanceFailed,
+    '초대 코드 발급에 실패함',
+  )
   createMeeting(@Body() dto: CreateMeetingDto) {
     const parsed = createMeetingRequestSchema.safeParse(dto)
     if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues[0]?.message ??
-          '모임 생성 요청이 올바르지 않습니다.',
-      )
+      throw createValidationException(parsed.error.issues)
     }
 
     return this.meetingService.createMeeting(parsed.data)
@@ -109,9 +118,19 @@ export class MeetingController {
     description: '첫 만남 기준 위치 변경 성공',
     type: MeetingLocationResponseDto,
   })
-  @ApiBadRequestResponse({ description: '위치 형식이 올바르지 않습니다.' })
-  @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
-  @ApiForbiddenResponse({ description: '방장만 위치를 변경할 수 있습니다.' })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    '위치 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '참여자 토큰이 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.hostOnly, '방장 권한이 필요함')
+  @ApiErrorResponse(
+    MeetingErrorCode.locationNotFound,
+    '모임 기준 위치를 찾을 수 없음',
+  )
   updateLocation(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -119,10 +138,7 @@ export class MeetingController {
   ) {
     const parsed = meetingLocationSchema.safeParse(dto)
     if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues[0]?.message ??
-          '위치 요청 형식이 올바르지 않습니다.',
-      )
+      throw createValidationException(parsed.error.issues)
     }
 
     return this.meetingService.updateLocation(
@@ -149,9 +165,26 @@ export class MeetingController {
     type: RecommendationPreviewDto,
   })
   @ApiBody({ type: AddRecommendationDto })
-  @ApiBadRequestResponse({ description: '장소를 추가할 수 없습니다.' })
-  @ApiConflictResponse({ description: '이미 모임에 추가된 장소입니다.' })
-  @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
+  @ApiErrorResponse(
+    [
+      CommonErrorCode.validationError,
+      MeetingErrorCode.placeCategoryMismatch,
+      MeetingErrorCode.placeOutsideRange,
+    ],
+    '요청 형식이나 장소 추가 조건이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.recommendationAlreadyExists,
+    '이미 모임에 추가된 장소',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '참여자 토큰이 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    [MeetingErrorCode.locationNotFound, MeetingErrorCode.placeNotFound],
+    '모임 기준 위치 또는 장소를 찾을 수 없음',
+  )
   addRecommendation(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -159,10 +192,7 @@ export class MeetingController {
   ) {
     const parsed = addRecommendationRequestSchema.safeParse(body)
     if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues[0]?.message ??
-          '추천 장소 요청이 올바르지 않습니다.',
-      )
+      throw createValidationException(parsed.error.issues)
     }
 
     return this.meetingService.addRecommendation(
@@ -186,7 +216,10 @@ export class MeetingController {
     type: RecommendationPreviewDto,
     isArray: true,
   })
-  @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '참여자 토큰이 유효하지 않음',
+  )
   getRecommendations(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -211,10 +244,11 @@ export class MeetingController {
     description: '코스 계획 조회 성공',
     type: CoursePlanResponseDto,
   })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임 ID가 존재하지 않음')
   getCoursePlan(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -239,20 +273,20 @@ export class MeetingController {
     description: '코스 계획 저장 성공',
     type: CoursePlanResponseDto,
   })
-  @ApiBadRequestResponse({
-    description: `코스 카테고리가 ${MAX_COURSE_STEPS}개를 초과했습니다.`,
-  })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiForbiddenResponse({
-    description: '방장만 코스 계획을 수정할 수 있습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
-  @ApiConflictResponse({
-    description:
-      '오래된 version으로 저장을 시도했습니다. 최신 계획을 다시 조회하세요.',
-  })
+  @ApiErrorResponse(
+    [CommonErrorCode.validationError, MeetingErrorCode.invalidCourseCategory],
+    `코스 카테고리가 ${MAX_COURSE_STEPS}개를 초과했거나 유효하지 않음`,
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.hostOnly, '방장 권한이 필요함')
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임 ID가 존재하지 않음')
+  @ApiErrorResponse(
+    MeetingErrorCode.staleCoursePlan,
+    '오래된 version으로 저장을 시도함',
+  )
   updateCoursePlan(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -260,10 +294,7 @@ export class MeetingController {
   ) {
     const parsed = updateCoursePlanRequestSchema.safeParse(dto)
     if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues[0]?.message ??
-          '코스 계획 요청 형식이 올바르지 않습니다.',
-      )
+      throw createValidationException(parsed.error.issues)
     }
 
     return this.meetingService.updateCoursePlan(
@@ -283,20 +314,18 @@ export class MeetingController {
     description: '초대 코드 검증 및 모임 미리보기 성공',
     type: MeetingInvitationResponseDto,
   })
-  @ApiBadRequestResponse({
-    description: '초대 코드가 비어 있거나 6자리 형식이 아닙니다.',
-  })
-  @ApiNotFoundResponse({
-    description:
-      '유효하지 않거나 삭제된 초대 코드입니다. 초대 코드 오류 화면으로 이동합니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    '초대 코드가 비어 있거나 6자리 형식이 아님',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.invitationNotFound,
+    '유효하지 않거나 삭제된 초대 코드',
+  )
   previewInvitation(@Body() dto: InvitationPreviewRequestDto) {
     const parsed = invitationPreviewRequestSchema.safeParse(dto)
     if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues[0]?.message ??
-          '초대 코드 요청 형식이 올바르지 않습니다.',
-      )
+      throw createValidationException(parsed.error.issues)
     }
 
     return this.meetingService.previewInvitation(parsed.data)
@@ -312,22 +341,22 @@ export class MeetingController {
     description: '모임 참여 성공',
     type: MeetingScreenResponseDto,
   })
-  @ApiBadRequestResponse({
-    description: '초대 코드 형식 또는 프로필 입력이 올바르지 않습니다.',
-  })
-  @ApiNotFoundResponse({
-    description: '유효하지 않거나 삭제된 초대 코드입니다.',
-  })
-  @ApiConflictResponse({
-    description: '다른 사용자 키와 중복된 닉네임 등 참여 제약에 걸렸습니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    '초대 코드 형식 또는 프로필 입력이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.invitationNotFound,
+    '유효하지 않거나 삭제된 초대 코드',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.nicknameAlreadyInUse,
+    '이미 사용 중인 닉네임',
+  )
   joinMeeting(@Body() dto: JoinMeetingDto) {
     const parsed = joinMeetingRequestSchema.safeParse(dto)
     if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues[0]?.message ??
-          '모임 참여 요청 형식이 올바르지 않습니다.',
-      )
+      throw createValidationException(parsed.error.issues)
     }
 
     return this.meetingService.joinMeeting(parsed.data)
@@ -361,17 +390,15 @@ export class MeetingController {
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   getMeetingStatus(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') _accessToken: string,
   ): never {
-    throw new NotImplementedException(
-      '모임 상태 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Get(':meetingId/places/pins')
@@ -404,17 +431,15 @@ export class MeetingController {
     description:
       '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   getMapPins(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') _accessToken: string,
   ): never {
-    throw new NotImplementedException(
-      '전체 지도 핀 조회 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Patch(':meetingId/places/:recommendationId/preference')
@@ -458,19 +483,17 @@ export class MeetingController {
     description:
       '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   updatePlacePreference(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('recommendationId', BigIntStringPipe) recommendationId: string,
     @Query('accessToken') _accessToken: string,
     @Body() _dto: UpdatePlacePreferenceRequestDto,
   ): never {
-    throw new NotImplementedException(
-      '장소 반응 설정 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Put(':meetingId/course-image')
@@ -511,18 +534,16 @@ export class MeetingController {
     description:
       '모임이 코스 확정 상태가 아니어서 코스 카드 이미지를 설정할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   updateCourseImage(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') _accessToken: string,
     @Body() _dto: UpdateCourseImageRequestDto,
   ): never {
-    throw new NotImplementedException(
-      '코스 카드 이미지 설정 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Get(':meetingId/places/:placeId/similar')
@@ -576,10 +597,10 @@ export class MeetingController {
     description:
       '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   getSimilarPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('placeId', BigIntStringPipe) placeId: string,
@@ -587,9 +608,7 @@ export class MeetingController {
     @Query('excludeIds', BigIntStringArrayPipe) excludeIds?: string[],
     @Query('size', new PositiveIntPipe(5)) size?: number,
   ): never {
-    throw new NotImplementedException(
-      '비슷한 장소 추천 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 }
 
@@ -615,11 +634,11 @@ export class MeetingDetailController {
     description: '역할별 모임 상세 조회 성공',
     type: MeetingScreenResponseDto,
   })
-  @ApiUnauthorizedResponse({
-    description:
-      'accessToken이 없거나 유효하지 않아 초대 코드 화면으로 이동해야 합니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임 ID가 존재하지 않습니다.' })
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임 ID가 존재하지 않음')
   getMeetingDetail(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
