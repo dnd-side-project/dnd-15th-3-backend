@@ -46,6 +46,17 @@ export type SimilarPlace = {
   previewUrl: string | null
 }
 
+const SIMILAR_PLACE_CANDIDATE_POOL_SIZE = 200
+
+export function shuffle<T>(items: readonly T[]): T[] {
+  const result = [...items]
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+
 @Injectable()
 export class PlaceRepository {
   constructor(private readonly dataSource: DataSource) {}
@@ -153,13 +164,20 @@ export class PlaceRepository {
             ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
             $5
           )
-        ORDER BY RANDOM()
+        ORDER BY "place"."location" <-> ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography
         LIMIT $6
       `,
-      [categoryId, excludedPlaceIds, longitude, latitude, radiusMeters, limit],
+      [
+        categoryId,
+        excludedPlaceIds,
+        longitude,
+        latitude,
+        radiusMeters,
+        SIMILAR_PLACE_CANDIDATE_POOL_SIZE,
+      ],
     )) as RawSimilarPlaceRow[]
 
-    return rows.map((row) => ({
+    const candidates = rows.map((row) => ({
       id: row.id,
       name: row.name,
       address: row.address,
@@ -167,5 +185,7 @@ export class PlaceRepository {
       longitude: Number(row.longitude),
       previewUrl: row.previewUrl,
     }))
+
+    return shuffle(candidates).slice(0, limit)
   }
 }
