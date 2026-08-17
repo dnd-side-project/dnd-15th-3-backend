@@ -36,14 +36,6 @@ describe('AppModule', () => {
     })
   })
 
-  it('does not register the course API module', () => {
-    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as
-      | unknown[]
-      | undefined
-
-    expect(imports?.map(getModuleName)).not.toContain('CourseModule')
-  })
-
   it('does not register a frontend mock API module', () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as
       | unknown[]

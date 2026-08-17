@@ -1,13 +1,12 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { Repository } from 'typeorm'
+import { PlaceException } from './exception/place.exception'
+import { PlaceErrorCode } from './exception/place-error-code'
 import { PlaceRepository } from './place.repository'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
 import {
@@ -38,7 +37,7 @@ export class PlaceService {
     })
 
     if (!participant) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
 
     const meetingLocation = await this.meetingLocationRepository.findOne({
@@ -46,9 +45,7 @@ export class PlaceService {
     })
 
     if (!meetingLocation) {
-      throw new NotFoundException(
-        '해당 모임의 첫 만남 기준 위치를 찾을 수 없습니다.',
-      )
+      throw new PlaceException(PlaceErrorCode.meetingLocationNotFound)
     }
 
     const result = await this.placeRepository.findNearby(
@@ -73,9 +70,7 @@ export class PlaceService {
 
     const parsedResponse = placeSearchResponseSchema.safeParse(response)
     if (!parsedResponse.success) {
-      throw new InternalServerErrorException(
-        '장소 검색 결과 형식이 올바르지 않습니다.',
-      )
+      throw new PlaceException(PlaceErrorCode.invalidSearchResponse)
     }
 
     return parsedResponse.data

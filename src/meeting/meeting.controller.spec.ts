@@ -1,6 +1,8 @@
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
+import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 import {
@@ -9,25 +11,198 @@ import {
 } from './meeting.controller'
 import { MeetingService } from './meeting.service'
 
-describe('MeetingController', () => {
-  function createController() {
-    const meetingService = {
-      createMeeting: jest.fn().mockResolvedValue({}),
-      updateLocation: jest.fn().mockResolvedValue({}),
-      addRecommendation: jest.fn().mockResolvedValue({}),
-      getRecommendations: jest.fn().mockResolvedValue([]),
-      getCoursePlan: jest.fn().mockResolvedValue({}),
-      updateCoursePlan: jest.fn().mockResolvedValue({}),
-      previewInvitation: jest.fn().mockResolvedValue({}),
-      joinMeeting: jest.fn().mockResolvedValue({}),
-      getMeetingDetail: jest.fn().mockResolvedValue({}),
-    } as unknown as MeetingService
+function createController() {
+  const meetingService = {
+    createMeeting: jest.fn().mockResolvedValue({}),
+    updateLocation: jest.fn().mockResolvedValue({}),
+    addRecommendation: jest.fn().mockResolvedValue({}),
+    getRecommendations: jest.fn().mockResolvedValue([]),
+    getCoursePlan: jest.fn().mockResolvedValue({}),
+    updateCoursePlan: jest.fn().mockResolvedValue({}),
+    previewInvitation: jest.fn().mockResolvedValue({}),
+    joinMeeting: jest.fn().mockResolvedValue({}),
+    getMeetingDetail: jest.fn().mockResolvedValue({}),
+  } as unknown as MeetingService
 
-    return {
-      controller: new MeetingController(meetingService),
-      meetingService,
-    }
+  return {
+    controller: new MeetingController(meetingService),
+    meetingService,
   }
+}
+
+describe('MeetingController', () => {
+  it('실제 데이터 연동 전까지 미구현 엔드포인트가 501을 반환한다', () => {
+    const { controller } = createController()
+
+    expect(() => controller.getMeetingStatus('1', 'token')).toThrow(
+      CommonException,
+    )
+    expect(() => controller.getMapPins('1', 'token')).toThrow(CommonException)
+    expect(() =>
+      controller.updatePlacePreference('1', '2', 'token', {
+        preference: PreferenceType.Like,
+      }),
+    ).toThrow(CommonException)
+    expect(() =>
+      controller.updateCourseImage('1', 'token', {
+        courseImageKey: 'course-cards/1/5.png',
+      }),
+    ).toThrow(CommonException)
+    expect(() => controller.getSimilarPlaces('1', '2', 'token')).toThrow(
+      CommonException,
+    )
+    expect(() =>
+      controller.getSimilarPlaces('1', '2', 'token', ['3', '4'], 5),
+    ).toThrow(CommonException)
+  })
+
+  it('Swagger 문서에 미구현 엔드포인트의 경로와 응답 코드가 포함된다', async () => {
+    const moduleFixture = await Test.createTestingModule({
+      controllers: [MeetingController],
+      providers: [
+        {
+          provide: MeetingService,
+          useValue: {
+            createMeeting: jest.fn(),
+            updateLocation: jest.fn(),
+            addRecommendation: jest.fn(),
+            getRecommendations: jest.fn(),
+            getCoursePlan: jest.fn(),
+            updateCoursePlan: jest.fn(),
+            previewInvitation: jest.fn(),
+            joinMeeting: jest.fn(),
+          },
+        },
+      ],
+    }).compile()
+    const app = moduleFixture.createNestApplication()
+    const document = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().build(),
+    )
+
+    type PathOperations = {
+      get?: { responses?: Record<string, unknown> }
+      post?: { responses?: Record<string, unknown> }
+      patch?: { responses?: Record<string, unknown> }
+      put?: { responses?: Record<string, unknown> }
+    }
+
+    function responseCodes(responses?: Record<string, unknown>) {
+      return Object.keys(responses ?? {}).sort()
+    }
+
+    const meetingStatusPath = document.paths?.['/meetings/{meetingId}'] as
+      | PathOperations
+      | undefined
+    expect(responseCodes(meetingStatusPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '404', '501'].sort(),
+    )
+
+    const mapPinsPath = document.paths?.['/meetings/{meetingId}/places/pins'] as
+      | PathOperations
+      | undefined
+    expect(responseCodes(mapPinsPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '404', '409', '501'].sort(),
+    )
+
+    const preferencePath = document.paths?.[
+      '/meetings/{meetingId}/places/{recommendationId}/preference'
+    ] as PathOperations | undefined
+    expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
+      ['200', '400', '401', '404', '409', '501'].sort(),
+    )
+
+    const courseImagePath = document.paths?.[
+      '/meetings/{meetingId}/course-image'
+    ] as PathOperations | undefined
+    expect(responseCodes(courseImagePath?.put?.responses)).toEqual(
+      ['204', '400', '401', '403', '404', '409', '501'].sort(),
+    )
+
+    const similarPlacesPath = document.paths?.[
+      '/meetings/{meetingId}/places/{placeId}/similar'
+    ] as PathOperations | undefined
+    expect(responseCodes(similarPlacesPath?.get?.responses)).toEqual(
+      ['200', '400', '401', '404', '409', '501'].sort(),
+    )
+
+    expect(document.components?.schemas?.PreferenceType).toMatchObject({
+      enum: Object.values(PreferenceType),
+    })
+
+    type SchemaWithProperties = { properties?: Record<string, unknown> }
+    type SchemaWithNullableProperties = {
+      properties?: Record<string, { nullable?: boolean }>
+    }
+
+    const statusSchema = document.components?.schemas
+      ?.MeetingStatusResponseDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(statusSchema?.properties ?? {})).toEqual([
+      'status',
+      'confirmedCourseCandidateId',
+    ])
+    expect(statusSchema?.properties?.confirmedCourseCandidateId?.nullable).toBe(
+      true,
+    )
+
+    const mapPinsSchema = document.components?.schemas?.MapPinsResponseDto as
+      | SchemaWithProperties
+      | undefined
+    expect(Object.keys(mapPinsSchema?.properties ?? {})).toEqual(
+      expect.arrayContaining(['startPlace', 'sharedPlaces']),
+    )
+
+    const updatePreferenceRequestSchema = document.components?.schemas
+      ?.UpdatePlacePreferenceRequestDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(
+      Object.keys(updatePreferenceRequestSchema?.properties ?? {}),
+    ).toEqual(['preference'])
+    expect(
+      updatePreferenceRequestSchema?.properties?.preference?.nullable,
+    ).toBe(true)
+
+    const placePreferenceSchema = document.components?.schemas
+      ?.PlacePreferenceResponseDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(placePreferenceSchema?.properties ?? {})).toEqual([
+      'likeCount',
+      'dislikeCount',
+      'myPreference',
+    ])
+    expect(placePreferenceSchema?.properties?.myPreference?.nullable).toBe(true)
+
+    const updateCourseImageRequestSchema = document.components?.schemas
+      ?.UpdateCourseImageRequestDto as SchemaWithProperties | undefined
+    expect(
+      Object.keys(updateCourseImageRequestSchema?.properties ?? {}),
+    ).toEqual(['courseImageKey'])
+
+    const similarPlaceResponseSchema = document.components?.schemas
+      ?.SimilarPlaceResponseDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(similarPlaceResponseSchema?.properties ?? {})).toEqual([
+      'id',
+      'categoryId',
+      'name',
+      'address',
+      'latitude',
+      'longitude',
+      'primaryImageUrl',
+      'previewUrl',
+    ])
+    expect(
+      similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
+    ).toBe(true)
+
+    await app.close()
+  })
 
   it('초대·참여·상세·코스 계획 API를 서비스에 전달한다', () => {
     const { controller, meetingService } = createController()
