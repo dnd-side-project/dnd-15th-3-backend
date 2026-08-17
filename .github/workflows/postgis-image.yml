@@ -189,3 +189,18 @@ jobs:
           set -euo pipefail
           docker push "${POSTGIS_IMAGE}:${POSTGIS_IMAGE_TAG}"
           docker push "${POSTGIS_IMAGE}:${POSTGIS_IMAGE_TAG}-${GITHUB_SHA}"
+
+      - name: Record published ARM64 digest
+        run: |
+          set -euo pipefail
+          reference="${POSTGIS_IMAGE}:${POSTGIS_IMAGE_TAG}"
+          digest="$(docker buildx imagetools inspect "$reference" | awk '$1 == "Digest:" { print $2; exit }')"
+          test -n "$digest"
+          {
+            echo "## Published PostGIS image"
+            echo
+            echo "- Reference: \`$reference\`"
+            echo "- Digest: \`$digest\`"
+            echo "- Platform: \`linux/arm64\`"
+            echo "- Smoke test: \`postgis_lib_version() = 3.5.x\`"
+          } >> "$GITHUB_STEP_SUMMARY"
