@@ -45,7 +45,6 @@ function createService() {
   const recommendationRepository = {
     findExcludedFromCourse: jest.fn().mockResolvedValue([]),
   }
-  const storageService = { getPresignedDownloadUrl: jest.fn() }
   const courseCandidateRepository = {
     find: jest.fn(),
     exists: jest.fn(),
@@ -59,7 +58,9 @@ function createService() {
   const courseCandidatePlaceRepository = {
     find: jest.fn().mockResolvedValue([]),
   }
-  const placeImageRepository = { find: jest.fn().mockResolvedValue([]) }
+  const placeImageService = {
+    getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
+  }
   const kakaoWalkingCourseService = { getWalkingCourse: jest.fn() }
   const courseRepository = {
     lockMeeting: jest.fn(),
@@ -71,11 +72,10 @@ function createService() {
     meetingAccessService as never,
     voteRepository as never,
     recommendationRepository as never,
-    storageService as never,
     courseCandidateRepository as never,
     commentRepository as never,
     courseCandidatePlaceRepository as never,
-    placeImageRepository as never,
+    placeImageService as never,
     kakaoWalkingCourseService as never,
     courseRepository as never,
   )
@@ -86,11 +86,10 @@ function createService() {
     meetingAccessService,
     voteRepository,
     recommendationRepository,
-    storageService,
     courseCandidateRepository,
     commentRepository,
     courseCandidatePlaceRepository,
-    placeImageRepository,
+    placeImageService,
     kakaoWalkingCourseService,
     courseRepository,
   }
@@ -390,7 +389,7 @@ describe('CourseService', () => {
         meetingAccessService,
         courseCandidateRepository,
         courseCandidatePlaceRepository,
-        placeImageRepository,
+        placeImageService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: '1',
@@ -407,7 +406,7 @@ describe('CourseService', () => {
       await expect(promise).rejects.toThrow(
         '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
-      expect(placeImageRepository.find).not.toHaveBeenCalled()
+      expect(placeImageService.getPrimaryImageUrls).not.toHaveBeenCalled()
     })
 
     it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(
@@ -418,8 +417,7 @@ describe('CourseService', () => {
           meetingAccessService,
           courseCandidateRepository,
           courseCandidatePlaceRepository,
-          placeImageRepository,
-          storageService,
+          placeImageService,
         } = createService()
         meetingAccessService.findParticipant.mockResolvedValue({
           id: '1',
@@ -478,14 +476,8 @@ describe('CourseService', () => {
             },
           },
         ])
-        placeImageRepository.find.mockResolvedValue([
-          {
-            place: { id: '1' },
-            mediaAsset: { objectKey: 'places/1/first.jpg' },
-          },
-        ])
-        storageService.getPresignedDownloadUrl.mockResolvedValue(
-          'https://signed.example.com/first.jpg',
+        placeImageService.getPrimaryImageUrls.mockResolvedValue(
+          new Map([['1', 'https://signed.example.com/first.jpg']]),
         )
 
         await expect(
@@ -886,7 +878,7 @@ describe('CourseService', () => {
         meetingAccessService,
         courseCandidateRepository,
         voteRepository,
-        placeImageRepository,
+        placeImageService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: '1',
@@ -901,7 +893,7 @@ describe('CourseService', () => {
         [],
         '1',
       )
-      expect(placeImageRepository.find).not.toHaveBeenCalled()
+      expect(placeImageService.getPrimaryImageUrls).toHaveBeenCalledWith([])
     })
 
     it('카테고리 필터를 저장소 조회에 그대로 전달한다', async () => {
@@ -931,8 +923,7 @@ describe('CourseService', () => {
         courseCandidateRepository,
         recommendationRepository,
         voteRepository,
-        placeImageRepository,
-        storageService,
+        placeImageService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: '1',
@@ -962,14 +953,8 @@ describe('CourseService', () => {
           ],
         ]),
       )
-      placeImageRepository.find.mockResolvedValue([
-        {
-          place: { id: '1' },
-          mediaAsset: { objectKey: 'places/1/first.jpg' },
-        },
-      ])
-      storageService.getPresignedDownloadUrl.mockResolvedValue(
-        'https://signed.example.com/first.jpg',
+      placeImageService.getPrimaryImageUrls.mockResolvedValue(
+        new Map([['1', 'https://signed.example.com/first.jpg']]),
       )
 
       await expect(

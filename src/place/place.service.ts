@@ -9,12 +9,11 @@ import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
-import { StorageService } from 'src/storage/storage.service'
 import { Repository } from 'typeorm'
 import type { PlaceSearchResultDto } from './dto/place-search-result.dto'
 import { Place } from './entities/place.entity'
-import { PlaceImage } from './entities/place-image.entity'
 import { PlaceRepository } from './place.repository'
+import { PlaceImageService } from './place-image.service'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
 import {
   type PlaceSearchResponse,
@@ -31,11 +30,9 @@ export class PlaceService {
     private readonly participantRepository: Repository<MeetingParticipant>,
     @InjectRepository(Place)
     private readonly placeRepository: Repository<Place>,
-    @InjectRepository(PlaceImage)
-    private readonly placeImageRepository: Repository<PlaceImage>,
     private readonly placeSearchRepository: PlaceRepository,
     private readonly placeSyncService: PlaceSyncService,
-    private readonly storageService: StorageService,
+    private readonly placeImageService: PlaceImageService,
   ) {}
 
   async searchPlaces(
@@ -112,7 +109,7 @@ export class PlaceService {
       throw new NotFoundException('장소를 찾을 수 없습니다.')
     }
 
-    const imageUrls = await this.getImageUrls(placeId)
+    const imageUrls = await this.placeImageService.getImageUrls(placeId)
 
     return {
       placeId: place.id,
@@ -123,23 +120,5 @@ export class PlaceService {
       imageUrls,
       previewUrl: place.previewUrl as string,
     }
-  }
-
-  private async getImageUrls(placeId: string): Promise<string[]> {
-    const images = await this.placeImageRepository.find({
-      where: { place: { id: placeId } },
-      relations: { mediaAsset: true },
-      select: { displayOrder: true, mediaAsset: { objectKey: true } },
-      order: { displayOrder: 'ASC' },
-    })
-    if (images.length === 0) {
-      return []
-    }
-
-    return await Promise.all(
-      images.map((image) =>
-        this.storageService.getPresignedDownloadUrl(image.mediaAsset.objectKey),
-      ),
-    )
   }
 }

@@ -24,16 +24,15 @@ import { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-pla
 import { MapPinDto } from 'src/place/dto/map-pin.dto'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { Place } from 'src/place/entities/place.entity'
-import { PlaceImage } from 'src/place/entities/place-image.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
 import { PlaceRepository } from 'src/place/place.repository'
+import { PlaceImageService } from 'src/place/place-image.service'
 import {
   haversineDistanceMeters,
   PLACE_SYNC_RADIUS_METERS,
 } from 'src/place/sync/place-sync.constants'
 import { PlaceSyncService } from 'src/place/sync/place-sync.service'
-import { StorageService } from 'src/storage/storage.service'
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
@@ -84,12 +83,10 @@ export class MeetingService {
     private readonly meetingRepository: Repository<Meeting>,
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
-    @InjectRepository(PlaceImage)
-    private readonly placeImageRepository: Repository<PlaceImage>,
     private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
     private readonly meetingAccessService: MeetingAccessService,
     private readonly placeSearchRepository: PlaceRepository,
-    private readonly storageService: StorageService,
+    private readonly placeImageService: PlaceImageService,
   ) {}
 
   async createMeeting(
@@ -1063,7 +1060,7 @@ export class MeetingService {
         : []
 
     const candidates = [...similar, ...padding]
-    const primaryImageUrls = await this.findPrimaryImageUrls(
+    const primaryImageUrls = await this.placeImageService.getPrimaryImageUrls(
       candidates.map((candidate) => candidate.id),
     )
 
@@ -1077,29 +1074,5 @@ export class MeetingService {
       primaryImageUrl: primaryImageUrls.get(candidate.id) ?? null,
       previewUrl: candidate.previewUrl,
     }))
-  }
-
-  private async findPrimaryImageUrls(
-    placeIds: string[],
-  ): Promise<Map<string, string>> {
-    if (placeIds.length === 0) {
-      return new Map()
-    }
-
-    const images = await this.placeImageRepository.find({
-      where: { place: { id: In(placeIds) }, isPrimary: true },
-      relations: { place: true, mediaAsset: true },
-      select: {
-        place: { id: true },
-        mediaAsset: { objectKey: true },
-      },
-    })
-    const urls = await Promise.all(
-      images.map((image) =>
-        this.storageService.getPresignedDownloadUrl(image.mediaAsset.objectKey),
-      ),
-    )
-
-    return new Map(images.map((image, index) => [image.place.id, urls[index]]))
   }
 }

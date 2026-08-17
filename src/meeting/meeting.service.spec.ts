@@ -90,9 +90,6 @@ function createMeetingService() {
   const courseCandidateRepository = {
     findOne: jest.fn(),
   }
-  const placeImageRepository = {
-    find: jest.fn().mockResolvedValue([]),
-  }
   const voteRepository = {
     applyPreference: jest.fn(),
   }
@@ -102,8 +99,8 @@ function createMeetingService() {
   const placeSearchRepository = {
     findSimilar: jest.fn(),
   }
-  const storageService = {
-    getPresignedDownloadUrl: jest.fn(),
+  const placeImageService = {
+    getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
   }
 
   const service = new MeetingService(
@@ -115,11 +112,10 @@ function createMeetingService() {
     recommendationRepository as never,
     meetingRepository as unknown as Repository<Meeting>,
     courseCandidateRepository as unknown as Repository<CourseCandidate>,
-    placeImageRepository as never,
     voteRepository as unknown as MeetingPlaceRecommendationVoteRepository,
     meetingAccessService as unknown as MeetingAccessService,
     placeSearchRepository as never,
-    storageService as never,
+    placeImageService as never,
   )
 
   return {
@@ -132,11 +128,10 @@ function createMeetingService() {
     dataSource,
     meetingRepository,
     courseCandidateRepository,
-    placeImageRepository,
     voteRepository,
     meetingAccessService,
     placeSearchRepository,
-    storageService,
+    placeImageService,
   }
 }
 

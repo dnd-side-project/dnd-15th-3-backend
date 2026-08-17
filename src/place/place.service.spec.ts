@@ -3,9 +3,9 @@ import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import type { Repository } from 'typeorm'
 import { Place } from './entities/place.entity'
-import { PlaceImage } from './entities/place-image.entity'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
+import { PlaceImageService } from './place-image.service'
 
 function createService() {
   const meetingLocationRepository = {
@@ -17,9 +17,6 @@ function createService() {
   const placeRepository = {
     findOne: jest.fn(),
   }
-  const placeImageRepository = {
-    find: jest.fn().mockResolvedValue([]),
-  }
   const placeSearchRepository = {
     findNearby: jest.fn(),
   }
@@ -29,8 +26,8 @@ function createService() {
       lastSyncedAt: null,
     }),
   }
-  const storageService = {
-    getPresignedDownloadUrl: jest.fn(),
+  const placeImageService = {
+    getImageUrls: jest.fn().mockResolvedValue([]),
   }
 
   return {
@@ -38,18 +35,16 @@ function createService() {
       meetingLocationRepository as unknown as Repository<MeetingLocation>,
       participantRepository as unknown as Repository<MeetingParticipant>,
       placeRepository as unknown as Repository<Place>,
-      placeImageRepository as unknown as Repository<PlaceImage>,
       placeSearchRepository as unknown as PlaceRepository,
       placeSyncService as never,
-      storageService as never,
+      placeImageService as unknown as PlaceImageService,
     ),
     meetingLocationRepository,
     participantRepository,
     placeRepository,
-    placeImageRepository,
     placeSearchRepository,
     placeSyncService,
-    storageService,
+    placeImageService,
   }
 }
 
@@ -142,13 +137,12 @@ describe('PlaceService', () => {
       ).rejects.toBeInstanceOf(NotFoundException)
     })
 
-    it('이미지 목록을 표시 순서대로 presigned URL로 변환해 응답한다', async () => {
+    it('이미지 URL 조회를 PlaceImageService에 위임하고 응답에 그대로 담는다', async () => {
       const {
         service,
         participantRepository,
         placeRepository,
-        placeImageRepository,
-        storageService,
+        placeImageService,
       } = createService()
       participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
       placeRepository.findOne.mockResolvedValue({
@@ -158,13 +152,10 @@ describe('PlaceService', () => {
         previewUrl: 'https://preview.example.com/1',
         category: { name: '카페', slug: 'cafe' },
       })
-      placeImageRepository.find.mockResolvedValue([
-        { displayOrder: 1, mediaAsset: { objectKey: 'places/1/first.jpg' } },
-        { displayOrder: 2, mediaAsset: { objectKey: 'places/1/second.jpg' } },
+      placeImageService.getImageUrls.mockResolvedValue([
+        'https://signed.example.com/first.jpg',
+        'https://signed.example.com/second.jpg',
       ])
-      storageService.getPresignedDownloadUrl
-        .mockResolvedValueOnce('https://signed.example.com/first.jpg')
-        .mockResolvedValueOnce('https://signed.example.com/second.jpg')
 
       await expect(service.getPlaceDetail('1', 'token')).resolves.toMatchObject(
         {
@@ -180,21 +171,15 @@ describe('PlaceService', () => {
           previewUrl: 'https://preview.example.com/1',
         },
       )
-      expect(placeImageRepository.find).toHaveBeenCalledWith({
-        where: { place: { id: '1' } },
-        relations: { mediaAsset: true },
-        select: { displayOrder: true, mediaAsset: { objectKey: true } },
-        order: { displayOrder: 'ASC' },
-      })
+      expect(placeImageService.getImageUrls).toHaveBeenCalledWith('1')
     })
 
-    it('이미지가 없으면 저장소를 조회하지 않고 빈 배열을 반환한다', async () => {
+    it('이미지가 없으면 빈 배열을 그대로 응답한다', async () => {
       const {
         service,
         participantRepository,
         placeRepository,
-        placeImageRepository,
-        storageService,
+        placeImageService,
       } = createService()
       participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
       placeRepository.findOne.mockResolvedValue({
@@ -204,12 +189,11 @@ describe('PlaceService', () => {
         previewUrl: 'https://preview.example.com/1',
         category: { name: '카페', slug: 'cafe' },
       })
-      placeImageRepository.find.mockResolvedValue([])
+      placeImageService.getImageUrls.mockResolvedValue([])
 
       await expect(service.getPlaceDetail('1', 'token')).resolves.toMatchObject(
         { imageUrls: [] },
       )
-      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled()
     })
   })
 })

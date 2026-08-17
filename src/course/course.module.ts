@@ -2,8 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { KakaoModule } from 'src/kakao/kakao.module'
 import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
-import { PlaceImage } from 'src/place/entities/place-image.entity'
-import { StorageModule } from 'src/storage/storage.module'
+import { PlaceModule } from 'src/place/place.module'
 import { CourseController } from './course.controller'
 import { CourseRepository } from './course.repository'
 import { CourseService } from './course.service'
@@ -16,13 +15,12 @@ import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recomm
 @Module({
   imports: [
     MeetingAccessModule,
-    StorageModule,
+    PlaceModule,
     KakaoModule,
     TypeOrmModule.forFeature([
       CourseCandidate,
       CourseCandidateComment,
       CourseCandidatePlace,
-      PlaceImage,
     ]),
   ],
   controllers: [CourseController],

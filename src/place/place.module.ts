@@ -12,6 +12,7 @@ import { PlaceSyncTileLease } from './entities/place-sync-tile-lease.entity'
 import { PlaceController } from './place.controller'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
+import { PlaceImageService } from './place-image.service'
 import { GooglePlacesProvider } from './provider/google-places.provider'
 import { PlaceSyncService } from './sync/place-sync.service'
 import { PLACE_PROVIDER } from './sync/place-sync.tokens'
@@ -35,11 +36,12 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
   providers: [
     PlaceRepository,
     PlaceService,
+    PlaceImageService,
     GooglePlacesProvider,
     { provide: PLACE_PROVIDER, useExisting: GooglePlacesProvider },
     PlaceSyncService,
     PlaceSyncWorker,
   ],
-  exports: [PlaceSyncService, PlaceRepository],
+  exports: [PlaceSyncService, PlaceRepository, PlaceImageService],
 })
 export class PlaceModule {}

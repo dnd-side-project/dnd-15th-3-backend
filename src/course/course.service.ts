@@ -28,8 +28,7 @@ import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import type { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import type { Place } from 'src/place/entities/place.entity'
-import { PlaceImage } from 'src/place/entities/place-image.entity'
-import { StorageService } from 'src/storage/storage.service'
+import { PlaceImageService } from 'src/place/place-image.service'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { CourseRepository } from './course.repository'
 import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
@@ -62,15 +61,13 @@ export class CourseService {
     private readonly meetingAccessService: MeetingAccessService,
     private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
     private readonly recommendationRepository: MeetingPlaceRecommendationRepository,
-    private readonly storageService: StorageService,
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
     @InjectRepository(CourseCandidateComment)
     private readonly commentRepository: Repository<CourseCandidateComment>,
     @InjectRepository(CourseCandidatePlace)
     private readonly courseCandidatePlaceRepository: Repository<CourseCandidatePlace>,
-    @InjectRepository(PlaceImage)
-    private readonly placeImageRepository: Repository<PlaceImage>,
+    private readonly placeImageService: PlaceImageService,
     private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
     private readonly courseRepository: CourseRepository,
   ) {}
@@ -289,7 +286,7 @@ export class CourseService {
 
     const [preferenceSummaries, primaryImageUrls] = await Promise.all([
       this.voteRepository.getPreferenceSummaries(recommendationIds, viewer.id),
-      this.findPrimaryImageUrls(
+      this.placeImageService.getPrimaryImageUrls(
         recommendations.map((recommendation) => recommendation.place.id),
       ),
     ])
@@ -728,26 +725,6 @@ export class CourseService {
     }
   }
 
-  private async findPrimaryImageUrls(
-    placeIds: string[],
-  ): Promise<Map<string, string>> {
-    if (placeIds.length === 0) {
-      return new Map()
-    }
-
-    const images = await this.placeImageRepository.find({
-      where: { place: { id: In(placeIds) }, isPrimary: true },
-      relations: { place: true, mediaAsset: true },
-      select: { place: { id: true }, mediaAsset: { objectKey: true } },
-    })
-    const urls = await Promise.all(
-      images.map((image) =>
-        this.storageService.getPresignedDownloadUrl(image.mediaAsset.objectKey),
-      ),
-    )
-    return new Map(images.map((image, index) => [image.place.id, urls[index]]))
-  }
-
   private async assertCourseCandidateExists(
     courseCandidateId: string,
     meetingId: string,
@@ -764,7 +741,7 @@ export class CourseService {
     candidate: CourseCandidate,
     steps: CourseCandidatePlace[],
   ): Promise<CourseDetailResponseDto> {
-    const primaryImageUrls = await this.findPrimaryImageUrls(
+    const primaryImageUrls = await this.placeImageService.getPrimaryImageUrls(
       steps.map((step) => step.meetingPlaceRecommendation.place.id),
     )
 
