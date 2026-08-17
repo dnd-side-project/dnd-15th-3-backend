@@ -1,4 +1,4 @@
-import { Controller, Get, Logger } from '@nestjs/common'
+import { Controller, Get, Logger, UseFilters } from '@nestjs/common'
 import {
   ApiExcludeEndpoint,
   ApiOperation,
@@ -10,6 +10,8 @@ import {
   HealthCheckService,
   TypeOrmHealthIndicator,
 } from '@nestjs/terminus'
+import { HealthExceptionFilter } from './health-exception.filter'
+import { PostgisHealthIndicator } from './postgis.health'
 import { OciStorageHealthIndicator } from './storage.health'
 
 @ApiTags('헬스 체크')
@@ -20,11 +22,13 @@ export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
     private readonly db: TypeOrmHealthIndicator,
+    private readonly postgis: PostgisHealthIndicator,
     private readonly storage: OciStorageHealthIndicator,
   ) {}
 
   @Get()
   @HealthCheck()
+  @UseFilters(HealthExceptionFilter)
   @ApiOperation({ summary: '애플리케이션 상태 확인' })
   @ApiResponse({ status: 200, description: '모든 의존성이 정상입니다.' })
   @ApiResponse({
@@ -34,11 +38,13 @@ export class HealthController {
   async checkAppHealth() {
     const result = await this.health.check([
       () => this.db.pingCheck('database', { timeout: 5000 }),
+      () => this.postgis.isHealthy('postgis'),
       () => this.storage.isHealthy('storage'),
     ])
 
     const checks = {
       database: result.info?.database?.status ?? result.error?.database?.status,
+      postgis: result.info?.postgis?.status ?? result.error?.postgis?.status,
       storage: result.info?.storage?.status ?? result.error?.storage?.status,
     }
 

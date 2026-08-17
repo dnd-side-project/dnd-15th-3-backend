@@ -4,6 +4,11 @@ namespace: dnd-15th-3-prod
 resources:
   - ../../base
   - postgres-secret.yaml
+images:
+  # prod는 backup/restore 검증 후 별도 변경으로 PostGIS digest에 승격한다.
+  - name: ghcr.io/dnd-side-project/dnd-15th-3-postgis
+    newName: postgres
+    newTag: 17-alpine
 patches:
   - path: resources.yaml
   - path: backup.yaml

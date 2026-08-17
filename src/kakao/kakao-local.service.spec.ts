@@ -1,5 +1,5 @@
-import { ServiceUnavailableException } from '@nestjs/common'
 import type { ConfigService } from '@nestjs/config'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { Env } from 'src/config/env'
 import { KakaoLocalService } from './kakao-local.service'
 
@@ -77,9 +77,9 @@ describe('KakaoLocalService', () => {
       .mockResolvedValue(new Response(null, { status: 401 }))
     const service = createService()
 
-    await expect(service.searchAddress(request)).rejects.toThrow(
-      '카카오 주소 검색 API가 401 상태를 반환했습니다.',
-    )
+    await expect(service.searchAddress(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.externalServiceError,
+    })
   })
 
   it('카카오 API 응답 형식이 잘못되면 Bad Gateway로 변환한다', async () => {
@@ -90,18 +90,18 @@ describe('KakaoLocalService', () => {
       )
     const service = createService()
 
-    await expect(service.searchAddress(request)).rejects.toThrow(
-      '카카오 주소 검색 API 응답 형식이 올바르지 않습니다.',
-    )
+    await expect(service.searchAddress(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.externalServiceError,
+    })
   })
 
   it('REST API 키가 없으면 외부 API를 호출하지 않는다', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch')
     const service = createService('')
 
-    await expect(service.searchAddress(request)).rejects.toBeInstanceOf(
-      ServiceUnavailableException,
-    )
+    await expect(service.searchAddress(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.serviceUnavailable,
+    })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
