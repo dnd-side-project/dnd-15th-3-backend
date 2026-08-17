@@ -73,9 +73,15 @@ const envSchema = z.object({
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OCI_S3_SECRET_KEY: requiredInProduction(z.string()),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  OCI_BUCKET_NAME_DEV: z.string().default('momo-bucket-dev'),
+  MEDIA_BUCKET_NAME: z.string().trim().min(1),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  OCI_BUCKET_NAME_PROD: z.string().default('momo-bucket-prod'),
+  MEDIA_PUBLIC_BASE_URL: z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => new URL(value).pathname.endsWith('/o/'), {
+      message: 'Must include the OCI native object URL path ending in /o/',
+    }),
 })
 
 export type Env = z.infer<typeof envSchema>

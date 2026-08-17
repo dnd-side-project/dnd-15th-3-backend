@@ -39,13 +39,11 @@ export class HealthController {
     const result = await this.health.check([
       () => this.db.pingCheck('database', { timeout: 5000 }),
       () => this.postgis.isHealthy('postgis'),
-      () => this.storage.isHealthy('storage'),
     ])
 
     const checks = {
       database: result.info?.database?.status ?? result.error?.database?.status,
       postgis: result.info?.postgis?.status ?? result.error?.postgis?.status,
-      storage: result.info?.storage?.status ?? result.error?.storage?.status,
     }
 
     if (result.status === 'ok') {
@@ -55,6 +53,16 @@ export class HealthController {
     }
 
     return result
+  }
+
+  @Get('storage')
+  @HealthCheck()
+  @UseFilters(HealthExceptionFilter)
+  @ApiOperation({ summary: '공개 미디어 스토리지 상태 확인' })
+  @ApiResponse({ status: 200, description: '미디어 버킷이 정상입니다.' })
+  @ApiResponse({ status: 503, description: '미디어 버킷이 비정상입니다.' })
+  async checkStorageHealth() {
+    return await this.health.check([() => this.storage.isHealthy('storage')])
   }
 
   @Get('live')

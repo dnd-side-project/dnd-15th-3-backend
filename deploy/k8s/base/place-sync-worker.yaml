@@ -33,6 +33,8 @@ spec:
           envFrom:
             - secretRef:
                 name: momo-api-env
+            - secretRef:
+                name: momo-media-storage
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

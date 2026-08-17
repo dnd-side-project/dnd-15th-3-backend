@@ -12,9 +12,9 @@ import { type Env, validateEnv } from './config/env'
 import { CourseModule } from './course/course.module'
 import { createDatabaseOptions } from './database/database.options'
 import { HealthModule } from './health/health.module'
+import { MediaModule } from './media/media.module'
 import { MeetingModule } from './meeting/meeting.module'
 import { PlaceModule } from './place/place.module'
-import { StorageModule } from './storage/storage.module'
 
 if (existsSync('.env')) {
   loadEnvFile('.env')
@@ -43,7 +43,7 @@ const infrastructureModules = [
     inject: [ConfigService],
     useFactory: createTypeOrmOptions,
   }),
-  StorageModule,
+  MediaModule,
   HealthModule,
 ]
 

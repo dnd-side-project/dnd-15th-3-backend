@@ -12,6 +12,7 @@ async function bootstrap() {
     exclude: [
       { path: 'health', method: RequestMethod.GET },
       { path: 'health/live', method: RequestMethod.GET },
+      { path: 'health/storage', method: RequestMethod.GET },
     ],
   })
   const config = app.get(ConfigService) as ConfigService<Env, true>
