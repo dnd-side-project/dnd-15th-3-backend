@@ -1650,13 +1650,21 @@ describe('CourseService', () => {
       })
       expect(lastStep.travelTimeToNext).toBe(300)
       expect(lastStep.distanceToNextMeters).toBe(450)
-      expect(placeRepository.save).toHaveBeenCalledWith(lastStep)
       expect(placeRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           courseCandidate: { id: '2' },
           order: 2,
         }),
       )
+      expect(placeRepository.save).toHaveBeenCalledWith([
+        lastStep,
+        expect.objectContaining({
+          courseCandidate: { id: '2' },
+          order: 2,
+          travelTimeToNext: null,
+          distanceToNextMeters: null,
+        }),
+      ])
       expect(categoryStepRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           meeting: { id: '1' },

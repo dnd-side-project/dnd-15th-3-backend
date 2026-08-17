@@ -536,19 +536,17 @@ export class CourseService {
     const placeRepository = manager.getRepository(CourseCandidatePlace)
     lastStep.travelTimeToNext = walkingCourse.totalTime
     lastStep.distanceToNextMeters = walkingCourse.totalDistance
-    await placeRepository.save(lastStep)
 
-    const newStep = await placeRepository.save(
-      placeRepository.create({
-        courseCandidate: { id: courseCandidateId } as CourseCandidate,
-        meetingPlaceRecommendation: {
-          id: recommendation.id,
-        } as MeetingPlaceRecommendation,
-        order: lastStep.order + 1,
-        travelTimeToNext: null,
-        distanceToNextMeters: null,
-      }),
-    )
+    const newStepEntity = placeRepository.create({
+      courseCandidate: { id: courseCandidateId } as CourseCandidate,
+      meetingPlaceRecommendation: {
+        id: recommendation.id,
+      } as MeetingPlaceRecommendation,
+      order: lastStep.order + 1,
+      travelTimeToNext: null,
+      distanceToNextMeters: null,
+    })
+    const [, newStep] = await placeRepository.save([lastStep, newStepEntity])
     newStep.meetingPlaceRecommendation = recommendation
 
     await this.appendCategoryStep(manager, meetingId, newPlace.category)
