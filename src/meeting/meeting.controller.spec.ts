@@ -355,7 +355,8 @@ describe('MeetingController', () => {
     expect(joinMeetingSchema?.properties).toHaveProperty('invitationCode')
     expect(joinMeetingSchema?.properties).not.toHaveProperty('accessToken')
     expect(meetingInvitationSchema?.properties).toHaveProperty('invitationCode')
-    expect(meetingInvitationSchema?.properties).toHaveProperty('locationId')
+    expect(meetingInvitationSchema?.properties).toHaveProperty('locationName')
+    expect(meetingInvitationSchema?.properties).not.toHaveProperty('locationId')
     expect(meetingScreenSchema?.properties).toHaveProperty('invitationCode')
     expect(meetingScreenSchema?.required).toContain('selectedCourse')
     expect(meetingScreenSchema?.properties?.selectedCourse).toMatchObject({
