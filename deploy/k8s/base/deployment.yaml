@@ -32,6 +32,8 @@ spec:
           envFrom:
             - secretRef:
                 name: momo-api-env
+            - secretRef:
+                name: momo-media-storage
           env:
             - name: PORT
               value: "3000"

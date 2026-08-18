@@ -43,11 +43,11 @@ export class Meeting extends BaseEntity {
   @Column({ name: 'course_version', default: 1 })
   courseVersion: number
 
-  @Column({ nullable: true, unique: true })
-  courseImageKey: string
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  courseImageKey: string | null
 
-  @Column({ nullable: true })
-  courseImageUploadedAt: Date
+  @Column({ type: 'timestamp', nullable: true })
+  courseImageUploadedAt: Date | null
 
   isConfirmed(): boolean {
     return this.status === MeetingStatus.CourseConfirmed

@@ -4,18 +4,18 @@ import {
   HealthIndicator,
   type HealthIndicatorResult,
 } from '@nestjs/terminus'
-import { StorageService } from '../storage/storage.service'
+import { MediaService } from '../media/media.service'
 
 @Injectable()
 export class OciStorageHealthIndicator extends HealthIndicator {
-  constructor(private readonly storageService: StorageService) {
+  constructor(private readonly mediaService: MediaService) {
     super()
   }
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
-    const isHealthy = await this.storageService.checkHealth()
+    const isHealthy = await this.mediaService.checkStorageHealth()
     const result = this.getStatus(key, isHealthy, {
-      bucket: this.storageService.getBucketName(),
+      bucket: this.mediaService.getBucketName(),
     })
 
     if (isHealthy) {

@@ -6,17 +6,17 @@ function createService() {
   const placeImageRepository = {
     find: jest.fn(),
   }
-  const storageService = {
-    getPresignedDownloadUrl: jest.fn(),
+  const mediaService = {
+    getPublicUrl: jest.fn(),
   }
 
   return {
     service: new PlaceImageService(
       placeImageRepository as unknown as Repository<PlaceImage>,
-      storageService as never,
+      mediaService as never,
     ),
     placeImageRepository,
-    storageService,
+    mediaService,
   }
 }
 
@@ -29,8 +29,8 @@ describe('PlaceImageService', () => {
       expect(placeImageRepository.find).not.toHaveBeenCalled()
     })
 
-    it('대표 이미지만 조회해 장소 ID별 presigned URL Map으로 변환한다', async () => {
-      const { service, placeImageRepository, storageService } = createService()
+    it('대표 이미지만 조회해 장소 ID별 공개 URL Map으로 변환한다', async () => {
+      const { service, placeImageRepository, mediaService } = createService()
       placeImageRepository.find.mockResolvedValue([
         {
           place: { id: '1' },
@@ -41,14 +41,14 @@ describe('PlaceImageService', () => {
           mediaAsset: { objectKey: 'places/2/primary.jpg' },
         },
       ])
-      storageService.getPresignedDownloadUrl
-        .mockResolvedValueOnce('https://signed.example.com/1.jpg')
-        .mockResolvedValueOnce('https://signed.example.com/2.jpg')
+      mediaService.getPublicUrl
+        .mockReturnValueOnce('https://media.example.com/1.jpg')
+        .mockReturnValueOnce('https://media.example.com/2.jpg')
 
       await expect(service.getPrimaryImageUrls(['1', '2'])).resolves.toEqual(
         new Map([
-          ['1', 'https://signed.example.com/1.jpg'],
-          ['2', 'https://signed.example.com/2.jpg'],
+          ['1', 'https://media.example.com/1.jpg'],
+          ['2', 'https://media.example.com/2.jpg'],
         ]),
       )
       expect(placeImageRepository.find).toHaveBeenCalledWith({
@@ -72,27 +72,27 @@ describe('PlaceImageService', () => {
   })
 
   describe('getImageUrls', () => {
-    it('이미지가 없으면 presigned URL을 조회하지 않고 빈 배열을 반환한다', async () => {
-      const { service, placeImageRepository, storageService } = createService()
+    it('이미지가 없으면 공개 URL을 조회하지 않고 빈 배열을 반환한다', async () => {
+      const { service, placeImageRepository, mediaService } = createService()
       placeImageRepository.find.mockResolvedValue([])
 
       await expect(service.getImageUrls('1')).resolves.toEqual([])
-      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled()
+      expect(mediaService.getPublicUrl).not.toHaveBeenCalled()
     })
 
-    it('이미지 목록을 표시 순서대로 presigned URL로 변환한다', async () => {
-      const { service, placeImageRepository, storageService } = createService()
+    it('이미지 목록을 표시 순서대로 공개 URL로 변환한다', async () => {
+      const { service, placeImageRepository, mediaService } = createService()
       placeImageRepository.find.mockResolvedValue([
         { displayOrder: 1, mediaAsset: { objectKey: 'places/1/first.jpg' } },
         { displayOrder: 2, mediaAsset: { objectKey: 'places/1/second.jpg' } },
       ])
-      storageService.getPresignedDownloadUrl
-        .mockResolvedValueOnce('https://signed.example.com/first.jpg')
-        .mockResolvedValueOnce('https://signed.example.com/second.jpg')
+      mediaService.getPublicUrl
+        .mockReturnValueOnce('https://media.example.com/first.jpg')
+        .mockReturnValueOnce('https://media.example.com/second.jpg')
 
       await expect(service.getImageUrls('1')).resolves.toEqual([
-        'https://signed.example.com/first.jpg',
-        'https://signed.example.com/second.jpg',
+        'https://media.example.com/first.jpg',
+        'https://media.example.com/second.jpg',
       ])
       expect(placeImageRepository.find).toHaveBeenCalledWith({
         where: { place: { id: '1' } },

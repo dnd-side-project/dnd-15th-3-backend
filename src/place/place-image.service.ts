@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { StorageService } from 'src/storage/storage.service'
+import { MediaService } from 'src/media/media.service'
 import { In, Repository } from 'typeorm'
 import { PlaceImage } from './entities/place-image.entity'
 
@@ -9,7 +9,7 @@ export class PlaceImageService {
   constructor(
     @InjectRepository(PlaceImage)
     private readonly placeImageRepository: Repository<PlaceImage>,
-    private readonly storageService: StorageService,
+    private readonly mediaService: MediaService,
   ) {}
 
   async getPrimaryImageUrls(placeIds: string[]): Promise<Map<string, string>> {
@@ -49,7 +49,7 @@ export class PlaceImageService {
   ): Promise<string[]> {
     return Promise.all(
       images.map((image) =>
-        this.storageService.getPresignedDownloadUrl(image.mediaAsset.objectKey),
+        this.mediaService.getPublicUrl(image.mediaAsset.objectKey),
       ),
     )
   }

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { SimilarPlaceResponseDto } from 'src/catalog/dto/similar-place-response.dto'
@@ -14,6 +14,7 @@ import { CourseCategoryStep } from 'src/course/entities/course-category-step.ent
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
+import { MediaService } from 'src/media/media.service'
 import { MapPinDto } from 'src/place/dto/map-pin.dto'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { Place } from 'src/place/entities/place.entity'
@@ -35,6 +36,7 @@ import {
   PLACE_PREFERENCE_EDITABLE_STATUSES,
   SIMILAR_PLACES_RECOMMENDABLE_STATUSES,
 } from './constants/meeting-status.constants'
+import { CourseImageResponseDto } from './dto/course-image-response.dto'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import { MeetingLocationResponseDto } from './dto/meeting-location.dto'
@@ -62,12 +64,20 @@ import type { AddRecommendationRequest } from './schema/recommendation-request.s
 const INVITATION_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const MAX_SIMILAR_PLACES_SIZE = 100
 
+export type CourseImageFile = {
+  buffer: Buffer
+  mimetype: string
+}
+
 @Injectable()
 export class MeetingService {
+  private readonly logger = new Logger(MeetingService.name)
+
   constructor(
     private readonly config: ConfigService<Env, true>,
     private readonly dataSource: DataSource,
     private readonly placeSyncService: PlaceSyncService,
+    private readonly mediaService: MediaService,
     @InjectRepository(MeetingParticipant)
     private readonly participantRepository: Repository<MeetingParticipant>,
     @InjectRepository(Place)
@@ -301,6 +311,87 @@ export class MeetingService {
     accessToken: string,
   ): Promise<MeetingScreenResponseDto> {
     return this.getMeetingScreen(meetingId, accessToken)
+  }
+
+  async storeCourseImage(
+    meetingId: string,
+    accessToken: string,
+    file: CourseImageFile,
+  ): Promise<CourseImageResponseDto> {
+    const participant = await this.findParticipant(meetingId, accessToken)
+    if (participant.role !== ParticipantRole.Host) {
+      throw new MeetingException(MeetingErrorCode.hostOnly)
+    }
+
+    const meetingRepository = this.dataSource.getRepository(Meeting)
+    const meeting = await meetingRepository.findOne({
+      where: { id: meetingId },
+    })
+    if (!meeting) {
+      throw new MeetingException(MeetingErrorCode.notFound)
+    }
+    this.assertCourseImageState(meeting)
+
+    if (meeting.courseImageKey) {
+      return this.toCourseImageResponse(meeting)
+    }
+
+    const stored = await this.mediaService.storePublicImage({
+      body: file.buffer,
+      mimeType: file.mimetype,
+    })
+    const uploadedAt = new Date()
+
+    let affected: number | null | undefined
+    try {
+      const updateResult = await meetingRepository
+        .createQueryBuilder()
+        .update(Meeting)
+        .set({
+          courseImageKey: stored.asset.objectKey,
+          courseImageUploadedAt: uploadedAt,
+        })
+        .where('id = :meetingId', { meetingId })
+        .andWhere('course_image_key IS NULL')
+        .andWhere('status = :status', {
+          status: MeetingStatus.CourseConfirmed,
+        })
+        .execute()
+      affected = updateResult.affected
+    } catch (error) {
+      await this.discardCourseImage(stored.asset)
+      throw error
+    }
+
+    if (affected === 1) {
+      return { imageUrl: stored.publicUrl, uploadedAt }
+    }
+
+    await this.discardCourseImage(stored.asset)
+    const winner = await meetingRepository.findOne({
+      where: { id: meetingId },
+    })
+    if (!winner) {
+      throw new MeetingException(MeetingErrorCode.notFound)
+    }
+    this.assertCourseImageState(winner)
+    return this.toCourseImageResponse(winner)
+  }
+
+  async downloadCourseImage(meetingId: string, accessToken: string) {
+    await this.findParticipant(meetingId, accessToken)
+
+    const meeting = await this.dataSource.getRepository(Meeting).findOne({
+      where: { id: meetingId },
+    })
+    if (!meeting) {
+      throw new MeetingException(MeetingErrorCode.notFound)
+    }
+    if (!meeting.courseImageKey) {
+      throw new MeetingException(MeetingErrorCode.courseImageNotFound)
+    }
+
+    return this.mediaService.downloadPublicImage(meeting.courseImageKey)
   }
 
   async getCoursePlan(
@@ -661,6 +752,9 @@ export class MeetingService {
       name: meeting.name,
       date: meeting.date,
       time: meeting.time,
+      courseImageUrl: meeting.courseImageKey
+        ? this.mediaService.getPublicUrl(meeting.courseImageKey)
+        : null,
       role: viewer.role === ParticipantRole.Host ? 'HOST' : 'MEMBER',
       isHost: viewer.role === ParticipantRole.Host,
       permissions: {
@@ -796,6 +890,60 @@ export class MeetingService {
     )
   }
 
+  private assertCourseImageState(meeting: Meeting): void {
+    if (meeting.status !== MeetingStatus.CourseConfirmed) {
+      throw new MeetingException(MeetingErrorCode.courseImageStateInvalid)
+    }
+  }
+
+  private toCourseImageResponse(meeting: Meeting): CourseImageResponseDto {
+    if (!meeting.courseImageKey || !meeting.courseImageUploadedAt) {
+      throw new CommonException(CommonErrorCode.internalServerError)
+    }
+    return {
+      imageUrl: this.mediaService.getPublicUrl(meeting.courseImageKey),
+      uploadedAt: meeting.courseImageUploadedAt,
+    }
+  }
+
+  private async discardCourseImage(
+    asset: Parameters<MediaService['discardStoredImage']>[0],
+  ): Promise<void> {
+    try {
+      await this.mediaService.discardStoredImage(asset)
+    } catch (error) {
+      const detail = error instanceof Error ? error.stack : String(error)
+      this.logger.error(
+        `Failed to discard unreferenced course image: ${asset.objectKey}`,
+        detail,
+      )
+    }
+  }
+
+  private async findParticipant(
+    meetingId: string,
+    accessToken: string,
+  ): Promise<MeetingParticipant> {
+    this.assertAccessToken(accessToken)
+    const participant = await this.participantRepository.findOne({
+      where: {
+        meeting: { id: meetingId },
+        accessToken: accessToken.trim(),
+      },
+      relations: { user: true },
+    })
+    if (!participant) {
+      throw new CommonException(CommonErrorCode.authenticationFailed)
+    }
+    return participant
+  }
+
+  private assertAccessToken(accessToken: string): void {
+    if (!accessToken?.trim()) {
+      throw new CommonException(CommonErrorCode.authenticationFailed)
+    }
+  }
+
   private toMeetingLocationResponse(
     location: MeetingLocation,
   ): MeetingLocationResponseDto {
@@ -849,6 +997,7 @@ export class MeetingService {
       name: created.meeting.name,
       date: created.meeting.date,
       time: created.meeting.time,
+      courseImageUrl: null,
       role: 'HOST',
       isHost: true,
       permissions: {

@@ -1,16 +1,19 @@
 import { S3Client } from '@aws-sdk/client-s3'
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
+import { TypeOrmModule } from '@nestjs/typeorm'
+import { MediaAsset } from '../common/entities/media-asset.entity'
 import type { Env } from '../config/env'
-import { StorageController } from './storage.controller'
-import { StorageService } from './storage.service'
+import { MediaService } from './media.service'
+import { MediaCleanupWorker } from './media-cleanup.worker'
+import { MediaStorageService } from './media-storage.service'
 
 function buildOciS3Endpoint(namespace: string, region: string): string {
   return `https://${namespace}.compat.objectstorage.${region}.oraclecloud.com`
 }
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, TypeOrmModule.forFeature([MediaAsset])],
   providers: [
     {
       provide: 'S3_CLIENT',
@@ -20,11 +23,9 @@ function buildOciS3Endpoint(namespace: string, region: string): string {
         const accessKey = config.get('OCI_S3_ACCESS_KEY', { infer: true })
         const secretKey = config.get('OCI_S3_SECRET_KEY', { infer: true })
 
-        const endpoint = buildOciS3Endpoint(namespace, region)
-
         return new S3Client({
           region,
-          endpoint,
+          endpoint: buildOciS3Endpoint(namespace, region),
           credentials: {
             accessKeyId: accessKey,
             secretAccessKey: secretKey,
@@ -34,9 +35,10 @@ function buildOciS3Endpoint(namespace: string, region: string): string {
       },
       inject: [ConfigService],
     },
-    StorageService,
+    MediaStorageService,
+    MediaService,
+    MediaCleanupWorker,
   ],
-  controllers: [StorageController],
-  exports: [StorageService],
+  exports: [MediaService],
 })
-export class StorageModule {}
+export class MediaModule {}
