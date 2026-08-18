@@ -30,7 +30,6 @@ import { PlaceImageService } from 'src/place/place-image.service'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { CourseRepository } from './course.repository'
 import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
-import { ConfirmCourseRequestDto } from './dto/confirm-course-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
 import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
@@ -204,7 +203,6 @@ export class CourseService {
     meetingId: string,
     courseCandidateId: string,
     accessToken: string,
-    request: ConfirmCourseRequestDto,
   ): Promise<MeetingStatusResponseDto> {
     assertAccessToken(accessToken)
     const normalizedAccessToken = accessToken.trim()
@@ -239,10 +237,6 @@ export class CourseService {
         throw new CourseException(CourseErrorCode.candidateNotFound)
       }
       candidate.select()
-
-      if (request.courseImageKey) {
-        meeting.setCourseImage(request.courseImageKey)
-      }
 
       await candidateRepository.save(candidate)
       await manager.getRepository(Meeting).save(meeting)

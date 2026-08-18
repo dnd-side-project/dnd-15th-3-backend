@@ -983,7 +983,7 @@ describe('CourseService', () => {
     it('accessToken이 빈 문자열이면 트랜잭션 없이 401을 던진다', async () => {
       const { service, dataSource } = createService()
 
-      const promise = service.confirmCourse('1', '2', '', {})
+      const promise = service.confirmCourse('1', '2', '')
 
       await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(dataSource.transaction).not.toHaveBeenCalled()
@@ -998,7 +998,7 @@ describe('CourseService', () => {
       )
       participantRepository.findOne.mockResolvedValue(null)
 
-      const promise = service.confirmCourse('1', '2', 'token', {})
+      const promise = service.confirmCourse('1', '2', 'token')
 
       await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(candidateRepository.save).not.toHaveBeenCalled()
@@ -1015,7 +1015,7 @@ describe('CourseService', () => {
         createParticipant({ role: ParticipantRole.Member }),
       )
 
-      const promise = service.confirmCourse('1', '2', 'token', {})
+      const promise = service.confirmCourse('1', '2', 'token')
 
       await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('방장만 코스를 확정할 수 있습니다.')
@@ -1034,7 +1034,7 @@ describe('CourseService', () => {
       )
       courseRepository.lockMeeting.mockResolvedValue(null)
 
-      const promise = service.confirmCourse('1', '2', 'token', {})
+      const promise = service.confirmCourse('1', '2', 'token')
 
       await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
@@ -1063,7 +1063,7 @@ describe('CourseService', () => {
           createMeetingWithStatus(status),
         )
 
-        const promise = service.confirmCourse('1', '2', 'token', {})
+        const promise = service.confirmCourse('1', '2', 'token')
 
         await expect(promise).rejects.toBeInstanceOf(MeetingException)
         expect(candidateRepository.findOne).not.toHaveBeenCalled()
@@ -1085,7 +1085,7 @@ describe('CourseService', () => {
       )
       candidateRepository.findOne.mockResolvedValue(null)
 
-      const promise = service.confirmCourse('1', '2', 'token', {})
+      const promise = service.confirmCourse('1', '2', 'token')
 
       await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
@@ -1113,9 +1113,7 @@ describe('CourseService', () => {
       const candidate = createCandidate({ id: '2', isSelected: false })
       candidateRepository.findOne.mockResolvedValue(candidate)
 
-      await expect(
-        service.confirmCourse('1', '2', 'token', {}),
-      ).resolves.toEqual({
+      await expect(service.confirmCourse('1', '2', 'token')).resolves.toEqual({
         status: MeetingStatus.CourseConfirmed,
         confirmedCourseCandidateId: '2',
       })
@@ -1129,36 +1127,6 @@ describe('CourseService', () => {
       expect(candidate.isSelected).toBe(true)
       expect(candidateRepository.save).toHaveBeenCalledWith(candidate)
       expect(meeting.status).toBe(MeetingStatus.CourseConfirmed)
-      expect(meeting.courseImageKey).toBeUndefined()
-      expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
-    })
-
-    it('courseImageKey가 있으면 모임에 반영하고 업로드 시각을 기록한다', async () => {
-      const { service, dataSource, courseRepository } = createService()
-      const {
-        manager,
-        participantRepository,
-        meetingRepository,
-        candidateRepository,
-      } = createConfirmTransactionMocks()
-      dataSource.transaction.mockImplementation((callback: never) =>
-        (callback as (manager: unknown) => unknown)(manager),
-      )
-      participantRepository.findOne.mockResolvedValue(
-        createParticipant({ role: ParticipantRole.Host }),
-      )
-      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
-      courseRepository.lockMeeting.mockResolvedValue(meeting)
-      candidateRepository.findOne.mockResolvedValue(
-        createCandidate({ id: '2', isSelected: false }),
-      )
-
-      await service.confirmCourse('1', '2', 'token', {
-        courseImageKey: 'course-cards/1/5.png',
-      })
-
-      expect(meeting.courseImageKey).toBe('course-cards/1/5.png')
-      expect(meeting.courseImageUploadedAt).toBeInstanceOf(Date)
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
     })
   })

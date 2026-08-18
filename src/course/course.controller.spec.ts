@@ -97,17 +97,11 @@ describe('CourseController', () => {
       confirmedCourseCandidateId: '2',
     }
     ;(courseService.confirmCourse as jest.Mock).mockResolvedValue(expected)
-    const dto = { courseImageKey: 'course-cards/1/5.png' }
 
-    await expect(
-      controller.confirmCourse('1', '2', 'token', dto),
-    ).resolves.toEqual(expected)
-    expect(courseService.confirmCourse).toHaveBeenCalledWith(
-      '1',
-      '2',
-      'token',
-      dto,
+    await expect(controller.confirmCourse('1', '2', 'token')).resolves.toEqual(
+      expected,
     )
+    expect(courseService.confirmCourse).toHaveBeenCalledWith('1', '2', 'token')
   })
 
   it('코스 상세 조회는 CourseService에 위임한다', async () => {

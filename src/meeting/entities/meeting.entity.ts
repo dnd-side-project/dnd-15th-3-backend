@@ -61,11 +61,6 @@ export class Meeting extends BaseEntity {
     this.status = MeetingStatus.CourseConfirmed
   }
 
-  setCourseImage(courseImageKey: string): void {
-    this.courseImageKey = courseImageKey
-    this.courseImageUploadedAt = new Date()
-  }
-
   bumpCourseVersion(): void {
     this.courseVersion += 1
   }
