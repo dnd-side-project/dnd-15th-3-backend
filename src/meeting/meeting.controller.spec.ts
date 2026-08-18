@@ -356,7 +356,7 @@ describe('MeetingController', () => {
     const meetingScreenSchema = document.components?.schemas
       ?.MeetingScreenResponseDto as
       | {
-          properties?: Record<string, { nullable?: boolean }>
+          properties?: Record<string, { nullable?: boolean; type?: string }>
           required?: string[]
         }
       | undefined
@@ -392,6 +392,7 @@ describe('MeetingController', () => {
     expect(meetingInvitationSchema?.properties).toHaveProperty('locationId')
     expect(meetingScreenSchema?.properties).toHaveProperty('invitationCode')
     expect(meetingScreenSchema?.properties?.courseImageUrl).toMatchObject({
+      type: 'string',
       nullable: true,
     })
     expect(meetingScreenSchema?.required).toContain('selectedCourse')

@@ -14,6 +14,7 @@ import { SelectedCourseResponseDto } from './selected-course-response.dto'
 export class MeetingScreenResponseDto extends MeetingResponseDto {
   @ApiProperty({
     description: '확정된 코스 이미지의 공개 URL. 아직 생성 전이면 null',
+    type: String,
     nullable: true,
     example: 'https://media.example.com/o/media/2026/08/course.png',
   })

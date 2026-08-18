@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
@@ -12,6 +13,16 @@ import type { MimeType } from '../common/enums/mime-type.enum'
 import type { Env } from '../config/env'
 
 const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+
+export type StoredMediaObject = {
+  objectKey: string
+  lastModified: Date | null
+}
+
+export type StoredMediaObjectPage = {
+  objects: StoredMediaObject[]
+  continuationToken?: string
+}
 
 @Injectable()
 export class MediaStorageService {
@@ -70,6 +81,38 @@ export class MediaStorageService {
         Key: objectKey,
       }),
     )
+  }
+
+  async listObjects(
+    prefix: string,
+    continuationToken?: string,
+  ): Promise<StoredMediaObjectPage> {
+    const response = await this.s3Client.send(
+      new ListObjectsV2Command({
+        // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+        Bucket: this.bucketName,
+        // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+        Prefix: prefix,
+        // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+        ContinuationToken: continuationToken,
+      }),
+    )
+
+    return {
+      objects: (response.Contents ?? []).flatMap((object) =>
+        object.Key
+          ? [
+              {
+                objectKey: object.Key,
+                lastModified: object.LastModified ?? null,
+              },
+            ]
+          : [],
+      ),
+      ...(response.IsTruncated && response.NextContinuationToken
+        ? { continuationToken: response.NextContinuationToken }
+        : {}),
+    }
   }
 
   async downloadObject(objectKey: string): Promise<Readable> {

@@ -132,5 +132,29 @@ describe('validateEnv', () => {
         }),
       ).toThrow('Invalid environment variables')
     })
+
+    it('requires the public base URL to identify the configured media bucket', () => {
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          MEDIA_PUBLIC_BASE_URL:
+            'https://objectstorage.example/n/namespace/b/another-bucket/o/',
+        }),
+      ).toThrow('Invalid environment variables')
+    })
+
+    it.each(['?', '#', '?token=unexpected', '#unexpected'])(
+      'rejects a public base URL with %s',
+      (suffix) => {
+        expect(() =>
+          validateEnv({
+            ...baseConfig,
+            // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+            MEDIA_PUBLIC_BASE_URL: `${baseConfig.MEDIA_PUBLIC_BASE_URL}${suffix}`,
+          }),
+        ).toThrow('Invalid environment variables')
+      },
+    )
   })
 })

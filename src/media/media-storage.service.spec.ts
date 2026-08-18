@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
 import type { ConfigService } from '@nestjs/config'
@@ -77,6 +78,44 @@ describe('MediaStorageService', () => {
       Bucket: 'momo-media-test',
       // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
       Key: 'media/2026/08/id.png',
+    })
+  })
+
+  it('lists a page of media objects for reconciliation', async () => {
+    const lastModified = new Date('2026-08-17T00:00:00Z')
+    mockSend.mockResolvedValue({
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Contents: [
+        {
+          // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+          Key: 'media/2026/08/id.png',
+          // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+          LastModified: lastModified,
+        },
+        {},
+      ],
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      IsTruncated: true,
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      NextContinuationToken: 'next-page',
+    })
+
+    await expect(
+      service.listObjects('media/', 'current-page'),
+    ).resolves.toEqual({
+      objects: [{ objectKey: 'media/2026/08/id.png', lastModified }],
+      continuationToken: 'next-page',
+    })
+
+    const command = mockSend.mock.calls[0][0]
+    expect(command).toBeInstanceOf(ListObjectsV2Command)
+    expect(command.input).toMatchObject({
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Bucket: 'momo-media-test',
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      Prefix: 'media/',
+      // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
+      ContinuationToken: 'current-page',
     })
   })
 

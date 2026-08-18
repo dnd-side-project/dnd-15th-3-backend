@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { MediaAsset } from '../common/entities/media-asset.entity'
 import type { Env } from '../config/env'
 import { MediaService } from './media.service'
+import { MediaCleanupWorker } from './media-cleanup.worker'
 import { MediaStorageService } from './media-storage.service'
 
 function buildOciS3Endpoint(namespace: string, region: string): string {
@@ -36,6 +37,7 @@ function buildOciS3Endpoint(namespace: string, region: string): string {
     },
     MediaStorageService,
     MediaService,
+    MediaCleanupWorker,
   ],
   exports: [MediaService],
 })
