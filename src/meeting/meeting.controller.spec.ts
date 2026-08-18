@@ -120,7 +120,7 @@ describe('MeetingController', () => {
       '/meetings/{meetingId}/course-image'
     ] as PathOperations | undefined
     expect(responseCodes(courseImagePath?.put?.responses)).toEqual(
-      ['200', '400', '401', '404', '409'].sort(),
+      ['200', '400', '401', '403', '404', '409'].sort(),
     )
     const courseImageDownloadPath = document.paths?.[
       '/meetings/{meetingId}/course-image/download'
@@ -246,16 +246,16 @@ describe('MeetingController', () => {
     expect(meetingService.getMeetingDetail).toHaveBeenCalledWith('1', 'token')
   })
 
-  it('모임원의 코스 이미지 등록과 다운로드를 서비스에 위임한다', async () => {
+  it('방장의 코스 이미지 등록과 모임원의 다운로드를 서비스에 위임한다', async () => {
     const { controller, meetingService } = createController()
     const file = { buffer: Buffer.from('image'), mimetype: 'image/png' }
 
-    await controller.storeCourseImage('1', 'member-token', file)
+    await controller.storeCourseImage('1', 'host-token', file)
     const download = await controller.downloadCourseImage('1', 'member-token')
 
     expect(meetingService.storeCourseImage).toHaveBeenCalledWith(
       '1',
-      'member-token',
+      'host-token',
       file,
     )
     expect(meetingService.downloadCourseImage).toHaveBeenCalledWith(

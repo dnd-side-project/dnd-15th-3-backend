@@ -291,7 +291,10 @@ export class MeetingService {
     accessToken: string,
     file: CourseImageFile,
   ): Promise<CourseImageResponseDto> {
-    await this.findParticipant(meetingId, accessToken)
+    const participant = await this.findParticipant(meetingId, accessToken)
+    if (participant.role !== ParticipantRole.Host) {
+      throw new MeetingException(MeetingErrorCode.hostOnly)
+    }
 
     const meetingRepository = this.dataSource.getRepository(Meeting)
     const meeting = await meetingRepository.findOne({

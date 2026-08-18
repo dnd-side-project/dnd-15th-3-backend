@@ -518,15 +518,15 @@ export class MeetingController {
   })
   @ApiQuery({
     name: 'accessToken',
-    description: '모임 참여자 전용 재접속 토큰',
-    example: 'member-session-token',
+    description: '방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
     required: true,
   })
   @ApiOperation({
     summary: '코스 이미지 최초 등록',
     description:
       '확정된 코스를 프론트엔드에서 렌더링한 이미지로 등록합니다. ' +
-      '모든 모임원이 호출할 수 있으며, 먼저 등록된 이미지는 교체하지 않습니다. ' +
+      '방장만 호출할 수 있으며, 먼저 등록된 이미지는 교체하지 않습니다. ' +
       '이미 등록되었다면 새 파일을 저장하지 않고 기존 결과를 반환합니다.',
   })
   @ApiConsumes('multipart/form-data')
@@ -550,6 +550,7 @@ export class MeetingController {
   @ApiUnauthorizedResponse({
     description: 'accessToken이 없거나 유효하지 않습니다.',
   })
+  @ApiForbiddenResponse({ description: '방장이 아닙니다.' })
   @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
   @ApiConflictResponse({
     description:
