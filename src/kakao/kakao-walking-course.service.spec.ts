@@ -1,5 +1,5 @@
-import { ServiceUnavailableException } from '@nestjs/common'
 import type { ConfigService } from '@nestjs/config'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { Env } from 'src/config/env'
 import { KakaoWalkingCourseService } from './kakao-walking-course.service'
 
@@ -122,38 +122,38 @@ describe('KakaoWalkingCourseService', () => {
     )
   })
 
-  it('네트워크 요청 자체가 실패하면 Bad Gateway로 변환한다', async () => {
+  it('네트워크 요청 자체가 실패하면 외부 서비스 오류로 변환한다', async () => {
     jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'))
     const service = createService()
 
-    await expect(service.getWalkingCourse(request)).rejects.toThrow(
-      '카카오 도보 경로 API를 호출하지 못했습니다.',
-    )
+    await expect(service.getWalkingCourse(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.externalServiceError,
+    })
   })
 
-  it('카카오 API가 오류 상태를 반환하면 Bad Gateway로 변환한다', async () => {
+  it('카카오 API가 오류 상태를 반환하면 외부 서비스 오류로 변환한다', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(null, { status: 401 }))
     const service = createService()
 
-    await expect(service.getWalkingCourse(request)).rejects.toThrow(
-      '카카오 도보 경로 API가 401 상태를 반환했습니다.',
-    )
+    await expect(service.getWalkingCourse(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.externalServiceError,
+    })
   })
 
-  it('카카오 API 응답을 JSON으로 읽을 수 없으면 Bad Gateway로 변환한다', async () => {
+  it('카카오 API 응답을 JSON으로 읽을 수 없으면 외부 서비스 오류로 변환한다', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('not json', { status: 200 }))
     const service = createService()
 
-    await expect(service.getWalkingCourse(request)).rejects.toThrow(
-      '카카오 도보 경로 API 응답을 읽을 수 없습니다.',
-    )
+    await expect(service.getWalkingCourse(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.externalServiceError,
+    })
   })
 
-  it('카카오 API 응답 형식이 잘못되면 Bad Gateway로 변환한다', async () => {
+  it('카카오 API 응답 형식이 잘못되면 외부 서비스 오류로 변환한다', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
@@ -161,18 +161,18 @@ describe('KakaoWalkingCourseService', () => {
       )
     const service = createService()
 
-    await expect(service.getWalkingCourse(request)).rejects.toThrow(
-      '카카오 도보 경로 API 응답 형식이 올바르지 않습니다.',
-    )
+    await expect(service.getWalkingCourse(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.externalServiceError,
+    })
   })
 
   it('REST API 키가 없으면 외부 API를 호출하지 않는다', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch')
     const service = createService('')
 
-    await expect(service.getWalkingCourse(request)).rejects.toBeInstanceOf(
-      ServiceUnavailableException,
-    )
+    await expect(service.getWalkingCourse(request)).rejects.toMatchObject({
+      errorCode: CommonErrorCode.serviceUnavailable,
+    })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

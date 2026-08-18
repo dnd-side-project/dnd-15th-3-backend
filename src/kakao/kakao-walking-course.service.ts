@@ -1,9 +1,7 @@
-import {
-  BadGatewayException,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { Env } from 'src/config/env'
 import {
   type KakaoWalkingCourseRequest,
@@ -28,9 +26,7 @@ export class KakaoWalkingCourseService {
     const apiKey = this.config.get('KAKAO_REST_API_KEY', { infer: true }).trim()
 
     if (!apiKey) {
-      throw new ServiceUnavailableException(
-        '카카오 REST API 키가 설정되지 않았습니다.',
-      )
+      throw new CommonException(CommonErrorCode.serviceUnavailable)
     }
 
     const url = new URL(KAKAO_WALKING_COURSE_URL)
@@ -52,31 +48,23 @@ export class KakaoWalkingCourseService {
         signal: AbortSignal.timeout(KAKAO_REQUEST_TIMEOUT_MS),
       })
     } catch {
-      throw new BadGatewayException(
-        '카카오 도보 경로 API를 호출하지 못했습니다.',
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     if (!response.ok) {
-      throw new BadGatewayException(
-        `카카오 도보 경로 API가 ${response.status} 상태를 반환했습니다.`,
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     let body: unknown
     try {
       body = await response.json()
     } catch {
-      throw new BadGatewayException(
-        '카카오 도보 경로 API 응답을 읽을 수 없습니다.',
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     const parsedResponse = kakaoWalkingCourseResponseSchema.safeParse(body)
     if (!parsedResponse.success) {
-      throw new BadGatewayException(
-        '카카오 도보 경로 API 응답 형식이 올바르지 않습니다.',
-      )
+      throw new CommonException(CommonErrorCode.externalServiceError)
     }
 
     return parsedResponse.data
