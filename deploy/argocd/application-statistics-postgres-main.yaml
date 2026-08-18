@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dnd-15th-3-statistics-postgres-prod
+  namespace: argocd
+spec:
+  project: dnd-15th-3
+  source:
+    repoURL: https://github.com/dnd-side-project/dnd-15th-3-backend.git
+    targetRevision: main
+    path: deploy/k8s/statistics-postgres/overlays/main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dnd-15th-3-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
