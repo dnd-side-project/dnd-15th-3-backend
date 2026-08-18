@@ -1,7 +1,7 @@
-import { NotImplementedException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { MeetingStatus } from './enums/meeting-status.enum'
@@ -121,7 +121,7 @@ describe('MeetingController', () => {
       controller.updateCourseImage('1', 'token', {
         courseImageKey: 'course-cards/1/5.png',
       }),
-    ).toThrow(NotImplementedException)
+    ).toThrow(CommonException)
   })
 
   it('Swagger 문서에 미구현 엔드포인트의 경로와 응답 코드가 포함된다', async () => {

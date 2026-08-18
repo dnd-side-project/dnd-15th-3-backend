@@ -1,13 +1,9 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  InternalServerErrorException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { ConflictException, ForbiddenException } from '@nestjs/common'
 import type { ConfigService } from '@nestjs/config'
 import { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
@@ -26,6 +22,7 @@ import { MeetingType } from './entities/meeting-type.entity'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
+import { MeetingException } from './exception/meeting.exception'
 import { MeetingService } from './meeting.service'
 import type {
   CreateMeetingRequest,
@@ -635,12 +632,12 @@ describe('MeetingService', () => {
     it('참여자 검증에 실패하면 그대로 전파한다', async () => {
       const { service, meetingAccessService } = createMeetingService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.getMeetingStatus('1', 'bad-token')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
         '1',
         'bad-token',
@@ -705,7 +702,7 @@ describe('MeetingService', () => {
 
       const promise = service.getMeetingStatus('1', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow(
         '확정된 모임인데 선택된 코스 후보를 찾을 수 없습니다.',
       )
@@ -721,12 +718,12 @@ describe('MeetingService', () => {
         recommendationRepository,
       } = createMeetingService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.getMapPins('1', '')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(meetingRepository.findOne).not.toHaveBeenCalled()
       expect(recommendationRepository.find).not.toHaveBeenCalled()
     })
@@ -807,13 +804,13 @@ describe('MeetingService', () => {
 
         const promise = service.getMapPins('1', 'token')
 
-        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        await expect(promise).rejects.toBeInstanceOf(MeetingException)
         expect(meetingRepository.findOne).not.toHaveBeenCalled()
         expect(recommendationRepository.find).not.toHaveBeenCalled()
       },
     )
 
-    it('모임은 있지만 시작지 정보가 없으면 데이터 정합성 오류로 500을 던진다', async () => {
+    it('모임 레코드 자체를 찾지 못하면 404를 던진다', async () => {
       const { service, meetingAccessService, meetingRepository } =
         createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
@@ -825,7 +822,25 @@ describe('MeetingService', () => {
 
       const promise = service.getMapPins('1', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
+      await expect(promise).rejects.toThrow('해당 모임을 찾을 수 없습니다.')
+    })
+
+    it('모임은 있지만 시작지 정보가 없으면 데이터 정합성 오류로 500을 던진다', async () => {
+      const { service, meetingAccessService, meetingRepository } =
+        createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      const meetingWithoutLocation = new Meeting()
+      meetingWithoutLocation.id = '1'
+      meetingRepository.findOne.mockResolvedValue(meetingWithoutLocation)
+
+      const promise = service.getMapPins('1', 'token')
+
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow(
         '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
@@ -841,7 +856,7 @@ describe('MeetingService', () => {
         voteRepository,
       } = createMeetingService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.updatePlacePreference(
@@ -851,7 +866,7 @@ describe('MeetingService', () => {
         PreferenceType.Like,
       )
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(recommendationRepository.exists).not.toHaveBeenCalled()
       expect(voteRepository.applyPreference).not.toHaveBeenCalled()
     })
@@ -877,7 +892,7 @@ describe('MeetingService', () => {
           PreferenceType.Like,
         )
 
-        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        await expect(promise).rejects.toBeInstanceOf(MeetingException)
         expect(recommendationRepository.exists).not.toHaveBeenCalled()
         expect(voteRepository.applyPreference).not.toHaveBeenCalled()
       },
@@ -905,7 +920,7 @@ describe('MeetingService', () => {
         PreferenceType.Like,
       )
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       expect(recommendationRepository.exists).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
       })
@@ -991,7 +1006,7 @@ describe('MeetingService', () => {
     it('참여자 검증에 실패하면 그대로 전파한다', async () => {
       const { service, meetingAccessService } = createMeetingService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.getSimilarPlaces(
@@ -1002,7 +1017,7 @@ describe('MeetingService', () => {
         5,
       )
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
     })
 
     it('허용되지 않은 상태면 409를 던지고 장소를 조회하지 않는다', async () => {
@@ -1014,7 +1029,7 @@ describe('MeetingService', () => {
 
       const promise = service.getSimilarPlaces('1', '2', 'token', undefined, 5)
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       expect(placeRepository.findOne).not.toHaveBeenCalled()
     })
 
@@ -1030,7 +1045,7 @@ describe('MeetingService', () => {
 
       const promise = service.getSimilarPlaces('1', '2', 'token', undefined, 5)
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('장소를 찾을 수 없습니다.')
     })
 

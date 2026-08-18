@@ -1,8 +1,10 @@
-import { NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
+import { CommonException } from 'src/common/exception/common.exception'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import type { Repository } from 'typeorm'
 import { Place } from './entities/place.entity'
+import { PlaceException } from './exception/place.exception'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
 import { PlaceImageService } from './place-image.service'
@@ -110,7 +112,7 @@ describe('PlaceService', () => {
       const { service, participantRepository } = createService()
 
       await expect(service.getPlaceDetail('1', '')).rejects.toBeInstanceOf(
-        UnauthorizedException,
+        CommonException,
       )
       expect(participantRepository.findOne).not.toHaveBeenCalled()
     })
@@ -122,7 +124,7 @@ describe('PlaceService', () => {
 
       await expect(
         service.getPlaceDetail('1', 'invalid-token'),
-      ).rejects.toBeInstanceOf(UnauthorizedException)
+      ).rejects.toBeInstanceOf(CommonException)
       expect(placeRepository.findOne).not.toHaveBeenCalled()
     })
 
@@ -153,7 +155,7 @@ describe('PlaceService', () => {
 
       await expect(
         service.getPlaceDetail('999', 'token'),
-      ).rejects.toBeInstanceOf(NotFoundException)
+      ).rejects.toBeInstanceOf(PlaceException)
     })
 
     it('이미지 URL 조회를 PlaceImageService에 위임하고 응답에 그대로 담는다', async () => {

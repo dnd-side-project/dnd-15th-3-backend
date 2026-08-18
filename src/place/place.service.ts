@@ -6,12 +6,16 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import type { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { Repository } from 'typeorm'
 import type { PlaceSearchResultDto } from './dto/place-search-result.dto'
 import { Place } from './entities/place.entity'
+import { PlaceException } from './exception/place.exception'
+import { PlaceErrorCode } from './exception/place-error-code'
 import { PlaceRepository } from './place.repository'
 import { PlaceImageService } from './place-image.service'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
@@ -98,7 +102,7 @@ export class PlaceService {
       where: { accessToken: accessToken.trim() },
     })
     if (!participant) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
 
     const place = await this.placeRepository.findOne({
@@ -106,7 +110,7 @@ export class PlaceService {
       relations: { category: true },
     })
     if (!place) {
-      throw new NotFoundException('장소를 찾을 수 없습니다.')
+      throw new PlaceException(PlaceErrorCode.notFound)
     }
 
     const imageUrls = await this.placeImageService.getImageUrls(placeId)

@@ -1,4 +1,5 @@
-import { NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { CommonException } from 'src/common/exception/common.exception'
+import { MeetingException } from '../exception/meeting.exception'
 import { MeetingAccessService } from './meeting-access.service'
 
 function createService() {
@@ -19,10 +20,8 @@ describe('MeetingAccessService', () => {
 
       const promise = service.findParticipant('1', '')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
-      await expect(promise).rejects.toThrow(
-        '모임 참여자 토큰이 유효하지 않습니다.',
-      )
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
+      await expect(promise).rejects.toThrow('인증에 실패했습니다.')
       expect(participantRepository.findOne).not.toHaveBeenCalled()
     })
 
@@ -31,7 +30,7 @@ describe('MeetingAccessService', () => {
 
       const promise = service.findParticipant('1', '   ')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(participantRepository.findOne).not.toHaveBeenCalled()
     })
 
@@ -43,10 +42,8 @@ describe('MeetingAccessService', () => {
 
       const promise = service.findParticipant('1', 'bad-token')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
-      await expect(promise).rejects.toThrow(
-        '모임 참여자 토큰이 유효하지 않습니다.',
-      )
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
+      await expect(promise).rejects.toThrow('인증에 실패했습니다.')
       expect(participantRepository.findOne).toHaveBeenCalledWith({
         where: { meeting: { id: '1' }, accessToken: 'bad-token' },
         relations: { user: true, meeting: true },
@@ -64,8 +61,8 @@ describe('MeetingAccessService', () => {
 
       const promise = service.findParticipant('999', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
-      await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
+      await expect(promise).rejects.toThrow('해당 모임을 찾을 수 없습니다.')
     })
 
     it('accessToken 앞뒤 공백을 제거하고 조회한다', async () => {

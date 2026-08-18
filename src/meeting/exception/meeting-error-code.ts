@@ -58,6 +58,11 @@ export const MeetingErrorCode = {
     status: HttpStatus.NOT_FOUND,
     message: '장소를 찾을 수 없습니다.',
   },
+  recommendationNotFound: {
+    code: 'MEETING_RECOMMENDATION_NOT_FOUND',
+    status: HttpStatus.NOT_FOUND,
+    message: '추천 장소를 찾을 수 없습니다.',
+  },
   placeCategoryMismatch: {
     code: 'MEETING_PLACE_CATEGORY_MISMATCH',
     status: HttpStatus.BAD_REQUEST,
@@ -72,5 +77,89 @@ export const MeetingErrorCode = {
     code: 'MEETING_RECOMMENDATION_ALREADY_EXISTS',
     status: HttpStatus.CONFLICT,
     message: '이미 모임에 추가된 장소입니다.',
+  },
+  confirmedCourseCandidateNotFound: {
+    code: 'MEETING_CONFIRMED_COURSE_CANDIDATE_NOT_FOUND',
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    message: '확정된 모임인데 선택된 코스 후보를 찾을 수 없습니다.',
+  },
+  meetingLocationDataMissing: {
+    code: 'MEETING_LOCATION_DATA_MISSING',
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    message:
+      '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
+  },
+  courseCandidatesNotVisible: {
+    code: 'MEETING_COURSE_CANDIDATES_NOT_VISIBLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 코스 생성 완료 상태가 아니어서 코스 후보 목록을 조회할 수 없습니다.',
+  },
+  courseDetailNotVisible: {
+    code: 'MEETING_COURSE_DETAIL_NOT_VISIBLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 코스 생성 완료 상태도 확정 상태도 아니어서 코스 상세를 조회할 수 없습니다.',
+  },
+  courseCommentsNotVisible: {
+    code: 'MEETING_COURSE_COMMENTS_NOT_VISIBLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 코스 생성 완료 상태가 아니어서 코스 댓글 목록을 조회할 수 없습니다.',
+  },
+  courseCommentNotCreatable: {
+    code: 'MEETING_COURSE_COMMENT_NOT_CREATABLE',
+    status: HttpStatus.CONFLICT,
+    message: '모임이 코스 생성 완료 상태가 아니어서 댓글을 작성할 수 없습니다.',
+  },
+  excludedPlacesNotVisible: {
+    code: 'MEETING_EXCLUDED_PLACES_NOT_VISIBLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 코스 생성 완료 상태가 아니어서 제외된 장소 목록을 조회할 수 없습니다.',
+  },
+  coursePlaceNotAddable: {
+    code: 'MEETING_COURSE_PLACE_NOT_ADDABLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 코스 생성 완료 상태가 아니어서 코스에 장소를 추가할 수 없습니다.',
+  },
+  coursePlacesNotReplaceable: {
+    code: 'MEETING_COURSE_PLACES_NOT_REPLACEABLE',
+    status: HttpStatus.CONFLICT,
+    message: '모임이 코스 생성 완료 상태가 아니어서 코스를 수정할 수 없습니다.',
+  },
+  courseNotConfirmable: {
+    code: 'MEETING_COURSE_NOT_CONFIRMABLE',
+    status: HttpStatus.CONFLICT,
+    message: '모임이 코스 생성 완료 상태가 아니어서 코스를 확정할 수 없습니다.',
+  },
+  mapPinsNotVisible: {
+    code: 'MEETING_MAP_PINS_NOT_VISIBLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
+  },
+  placePreferenceNotEditable: {
+    code: 'MEETING_PLACE_PREFERENCE_NOT_EDITABLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
+  },
+  similarPlacesNotRecommendable: {
+    code: 'MEETING_SIMILAR_PLACES_NOT_RECOMMENDABLE',
+    status: HttpStatus.CONFLICT,
+    message:
+      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
+  },
+  courseConfirmHostOnly: {
+    code: 'MEETING_COURSE_CONFIRM_HOST_ONLY',
+    status: HttpStatus.FORBIDDEN,
+    message: '방장만 코스를 확정할 수 있습니다.',
+  },
+  courseEditHostOnly: {
+    code: 'MEETING_COURSE_EDIT_HOST_ONLY',
+    status: HttpStatus.FORBIDDEN,
+    message: '방장만 코스를 편집할 수 있습니다.',
   },
 } as const satisfies Record<string, ErrorCode>

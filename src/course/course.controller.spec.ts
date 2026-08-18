@@ -1,7 +1,7 @@
-import { NotImplementedException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseController } from './course.controller'
@@ -212,7 +212,7 @@ describe('CourseController', () => {
     const { controller } = createController()
 
     expect(() => controller.generateCourse('1', 'token')).toThrow(
-      NotImplementedException,
+      CommonException,
     )
   })
 

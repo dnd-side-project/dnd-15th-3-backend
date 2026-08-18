@@ -1,17 +1,12 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-  ServiceUnavailableException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { Logger, ServiceUnavailableException } from '@nestjs/common'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
+import { MeetingException } from 'src/meeting/exception/meeting.exception'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
@@ -19,6 +14,7 @@ import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { CourseCategoryStep } from './entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from './entities/meeting-place-recommendation.entity'
 import { PreferenceType } from './enums/preference-type.enum'
+import { CourseException } from './exception/course.exception'
 
 function createMeetingWithStatus(status: MeetingStatus): Meeting {
   const meeting = new Meeting()
@@ -238,12 +234,12 @@ describe('CourseService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.getCourseCandidates('1', 'bad-token')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(courseCandidateRepository.find).not.toHaveBeenCalled()
     })
 
@@ -261,7 +257,7 @@ describe('CourseService', () => {
 
       const promise = service.getCourseCandidates('1', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       expect(courseCandidateRepository.find).not.toHaveBeenCalled()
     })
 
@@ -299,7 +295,7 @@ describe('CourseService', () => {
 
       const promise = service.getCourseCandidates('1', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow(
         '코스 생성이 완료된 모임인데 코스 후보를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
@@ -311,12 +307,12 @@ describe('CourseService', () => {
       const { service, meetingAccessService, courseCandidateRepository } =
         createService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.getCourseDetail('1', '2', 'bad-token')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(courseCandidateRepository.find).not.toHaveBeenCalled()
     })
 
@@ -338,7 +334,7 @@ describe('CourseService', () => {
 
       const promise = service.getCourseDetail('1', '2', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       expect(courseCandidateRepository.find).not.toHaveBeenCalled()
       expect(courseCandidatePlaceRepository.find).not.toHaveBeenCalled()
     })
@@ -356,7 +352,7 @@ describe('CourseService', () => {
 
         const promise = service.getCourseDetail('1', '2', 'token')
 
-        await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+        await expect(promise).rejects.toBeInstanceOf(CourseException)
         expect(courseCandidateRepository.findOne).toHaveBeenCalledWith({
           where: { id: '2', meeting: { id: '1' } },
         })
@@ -378,7 +374,7 @@ describe('CourseService', () => {
 
       const promise = service.getCourseDetail('1', '2', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(courseCandidatePlaceRepository.find).not.toHaveBeenCalled()
     })
@@ -402,7 +398,7 @@ describe('CourseService', () => {
 
       const promise = service.getCourseDetail('1', '2', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow(
         '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
@@ -548,12 +544,12 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.getCourseComments('1', '2', 'bad-token')
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
       expect(commentRepository.find).not.toHaveBeenCalled()
     })
@@ -577,7 +573,7 @@ describe('CourseService', () => {
 
       const promise = service.getCourseComments('1', '2', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
       expect(commentRepository.find).not.toHaveBeenCalled()
     })
@@ -597,7 +593,7 @@ describe('CourseService', () => {
 
       const promise = service.getCourseComments('1', '2', 'token')
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(courseCandidateRepository.exists).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
@@ -700,14 +696,14 @@ describe('CourseService', () => {
         commentRepository,
       } = createService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.createCourseComment('1', '2', 'bad-token', {
         content: '좋아요!',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
       expect(commentRepository.save).not.toHaveBeenCalled()
     })
@@ -733,7 +729,7 @@ describe('CourseService', () => {
         content: '좋아요!',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
       expect(commentRepository.save).not.toHaveBeenCalled()
     })
@@ -755,7 +751,7 @@ describe('CourseService', () => {
         content: '좋아요!',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(courseCandidateRepository.exists).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
@@ -808,7 +804,7 @@ describe('CourseService', () => {
       const { service, meetingAccessService, recommendationRepository } =
         createService()
       meetingAccessService.findParticipant.mockRejectedValue(
-        new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.'),
+        new CommonException(CommonErrorCode.authenticationFailed),
       )
 
       const promise = service.getExcludedPlaces(
@@ -818,7 +814,7 @@ describe('CourseService', () => {
         undefined,
       )
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(
         recommendationRepository.findExcludedFromCourse,
       ).not.toHaveBeenCalled()
@@ -843,7 +839,7 @@ describe('CourseService', () => {
 
       const promise = service.getExcludedPlaces('1', '2', 'token', undefined)
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       expect(courseCandidateRepository.exists).not.toHaveBeenCalled()
       expect(
         recommendationRepository.findExcludedFromCourse,
@@ -865,7 +861,7 @@ describe('CourseService', () => {
 
       const promise = service.getExcludedPlaces('1', '2', 'token', undefined)
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(
         recommendationRepository.findExcludedFromCourse,
@@ -989,7 +985,7 @@ describe('CourseService', () => {
 
       const promise = service.confirmCourse('1', '2', '', {})
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(dataSource.transaction).not.toHaveBeenCalled()
     })
 
@@ -1004,7 +1000,7 @@ describe('CourseService', () => {
 
       const promise = service.confirmCourse('1', '2', 'token', {})
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(candidateRepository.save).not.toHaveBeenCalled()
     })
 
@@ -1021,7 +1017,7 @@ describe('CourseService', () => {
 
       const promise = service.confirmCourse('1', '2', 'token', {})
 
-      await expect(promise).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('방장만 코스를 확정할 수 있습니다.')
       expect(candidateRepository.save).not.toHaveBeenCalled()
     })
@@ -1040,7 +1036,7 @@ describe('CourseService', () => {
 
       const promise = service.confirmCourse('1', '2', 'token', {})
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
       expect(candidateRepository.findOne).not.toHaveBeenCalled()
       expect(candidateRepository.save).not.toHaveBeenCalled()
@@ -1069,7 +1065,7 @@ describe('CourseService', () => {
 
         const promise = service.confirmCourse('1', '2', 'token', {})
 
-        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        await expect(promise).rejects.toBeInstanceOf(MeetingException)
         expect(candidateRepository.findOne).not.toHaveBeenCalled()
       },
     )
@@ -1091,7 +1087,7 @@ describe('CourseService', () => {
 
       const promise = service.confirmCourse('1', '2', 'token', {})
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(candidateRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
@@ -1175,7 +1171,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(dataSource.transaction).not.toHaveBeenCalled()
     })
 
@@ -1192,7 +1188,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(placeRepository.save).not.toHaveBeenCalled()
     })
 
@@ -1211,7 +1207,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('방장만 코스를 편집할 수 있습니다.')
       expect(placeRepository.save).not.toHaveBeenCalled()
     })
@@ -1232,7 +1228,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
     })
 
@@ -1261,7 +1257,7 @@ describe('CourseService', () => {
           recommendationId: '20',
         })
 
-        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        await expect(promise).rejects.toBeInstanceOf(MeetingException)
         expect(candidateRepository.findOne).not.toHaveBeenCalled()
       },
     )
@@ -1289,7 +1285,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(recommendationRepository.findOne).not.toHaveBeenCalled()
     })
@@ -1321,7 +1317,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('장소 추천을 찾을 수 없습니다.')
       expect(placeRepository.find).not.toHaveBeenCalled()
     })
@@ -1356,7 +1352,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow(
         '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
@@ -1401,7 +1397,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('이미 코스에 포함된 장소입니다.')
     })
 
@@ -1444,7 +1440,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(ConflictException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow(
         '코스에 이미 장소가 6개 있어서 추가할 수 없습니다.',
       )
@@ -1501,7 +1497,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow(
         '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       )
@@ -1566,7 +1562,7 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow(
         '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       )
@@ -1774,7 +1770,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(dataSource.transaction).not.toHaveBeenCalled()
     })
 
@@ -1791,7 +1787,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(placeRepository.save).not.toHaveBeenCalled()
     })
 
@@ -1810,7 +1806,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(ForbiddenException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('방장만 코스를 편집할 수 있습니다.')
       expect(placeRepository.save).not.toHaveBeenCalled()
     })
@@ -1831,7 +1827,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
       await expect(promise).rejects.toThrow('모임을 찾을 수 없습니다.')
     })
 
@@ -1860,7 +1856,7 @@ describe('CourseService', () => {
           recommendationIds: ['10', '20'],
         })
 
-        await expect(promise).rejects.toBeInstanceOf(ConflictException)
+        await expect(promise).rejects.toBeInstanceOf(MeetingException)
         expect(candidateRepository.findOne).not.toHaveBeenCalled()
       },
     )
@@ -1888,7 +1884,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(recommendationRepository.find).not.toHaveBeenCalled()
     })
@@ -1923,7 +1919,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(NotFoundException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow('장소 추천을 찾을 수 없습니다.')
       expect(placeRepository.save).not.toHaveBeenCalled()
     })
@@ -1971,7 +1967,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       await expect(promise).rejects.toThrow(
         '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       )
@@ -2021,7 +2017,7 @@ describe('CourseService', () => {
         recommendationIds: ['10', '20'],
       })
 
-      await expect(promise).rejects.toBeInstanceOf(InternalServerErrorException)
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
       expect(errorSpy).toHaveBeenCalled()
       expect(placeRepository.save).not.toHaveBeenCalled()
       errorSpy.mockRestore()

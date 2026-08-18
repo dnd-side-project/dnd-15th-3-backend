@@ -1,12 +1,12 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { Repository } from 'typeorm'
 import { Meeting } from '../entities/meeting.entity'
 import { MeetingParticipant } from '../entities/meeting-participant.entity'
+import { MeetingException } from '../exception/meeting.exception'
+import { MeetingErrorCode } from '../exception/meeting-error-code'
 import { assertAccessToken } from './meeting-access.utils'
 
 @Injectable()
@@ -35,9 +35,9 @@ export class MeetingAccessService {
         where: { id: meetingId },
       })
       if (!meetingExists) {
-        throw new NotFoundException('모임을 찾을 수 없습니다.')
+        throw new MeetingException(MeetingErrorCode.notFound)
       }
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
     return participant
   }

@@ -1,15 +1,11 @@
-import {
-  ConflictException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import type { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import type { ErrorCode } from 'src/common/exception/error-code.type'
 import { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
 import type { KakaoWalkingCourseResponse } from 'src/kakao/schema/walking-course-response.schema'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
@@ -27,6 +23,8 @@ import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-respons
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import type { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
+import { MeetingException } from 'src/meeting/exception/meeting.exception'
+import { MeetingErrorCode } from 'src/meeting/exception/meeting-error-code'
 import type { Place } from 'src/place/entities/place.entity'
 import { PlaceImageService } from 'src/place/place-image.service'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
@@ -45,6 +43,8 @@ import { CourseCandidateComment } from './entities/course-candidate-comment.enti
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { CourseCategoryStep } from './entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from './entities/meeting-place-recommendation.entity'
+import { CourseException } from './exception/course.exception'
+import { CourseErrorCode } from './exception/course-error-code'
 import { MeetingPlaceRecommendationRepository } from './meeting-place-recommendation.repository'
 import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recommendation-vote.repository'
 import {
@@ -82,7 +82,7 @@ export class CourseService {
     )
     meeting.assertStatus(
       COURSE_CANDIDATES_VISIBLE_STATUSES,
-      '모임이 코스 생성 완료 상태가 아니어서 코스 후보 목록을 조회할 수 없습니다.',
+      MeetingErrorCode.courseCandidatesNotVisible,
     )
 
     const candidates = await this.courseCandidateRepository.find({
@@ -90,9 +90,7 @@ export class CourseService {
       order: { order: 'ASC' },
     })
     if (candidates.length === 0) {
-      throw new InternalServerErrorException(
-        '코스 생성이 완료된 모임인데 코스 후보를 찾을 수 없는 데이터 정합성 오류입니다.',
-      )
+      throw new CourseException(CourseErrorCode.courseCandidatesMissing)
     }
 
     return {
@@ -115,14 +113,14 @@ export class CourseService {
     )
     viewer.meeting.assertStatus(
       COURSE_DETAIL_VISIBLE_STATUSES,
-      '모임이 코스 생성 완료 상태도 확정 상태도 아니어서 코스 상세를 조회할 수 없습니다.',
+      MeetingErrorCode.courseDetailNotVisible,
     )
 
     const candidate = await this.courseCandidateRepository.findOne({
       where: { id: courseCandidateId, meeting: { id: meetingId } },
     })
     if (!candidate) {
-      throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
+      throw new CourseException(CourseErrorCode.candidateNotFound)
     }
 
     const steps = await this.courseCandidatePlaceRepository.find({
@@ -133,9 +131,7 @@ export class CourseService {
       order: { order: 'ASC' },
     })
     if (steps.length === 0) {
-      throw new InternalServerErrorException(
-        '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
-      )
+      throw new CourseException(CourseErrorCode.routeMissing)
     }
 
     return this.buildCourseDetailResponse(candidate, steps)
@@ -152,7 +148,7 @@ export class CourseService {
     )
     viewer.meeting.assertStatus(
       COURSE_COMMENTS_VISIBLE_STATUSES,
-      '모임이 코스 생성 완료 상태가 아니어서 코스 댓글 목록을 조회할 수 없습니다.',
+      MeetingErrorCode.courseCommentsNotVisible,
     )
     await this.assertCourseCandidateExists(courseCandidateId, meetingId)
 
@@ -185,7 +181,7 @@ export class CourseService {
     )
     viewer.meeting.assertStatus(
       COURSE_COMMENT_CREATABLE_STATUSES,
-      '모임이 코스 생성 완료 상태가 아니어서 댓글을 작성할 수 없습니다.',
+      MeetingErrorCode.courseCommentNotCreatable,
     )
     await this.assertCourseCandidateExists(courseCandidateId, meetingId)
 
@@ -222,16 +218,16 @@ export class CourseService {
         },
       })
       if (!participant) {
-        throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+        throw new CommonException(CommonErrorCode.authenticationFailed)
       }
-      participant.assertHost('방장만 코스를 확정할 수 있습니다.')
+      participant.assertHost(MeetingErrorCode.courseConfirmHostOnly)
 
       const meeting = await this.courseRepository.lockMeeting(
         manager,
         meetingId,
       )
       if (!meeting) {
-        throw new NotFoundException('모임을 찾을 수 없습니다.')
+        throw new MeetingException(MeetingErrorCode.notFound)
       }
       meeting.confirm()
 
@@ -240,7 +236,7 @@ export class CourseService {
         where: { id: courseCandidateId, meeting: { id: meetingId } },
       })
       if (!candidate) {
-        throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
+        throw new CourseException(CourseErrorCode.candidateNotFound)
       }
       candidate.select()
 
@@ -270,7 +266,7 @@ export class CourseService {
     )
     viewer.meeting.assertStatus(
       COURSE_CANDIDATES_VISIBLE_STATUSES,
-      '모임이 코스 생성 완료 상태가 아니어서 제외된 장소 목록을 조회할 수 없습니다.',
+      MeetingErrorCode.excludedPlacesNotVisible,
     )
     await this.assertCourseCandidateExists(courseCandidateId, meetingId)
 
@@ -335,7 +331,7 @@ export class CourseService {
           manager,
           meetingId,
           COURSE_PLACE_ADDABLE_STATUSES,
-          '모임이 코스 생성 완료 상태가 아니어서 코스에 장소를 추가할 수 없습니다.',
+          MeetingErrorCode.coursePlaceNotAddable,
         )
         const candidate = await this.loadCourseCandidateOrThrow(
           manager,
@@ -388,7 +384,7 @@ export class CourseService {
           manager,
           meetingId,
           COURSE_PLACES_REPLACEABLE_STATUSES,
-          '모임이 코스 생성 완료 상태가 아니어서 코스를 수정할 수 없습니다.',
+          MeetingErrorCode.coursePlacesNotReplaceable,
         )
         const candidate = await this.loadCourseCandidateOrThrow(
           manager,
@@ -426,22 +422,22 @@ export class CourseService {
         where: { meeting: { id: meetingId }, accessToken },
       })
     if (!participant) {
-      throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
-    participant.assertHost('방장만 코스를 편집할 수 있습니다.')
+    participant.assertHost(MeetingErrorCode.courseEditHostOnly)
   }
 
   private async lockMeetingOrThrow(
     manager: EntityManager,
     meetingId: string,
     allowedStatuses: readonly MeetingStatus[],
-    statusErrorMessage: string,
+    statusErrorCode: ErrorCode,
   ): Promise<Meeting> {
     const meeting = await this.courseRepository.lockMeeting(manager, meetingId)
     if (!meeting) {
-      throw new NotFoundException('모임을 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.notFound)
     }
-    meeting.assertStatus(allowedStatuses, statusErrorMessage)
+    meeting.assertStatus(allowedStatuses, statusErrorCode)
     return meeting
   }
 
@@ -454,7 +450,7 @@ export class CourseService {
       where: { id: courseCandidateId, meeting: { id: meetingId } },
     })
     if (!candidate) {
-      throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
+      throw new CourseException(CourseErrorCode.candidateNotFound)
     }
     return candidate
   }
@@ -471,7 +467,7 @@ export class CourseService {
         relations: { place: { category: true } },
       })
     if (!recommendation) {
-      throw new NotFoundException('장소 추천을 찾을 수 없습니다.')
+      throw new CourseException(CourseErrorCode.recommendationNotFound)
     }
     return recommendation
   }
@@ -488,9 +484,7 @@ export class CourseService {
       order: { order: 'ASC' },
     })
     if (steps.length === 0) {
-      throw new InternalServerErrorException(
-        '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
-      )
+      throw new CourseException(CourseErrorCode.routeMissing)
     }
     return steps
   }
@@ -503,12 +497,10 @@ export class CourseService {
       (step) => step.meetingPlaceRecommendation.id === recommendationId,
     )
     if (alreadyIncluded) {
-      throw new ConflictException('이미 코스에 포함된 장소입니다.')
+      throw new CourseException(CourseErrorCode.alreadyIncludedInCourse)
     }
     if (steps.length >= MAX_COURSE_STEPS) {
-      throw new ConflictException(
-        `코스에 이미 장소가 ${MAX_COURSE_STEPS}개 있어서 추가할 수 없습니다.`,
-      )
+      throw new CourseException(CourseErrorCode.courseStepsFull)
     }
   }
 
@@ -596,7 +588,7 @@ export class CourseService {
     )
     const ordered = recommendationIds.map((id) => recommendationsById.get(id))
     if (ordered.some((recommendation) => !recommendation)) {
-      throw new NotFoundException('장소 추천을 찾을 수 없습니다.')
+      throw new CourseException(CourseErrorCode.recommendationNotFound)
     }
     return ordered as MeetingPlaceRecommendation[]
   }
@@ -702,9 +694,7 @@ export class CourseService {
         `카카오 도보 경로 API 호출에 실패했습니다. origin=(${origin.longitude}, ${origin.latitude}) destination=(${destination.longitude}, ${destination.latitude})`,
         error instanceof Error ? error.stack : error,
       )
-      throw new InternalServerErrorException(
-        '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-      )
+      throw new CourseException(CourseErrorCode.walkingCourseUnavailable)
     }
 
     if (walkingCourse.status !== 'OK' || !walkingCourse.route) {
@@ -712,9 +702,7 @@ export class CourseService {
         `두 장소 사이의 도보 경로를 찾을 수 없습니다. status=${walkingCourse.status} ` +
           `origin=(${origin.longitude}, ${origin.latitude}) destination=(${destination.longitude}, ${destination.latitude})`,
       )
-      throw new InternalServerErrorException(
-        '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-      )
+      throw new CourseException(CourseErrorCode.walkingCourseUnavailable)
     }
 
     return {
@@ -731,7 +719,7 @@ export class CourseService {
       where: { id: courseCandidateId, meeting: { id: meetingId } },
     })
     if (!exists) {
-      throw new NotFoundException('코스 후보를 찾을 수 없습니다.')
+      throw new CourseException(CourseErrorCode.candidateNotFound)
     }
   }
 

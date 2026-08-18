@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotImplementedException,
   Param,
   ParseEnumPipe,
   Patch,
@@ -32,6 +31,9 @@ import {
 import { SimilarPlaceResponseDto } from 'src/catalog/dto/similar-place-response.dto'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { BigIntStringArrayPipe } from 'src/common/pipes/bigint-string-array.pipe'
 import { PositiveIntPipe } from 'src/common/pipes/positive-int.pipe'
@@ -53,6 +55,7 @@ import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
 import { UpdateCourseImageRequestDto } from './dto/update-course-image-request.dto'
 import { UpdateCoursePlanDto } from './dto/update-course-plan.dto'
 import { UpdatePlacePreferenceRequestDto } from './dto/update-place-preference-request.dto'
+import { MeetingErrorCode } from './exception/meeting-error-code'
 import { MeetingService } from './meeting.service'
 import {
   createMeetingRequestSchema,
@@ -357,15 +360,19 @@ export class MeetingController {
       '이마저 실패하면 COURSE_GENERATION_FAILED로 전환됩니다.',
   })
   @ApiOkResponse({ type: MeetingStatusResponseDto })
-  @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
-  @ApiInternalServerErrorResponse({
-    description:
-      '모임이 코스 확정 상태인데 확정된 코스 후보를 찾을 수 없는 데이터 정합성 오류입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    'meetingId 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임을 찾을 수 없음')
+  @ApiErrorResponse(
+    MeetingErrorCode.confirmedCourseCandidateNotFound,
+    '모임이 코스 확정 상태인데 확정된 코스 후보를 찾을 수 없는 데이터 정합성 오류',
+  )
   getMeetingStatus(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -394,19 +401,23 @@ export class MeetingController {
       '코스가 생성 완료되었거나 확정된 상태에서는 호출할 수 없습니다.',
   })
   @ApiOkResponse({ type: MapPinsResponseDto })
-  @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
-  @ApiConflictResponse({
-    description:
-      '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
-  })
-  @ApiInternalServerErrorResponse({
-    description:
-      '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    'meetingId 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임을 찾을 수 없음')
+  @ApiErrorResponse(
+    MeetingErrorCode.mapPinsNotVisible,
+    '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.meetingLocationDataMissing,
+    '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류',
+  )
   getMapPins(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -441,20 +452,22 @@ export class MeetingController {
   })
   @ApiBody({ type: UpdatePlacePreferenceRequestDto })
   @ApiOkResponse({ type: PlacePreferenceResponseDto })
-  @ApiBadRequestResponse({
-    description:
-      'meetingId, recommendationId 형식이 올바르지 않거나 preference 값이 유효하지 않습니다.',
-  })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({
-    description: '모임 또는 추천 장소를 찾을 수 없습니다.',
-  })
-  @ApiConflictResponse({
-    description:
-      '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    'meetingId, recommendationId 형식이 올바르지 않거나 preference 값이 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    [MeetingErrorCode.notFound, MeetingErrorCode.recommendationNotFound],
+    '모임 또는 추천 장소를 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.placePreferenceNotEditable,
+    '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없음',
+  )
   updatePlacePreference(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('recommendationId', BigIntStringPipe) recommendationId: string,
@@ -507,18 +520,16 @@ export class MeetingController {
     description:
       '모임이 코스 확정 상태가 아니어서 코스 카드 이미지를 설정할 수 없습니다.',
   })
-  @ApiResponse({
-    status: 501,
-    description: '실제 데이터 연동 전까지 제공되지 않는 API입니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.notImplemented,
+    '실제 데이터 연동 전까지 제공되지 않는 API',
+  )
   updateCourseImage(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') _accessToken: string,
     @Body() _dto: UpdateCourseImageRequestDto,
   ): never {
-    throw new NotImplementedException(
-      '코스 카드 이미지 설정 API는 실제 데이터 연동 후 제공됩니다.',
-    )
+    throw new CommonException(CommonErrorCode.notImplemented)
   }
 
   @Get(':meetingId/places/:placeId/similar')
@@ -560,18 +571,22 @@ export class MeetingController {
       '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있습니다.',
   })
   @ApiOkResponse({ type: SimilarPlaceResponseDto, isArray: true })
-  @ApiBadRequestResponse({
-    description:
-      'meetingId, placeId 형식이 올바르지 않거나 excludeIds, size 값이 유효하지 않습니다.',
-  })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
-  @ApiConflictResponse({
-    description:
-      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
-  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    'meetingId, placeId 형식이 올바르지 않거나 excludeIds, size 값이 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    [MeetingErrorCode.notFound, MeetingErrorCode.placeNotFound],
+    '모임 또는 장소를 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.similarPlacesNotRecommendable,
+    '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없음',
+  )
   getSimilarPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('placeId', BigIntStringPipe) placeId: string,

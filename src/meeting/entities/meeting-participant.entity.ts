@@ -1,9 +1,10 @@
-import { ForbiddenException } from '@nestjs/common'
 import { BaseEntity } from 'src/common/entities/base.entity'
+import type { ErrorCode } from 'src/common/exception/error-code.type'
 import { User } from 'src/user/entities/user.entity'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { Check, Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm'
 import { ParticipantRole } from '../enums/participant-role.enum'
+import { MeetingException } from '../exception/meeting.exception'
 import { Meeting } from './meeting.entity'
 
 @Entity()
@@ -40,9 +41,9 @@ export class MeetingParticipant extends BaseEntity {
   })
   profileAvatarId: ProfileAvatarId
 
-  assertHost(message: string): void {
+  assertHost(errorCode: ErrorCode): void {
     if (this.role !== ParticipantRole.Host) {
-      throw new ForbiddenException(message)
+      throw new MeetingException(errorCode)
     }
   }
 }

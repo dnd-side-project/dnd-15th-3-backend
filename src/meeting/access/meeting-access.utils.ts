@@ -1,7 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common'
+import { CommonException } from 'src/common/exception/common.exception'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 
 export function assertAccessToken(accessToken: string): void {
   if (!accessToken?.trim()) {
-    throw new UnauthorizedException('모임 참여자 토큰이 유효하지 않습니다.')
+    throw new CommonException(CommonErrorCode.authenticationFailed)
   }
 }

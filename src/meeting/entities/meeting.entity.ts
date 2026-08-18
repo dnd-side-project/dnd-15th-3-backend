@@ -1,8 +1,10 @@
-import { ConflictException, InternalServerErrorException } from '@nestjs/common'
 import { BaseEntity } from 'src/common/entities/base.entity'
+import type { ErrorCode } from 'src/common/exception/error-code.type'
 import { Check, Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm'
 import { COURSE_CONFIRMABLE_STATUSES } from '../constants/meeting-status.constants'
 import { MeetingStatus } from '../enums/meeting-status.enum'
+import { MeetingException } from '../exception/meeting.exception'
+import { MeetingErrorCode } from '../exception/meeting-error-code'
 import { MeetingLocation } from './meeting-location.entity'
 import { MeetingType } from './meeting-type.entity'
 
@@ -54,7 +56,7 @@ export class Meeting extends BaseEntity {
   confirm(): void {
     this.assertStatus(
       COURSE_CONFIRMABLE_STATUSES,
-      '모임이 코스 생성 완료 상태가 아니어서 코스를 확정할 수 없습니다.',
+      MeetingErrorCode.courseNotConfirmable,
     )
     this.status = MeetingStatus.CourseConfirmed
   }
@@ -70,18 +72,16 @@ export class Meeting extends BaseEntity {
 
   assertStatus(
     allowedStatuses: readonly MeetingStatus[],
-    message: string,
+    errorCode: ErrorCode,
   ): void {
     if (!allowedStatuses.includes(this.status)) {
-      throw new ConflictException(message)
+      throw new MeetingException(errorCode)
     }
   }
 
   assertHasLocation(): void {
     if (!this.meetingLocation) {
-      throw new InternalServerErrorException(
-        '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
-      )
+      throw new MeetingException(MeetingErrorCode.meetingLocationDataMissing)
     }
   }
 }

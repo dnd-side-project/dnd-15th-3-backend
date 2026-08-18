@@ -4,7 +4,6 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -55,6 +54,8 @@ import { MeetingParticipant } from './entities/meeting-participant.entity'
 import { MeetingType } from './entities/meeting-type.entity'
 import { MeetingStatus } from './enums/meeting-status.enum'
 import { ParticipantRole } from './enums/participant-role.enum'
+import { MeetingException } from './exception/meeting.exception'
+import { MeetingErrorCode } from './exception/meeting-error-code'
 import type {
   CreateMeetingRequest,
   InvitationPreviewRequest,
@@ -621,8 +622,8 @@ export class MeetingService {
       where: { meeting: { id: meetingId }, isSelected: true },
     })
     if (!confirmed) {
-      throw new InternalServerErrorException(
-        '확정된 모임인데 선택된 코스 후보를 찾을 수 없습니다.',
+      throw new MeetingException(
+        MeetingErrorCode.confirmedCourseCandidateNotFound,
       )
     }
     return confirmed.id
@@ -917,7 +918,7 @@ export class MeetingService {
     )
     meeting.assertStatus(
       MAP_PINS_VISIBLE_STATUSES,
-      '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
+      MeetingErrorCode.mapPinsNotVisible,
     )
 
     const [meetingWithLocation, recommendations] = await Promise.all([
@@ -932,9 +933,7 @@ export class MeetingService {
       }),
     ])
     if (!meetingWithLocation) {
-      throw new InternalServerErrorException(
-        '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
-      )
+      throw new MeetingException(MeetingErrorCode.notFound)
     }
     meetingWithLocation.assertHasLocation()
 
@@ -977,14 +976,14 @@ export class MeetingService {
     )
     participant.meeting.assertStatus(
       PLACE_PREFERENCE_EDITABLE_STATUSES,
-      '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
+      MeetingErrorCode.placePreferenceNotEditable,
     )
 
     const recommendationExists = await this.recommendationRepository.exists({
       where: { id: recommendationId, meeting: { id: meetingId } },
     })
     if (!recommendationExists) {
-      throw new NotFoundException('추천 장소를 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.recommendationNotFound)
     }
 
     const { likeCount, dislikeCount } =
@@ -1010,7 +1009,7 @@ export class MeetingService {
     )
     meeting.assertStatus(
       SIMILAR_PLACES_RECOMMENDABLE_STATUSES,
-      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
+      MeetingErrorCode.similarPlacesNotRecommendable,
     )
 
     const [place, alreadyRecommended] = await Promise.all([
@@ -1026,7 +1025,7 @@ export class MeetingService {
       }),
     ])
     if (!place) {
-      throw new NotFoundException('장소를 찾을 수 없습니다.')
+      throw new MeetingException(MeetingErrorCode.placeNotFound)
     }
 
     const limit = Math.min(size, MAX_SIMILAR_PLACES_SIZE)

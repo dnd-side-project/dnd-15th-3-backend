@@ -18,11 +18,14 @@ import {
 } from '@nestjs/swagger'
 import { FirstMeetingPlaceResponseDto } from 'src/catalog/dto/first-meeting-place-response.dto'
 import { firstMeetingSearchRequestSchema } from 'src/catalog/schema/first-meeting-search-request.schema'
+import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
+import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { KakaoLocalService } from 'src/kakao/kakao-local.service'
 import { kakaoLocalAddressSearchRequestSchema } from 'src/kakao/schema/local-address-search-request.schema'
 import { PlaceSearchResponseDto } from './dto/place-search-response.dto'
 import { PlaceSearchResultDto } from './dto/place-search-result.dto'
+import { PlaceErrorCode } from './exception/place-error-code'
 import { PlaceService } from './place.service'
 import { placeSearchRequestSchema } from './schema/place-search-request.schema'
 
@@ -147,9 +150,15 @@ export class PlaceController {
     required: true,
   })
   @ApiOkResponse({ type: PlaceSearchResultDto })
-  @ApiBadRequestResponse({ description: 'placeId 형식이 올바르지 않습니다.' })
-  @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
-  @ApiNotFoundResponse({ description: '장소를 찾을 수 없습니다.' })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    'placeId 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '참여자 토큰이 유효하지 않음',
+  )
+  @ApiErrorResponse(PlaceErrorCode.notFound, '장소를 찾을 수 없음')
   async getPlaceDetail(
     @Param('placeId', BigIntStringPipe) placeId: string,
     @Query('accessToken') accessToken: string,
