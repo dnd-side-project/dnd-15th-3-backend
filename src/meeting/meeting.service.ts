@@ -694,7 +694,7 @@ export class MeetingService {
       name: meeting.name,
       date: meeting.date,
       time: meeting.time,
-      locationId: meeting.meetingLocation!.id,
+      locationName: meeting.meetingLocation!.displayName,
     }
   }
 

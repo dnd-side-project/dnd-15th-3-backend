@@ -93,7 +93,10 @@ describe('MeetingService', () => {
       name: '성수 모임',
       date: '2026-08-23',
       time: '12:00',
-      meetingLocation: { id: 'location-1' },
+      meetingLocation: {
+        id: 'location-1',
+        displayName: '서울특별시 강남구',
+      },
     }
     const meetingRepository = {
       findOne: jest.fn().mockResolvedValue(meeting),
@@ -111,7 +114,7 @@ describe('MeetingService', () => {
       name: '성수 모임',
       date: '2026-08-23',
       time: '12:00',
-      locationId: 'location-1',
+      locationName: '서울특별시 강남구',
     })
     expect(meetingRepository.findOne).toHaveBeenCalledWith({
       where: { accessToken: 'ABC234' },
