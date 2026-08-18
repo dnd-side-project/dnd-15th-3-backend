@@ -1,25 +1,16 @@
+import { Controller, Get, Param, Query } from '@nestjs/common'
 import {
-  BadRequestException,
-  Controller,
-  Get,
-  Param,
-  Query,
-} from '@nestjs/common'
-import {
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiResponse,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { FirstMeetingPlaceResponseDto } from 'src/catalog/dto/first-meeting-place-response.dto'
 import { firstMeetingSearchRequestSchema } from 'src/catalog/schema/first-meeting-search-request.schema'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import { createValidationException } from 'src/common/exception/validation-exception.factory'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { KakaoLocalService } from 'src/kakao/kakao-local.service'
 import { kakaoLocalAddressSearchRequestSchema } from 'src/kakao/schema/local-address-search-request.schema'
@@ -54,21 +45,19 @@ export class PlaceController {
     type: FirstMeetingPlaceResponseDto,
     isArray: true,
   })
-  @ApiBadRequestResponse({ description: '검색어가 비어 있습니다.' })
-  @ApiResponse({
-    status: 503,
-    description: 'KAKAO_REST_API_KEY가 설정되지 않았습니다.',
-  })
-  @ApiResponse({
-    status: 502,
-    description: '카카오 주소 검색 API 호출 또는 응답 검증에 실패했습니다.',
-  })
+  @ApiErrorResponse(CommonErrorCode.validationError, '검색어가 비어 있음')
+  @ApiErrorResponse(
+    CommonErrorCode.serviceUnavailable,
+    '주소 검색 서비스를 사용할 수 없음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.externalServiceError,
+    '카카오 주소 검색 API 호출 또는 응답 검증 실패',
+  )
   async searchFirstMeetingPlaces(@Query('q') q?: string) {
     const parsedQuery = firstMeetingSearchRequestSchema.safeParse({ q })
     if (!parsedQuery.success) {
-      throw new BadRequestException(
-        parsedQuery.error.issues[0]?.message ?? '검색어를 입력해주세요.',
-      )
+      throw createValidationException(parsedQuery.error.issues)
     }
 
     const kakaoRequest = kakaoLocalAddressSearchRequestSchema.parse({
@@ -117,16 +106,22 @@ export class PlaceController {
     description: '반경 내 장소 검색 성공',
     type: PlaceSearchResponseDto,
   })
-  @ApiBadRequestResponse({ description: '검색 요청 형식이 올바르지 않습니다.' })
-  @ApiNotFoundResponse({ description: '모임 기준 위치를 찾을 수 없습니다.' })
-  @ApiUnauthorizedResponse({ description: '참여자 토큰이 유효하지 않습니다.' })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    '검색 요청 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    PlaceErrorCode.meetingLocationNotFound,
+    '모임 기준 위치를 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '참여자 토큰이 유효하지 않음',
+  )
   search(@Query() query: Record<string, unknown>) {
     const parsedQuery = placeSearchRequestSchema.safeParse(query)
     if (!parsedQuery.success) {
-      throw new BadRequestException(
-        parsedQuery.error.issues[0]?.message ??
-          '장소 검색 요청 형식이 올바르지 않습니다.',
-      )
+      throw createValidationException(parsedQuery.error.issues)
     }
 
     return this.placeService.searchPlaces(parsedQuery.data)

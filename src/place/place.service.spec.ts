@@ -1,10 +1,10 @@
-import { NotFoundException } from '@nestjs/common'
 import { CommonException } from 'src/common/exception/common.exception'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import type { Repository } from 'typeorm'
 import { Place } from './entities/place.entity'
 import { PlaceException } from './exception/place.exception'
+import { PlaceErrorCode } from './exception/place-error-code'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
 import { PlaceImageService } from './place-image.service'
@@ -64,7 +64,9 @@ describe('PlaceService', () => {
           page: 1,
           size: 20,
         }),
-      ).rejects.toBeInstanceOf(NotFoundException)
+      ).rejects.toMatchObject({
+        errorCode: PlaceErrorCode.meetingLocationNotFound,
+      })
       expect(placeSearchRepository.findNearby).not.toHaveBeenCalled()
     })
 

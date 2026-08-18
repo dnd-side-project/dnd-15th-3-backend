@@ -22,6 +22,9 @@ export class MeetingInvitationResponseDto {
   @ApiProperty({ description: '모임 시간', example: '12:00' })
   time!: string
 
-  @ApiProperty({ description: '모임의 첫 만남 위치 ID', example: '12' })
-  locationId!: string
+  @ApiProperty({
+    description: '모임의 첫 만남 위치명',
+    example: '서울특별시 강남구',
+  })
+  locationName!: string
 }

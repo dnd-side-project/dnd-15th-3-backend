@@ -1,6 +1,6 @@
-import { BadRequestException } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
+import { CommonException } from 'src/common/exception/common.exception'
 import { KakaoLocalService } from 'src/kakao/kakao-local.service'
 import { PlaceController } from './place.controller'
 import { PlaceService } from './place.service'
@@ -93,7 +93,7 @@ describe('PlaceController', () => {
     )
 
     expect(() => controller.search({ meetingId: '123' })).toThrow(
-      BadRequestException,
+      CommonException,
     )
     expect(placeService.searchPlaces).not.toHaveBeenCalled()
   })
