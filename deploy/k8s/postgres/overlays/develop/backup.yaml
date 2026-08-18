@@ -10,10 +10,5 @@ spec:
           containers:
             - name: upload
               env:
-                - name: OCI_BUCKET_NAME
-                  valueFrom:
-                    secretKeyRef:
-                      name: momo-api-env
-                      key: OCI_BUCKET_NAME_DEV
                 - name: BACKUP_ENV
                   value: dev

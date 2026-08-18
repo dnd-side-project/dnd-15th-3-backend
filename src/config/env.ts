@@ -25,7 +25,7 @@ function requiredInProduction<T extends z.ZodTypeAny>(schema: T) {
   ])
 }
 
-const envSchema = z.object({
+const envSchemaBase = z.object({
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -73,9 +73,32 @@ const envSchema = z.object({
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OCI_S3_SECRET_KEY: requiredInProduction(z.string()),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  OCI_BUCKET_NAME_DEV: z.string().default('momo-bucket-dev'),
+  MEDIA_BUCKET_NAME: z.string().trim().min(1),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  OCI_BUCKET_NAME_PROD: z.string().default('momo-bucket-prod'),
+  MEDIA_PUBLIC_BASE_URL: z.string().trim().url(),
+})
+
+const envSchema = envSchemaBase.superRefine((config, context) => {
+  let publicUrl: URL
+  try {
+    publicUrl = new URL(config.MEDIA_PUBLIC_BASE_URL)
+  } catch {
+    return
+  }
+
+  const expectedPathSuffix = `/b/${encodeURIComponent(config.MEDIA_BUCKET_NAME)}/o/`
+  if (
+    config.MEDIA_PUBLIC_BASE_URL.includes('?') ||
+    config.MEDIA_PUBLIC_BASE_URL.includes('#') ||
+    !publicUrl.pathname.endsWith(expectedPathSuffix)
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['MEDIA_PUBLIC_BASE_URL'],
+      message:
+        'Must be an OCI native object URL for MEDIA_BUCKET_NAME ending in /o/ without a query or fragment',
+    })
+  }
 })
 
 export type Env = z.infer<typeof envSchema>

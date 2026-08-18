@@ -43,4 +43,14 @@ describe('AppModule', () => {
 
     expect(imports?.map(getModuleName)).not.toContain('MockApiModule')
   })
+
+  it('registers internal media support without a generic storage module', () => {
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as
+      | unknown[]
+      | undefined
+    const moduleNames = imports?.map(getModuleName)
+
+    expect(moduleNames).toContain('MediaModule')
+    expect(moduleNames).not.toContain('StorageModule')
+  })
 })

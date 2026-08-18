@@ -73,4 +73,14 @@ export const MeetingErrorCode = {
     status: HttpStatus.CONFLICT,
     message: '이미 모임에 추가된 장소입니다.',
   },
+  courseImageStateInvalid: {
+    code: 'MEETING_COURSE_IMAGE_STATE_INVALID',
+    status: HttpStatus.CONFLICT,
+    message: '코스가 확정된 모임에서만 코스 이미지를 등록할 수 있습니다.',
+  },
+  courseImageNotFound: {
+    code: 'MEETING_COURSE_IMAGE_NOT_FOUND',
+    status: HttpStatus.NOT_FOUND,
+    message: '아직 생성된 코스 이미지가 없습니다.',
+  },
 } as const satisfies Record<string, ErrorCode>

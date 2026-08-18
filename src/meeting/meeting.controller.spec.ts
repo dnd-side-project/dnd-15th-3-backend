@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { Test } from '@nestjs/testing'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
@@ -22,6 +23,11 @@ function createController() {
     previewInvitation: jest.fn().mockResolvedValue({}),
     joinMeeting: jest.fn().mockResolvedValue({}),
     getMeetingDetail: jest.fn().mockResolvedValue({}),
+    storeCourseImage: jest.fn().mockResolvedValue({}),
+    downloadCourseImage: jest.fn().mockResolvedValue({
+      body: Readable.from(Buffer.from('image')),
+      mimeType: 'image/png',
+    }),
   } as unknown as MeetingService
 
   return {
@@ -41,11 +47,6 @@ describe('MeetingController', () => {
     expect(() =>
       controller.updatePlacePreference('1', '2', 'token', {
         preference: PreferenceType.Like,
-      }),
-    ).toThrow(CommonException)
-    expect(() =>
-      controller.updateCourseImage('1', 'token', {
-        courseImageKey: 'course-cards/1/5.png',
       }),
     ).toThrow(CommonException)
     expect(() => controller.getSimilarPlaces('1', '2', 'token')).toThrow(
@@ -71,6 +72,8 @@ describe('MeetingController', () => {
             updateCoursePlan: jest.fn(),
             previewInvitation: jest.fn(),
             joinMeeting: jest.fn(),
+            storeCourseImage: jest.fn(),
+            downloadCourseImage: jest.fn(),
           },
         },
       ],
@@ -117,7 +120,13 @@ describe('MeetingController', () => {
       '/meetings/{meetingId}/course-image'
     ] as PathOperations | undefined
     expect(responseCodes(courseImagePath?.put?.responses)).toEqual(
-      ['204', '400', '401', '403', '404', '409', '501'].sort(),
+      ['200', '400', '401', '403', '404', '409'].sort(),
+    )
+    const courseImageDownloadPath = document.paths?.[
+      '/meetings/{meetingId}/course-image/download'
+    ] as PathOperations | undefined
+    expect(responseCodes(courseImageDownloadPath?.get?.responses)).toEqual(
+      ['200', '401', '404'].sort(),
     )
 
     const similarPlacesPath = document.paths?.[
@@ -177,11 +186,12 @@ describe('MeetingController', () => {
     ])
     expect(placePreferenceSchema?.properties?.myPreference?.nullable).toBe(true)
 
-    const updateCourseImageRequestSchema = document.components?.schemas
-      ?.UpdateCourseImageRequestDto as SchemaWithProperties | undefined
-    expect(
-      Object.keys(updateCourseImageRequestSchema?.properties ?? {}),
-    ).toEqual(['courseImageKey'])
+    const courseImageResponseSchema = document.components?.schemas
+      ?.CourseImageResponseDto as SchemaWithProperties | undefined
+    expect(Object.keys(courseImageResponseSchema?.properties ?? {})).toEqual([
+      'imageUrl',
+      'uploadedAt',
+    ])
 
     const similarPlaceResponseSchema = document.components?.schemas
       ?.SimilarPlaceResponseDto as
@@ -236,6 +246,28 @@ describe('MeetingController', () => {
     expect(meetingService.getMeetingDetail).toHaveBeenCalledWith('1', 'token')
   })
 
+  it('방장의 코스 이미지 등록과 모임원의 다운로드를 서비스에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const file = { buffer: Buffer.from('image'), mimetype: 'image/png' }
+
+    await controller.storeCourseImage('1', 'host-token', file)
+    const download = await controller.downloadCourseImage('1', 'member-token')
+
+    expect(meetingService.storeCourseImage).toHaveBeenCalledWith(
+      '1',
+      'host-token',
+      file,
+    )
+    expect(meetingService.downloadCourseImage).toHaveBeenCalledWith(
+      '1',
+      'member-token',
+    )
+    expect(download.getHeaders()).toMatchObject({
+      type: 'image/png',
+      disposition: 'attachment; filename="momo-course.png"',
+    })
+  })
+
   it('모임 생성 요청을 검증하고 서비스에 전달한다', () => {
     const { controller, meetingService } = createController()
     const request = {
@@ -279,6 +311,8 @@ describe('MeetingController', () => {
             previewInvitation: jest.fn(),
             joinMeeting: jest.fn(),
             getMeetingDetail: jest.fn(),
+            storeCourseImage: jest.fn(),
+            downloadCourseImage: jest.fn(),
           },
         },
       ],
@@ -322,7 +356,7 @@ describe('MeetingController', () => {
     const meetingScreenSchema = document.components?.schemas
       ?.MeetingScreenResponseDto as
       | {
-          properties?: Record<string, { nullable?: boolean }>
+          properties?: Record<string, { nullable?: boolean; type?: string }>
           required?: string[]
         }
       | undefined
@@ -358,6 +392,10 @@ describe('MeetingController', () => {
     expect(meetingInvitationSchema?.properties).toHaveProperty('locationName')
     expect(meetingInvitationSchema?.properties).not.toHaveProperty('locationId')
     expect(meetingScreenSchema?.properties).toHaveProperty('invitationCode')
+    expect(meetingScreenSchema?.properties?.courseImageUrl).toMatchObject({
+      type: 'string',
+      nullable: true,
+    })
     expect(meetingScreenSchema?.required).toContain('selectedCourse')
     expect(meetingScreenSchema?.properties?.selectedCourse).toMatchObject({
       nullable: true,

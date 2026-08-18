@@ -29,7 +29,7 @@ describe('CourseController', () => {
     expect(() => controller.getExcludedPlaces('1', '2', 'token')).toThrow(
       CommonException,
     )
-    expect(() => controller.confirmCourse('1', '2', 'token', {})).toThrow(
+    expect(() => controller.confirmCourse('1', '2', 'token')).toThrow(
       CommonException,
     )
     expect(() =>
