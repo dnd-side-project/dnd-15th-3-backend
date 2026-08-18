@@ -20,9 +20,9 @@ export class CourseCandidatePlace extends BaseEntity {
   @Column()
   order: number
 
-  @Column({ nullable: true, comment: 'Unit: seconds' })
+  @Column({ type: 'int', nullable: true, comment: 'Unit: seconds' })
   travelTimeToNext: number | null
 
-  @Column({ nullable: true, comment: 'Unit: meter' })
+  @Column({ type: 'int', nullable: true, comment: 'Unit: meter' })
   distanceToNextMeters: number | null
 }
