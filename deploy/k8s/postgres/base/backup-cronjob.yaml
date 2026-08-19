@@ -71,28 +71,28 @@ spec:
                 - name: OCI_NAMESPACE
                   valueFrom:
                     secretKeyRef:
-                      name: momo-api-env
+                      name: momo-postgres-backup-storage
                       key: OCI_NAMESPACE
                 - name: OCI_REGION
                   valueFrom:
                     secretKeyRef:
-                      name: momo-api-env
+                      name: momo-postgres-backup-storage
                       key: OCI_REGION
                 - name: OCI_S3_ACCESS_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: momo-api-env
+                      name: momo-postgres-backup-storage
                       key: OCI_S3_ACCESS_KEY
                 - name: OCI_S3_SECRET_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: momo-api-env
+                      name: momo-postgres-backup-storage
                       key: OCI_S3_SECRET_KEY
                 - name: OCI_BUCKET_NAME
                   valueFrom:
                     secretKeyRef:
-                      name: momo-api-env
-                      key: OCI_BUCKET_NAME_PROD
+                      name: momo-postgres-backup-storage
+                      key: OCI_BUCKET_NAME
                 - name: BACKUP_ENV
                   value: prod
               command:

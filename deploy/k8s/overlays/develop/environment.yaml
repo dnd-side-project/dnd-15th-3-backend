@@ -11,7 +11,7 @@ spec:
             - name: NODE_ENV
               value: development
             - name: CORS_ORIGINS
-              value: "https://dnd-15th-3-frontend.pages.dev,http://localhost:5173,http://localhost:6006"
+              value: "http://localhost:5173,http://localhost:6006,https://dnd-15th-3-frontend.pages.dev,https://*.dnd-15th-3-frontend.pages.dev"
             - name: DB_HOST
               value: momo-postgres
             - name: DB_PORT

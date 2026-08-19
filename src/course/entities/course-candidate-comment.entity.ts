@@ -14,6 +14,6 @@ export class CourseCandidateComment extends BaseEntity {
   @JoinColumn({ name: 'participant_id' })
   participant: MeetingParticipant
 
-  @Column('text')
+  @Column({ type: 'varchar', length: 300 })
   content: string
 }

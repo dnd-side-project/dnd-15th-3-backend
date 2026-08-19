@@ -3,10 +3,12 @@ kind: Kustomization
 namespace: dnd-15th-3-prod
 resources:
   - ../../base
+  - media-storage-secret.yaml
 images:
   - name: ghcr.io/dnd-side-project/dnd-15th-3-backend
     newTag: main-45d570e5ab88575a8cf3aae0e4222e0fe9c8fb04
 patches:
   - path: ingress.yaml
   - path: environment.yaml
+  - path: worker-environment.yaml
   - path: resources.yaml

@@ -9,12 +9,38 @@ on:
       - "*.json"                   # package, biome, tsconfig, nest-cli
       - "*.toml"                   # mise
       - "*.yaml"                   # pnpm-lock, pnpm-workspace
+      - "deploy/**/*.yaml"
+      - "deploy/**/*.yml"
+      - ".github/workflows/postgis-image.yml"
       - ".github/workflows/ci.yml"
   pull_request: *ci-trigger
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5-alpine
+        env:
+          POSTGRES_DB: momo_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d momo_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_DATABASE: momo_ci
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_SSL: "false"
 
     steps:
       - name: Checkout
@@ -36,3 +62,72 @@ jobs:
 
       - name: Test
         run: pnpm run test
+
+      - name: Build and run migrations against PostGIS
+        run: |
+          pnpm run build
+          pnpm run migration:run:prod
+          node - <<'NODE'
+          const { Client } = require('pg')
+          const client = new Client({
+            host: process.env.DB_HOST,
+            port: Number(process.env.DB_PORT),
+            database: process.env.DB_DATABASE,
+            user: process.env.DB_USERNAME,
+            password: process.env.DB_PASSWORD,
+          })
+          async function verify() {
+            await client.connect()
+            const { rows } = await client.query(`
+              SELECT
+                postgis_lib_version() AS postgis_version,
+                (SELECT count(*)::int FROM typeorm_migrations) AS migration_count,
+                ST_DWithin(
+                  ST_SetSRID(ST_MakePoint(127.0, 37.5), 4326)::geography,
+                  ST_SetSRID(ST_MakePoint(127.001, 37.5), 4326)::geography,
+                  1000
+                ) AS spatial_query_ok
+            `)
+            const result = rows[0]
+            if (!result.postgis_version.startsWith('3.5.')) throw new Error(`Unexpected PostGIS version: ${result.postgis_version}`)
+            if (result.migration_count < 3) throw new Error(`Unexpected migration count: ${result.migration_count}`)
+            if (!result.spatial_query_ok) throw new Error('PostGIS spatial query failed')
+            await client.end()
+          }
+          verify().catch((error) => {
+            console.error(error)
+            process.exit(1)
+          })
+          NODE
+
+      - name: Render Kubernetes manifests
+        run: |
+          set -euo pipefail
+          render_dir="$(mktemp -d)"
+          trap 'rm -rf "$render_dir"' EXIT
+
+          kubectl kustomize deploy/k8s/overlays/develop >"$render_dir/app-develop.yaml"
+          kubectl kustomize deploy/k8s/overlays/main >"$render_dir/app-main.yaml"
+          kubectl kustomize deploy/k8s/postgres/overlays/develop >"$render_dir/postgres-develop.yaml"
+          kubectl kustomize deploy/k8s/postgres/overlays/main >"$render_dir/postgres-main.yaml"
+          kubectl kustomize deploy/k8s/statistics-postgres/overlays/develop >"$render_dir/statistics-postgres-develop.yaml"
+          kubectl kustomize deploy/k8s/statistics-postgres/overlays/main >"$render_dir/statistics-postgres-main.yaml"
+          kubectl kustomize deploy/argocd >"$render_dir/argocd.yaml"
+
+          awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-api-migration/ && /argocd.argoproj.io\/hook: PreSync/ { found = 1 } END { exit !found }' "$render_dir/app-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-api-migration/ && /argocd.argoproj.io\/hook: PreSync/ { found = 1 } END { exit !found }' "$render_dir/app-main.yaml"
+
+          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /name: momo-postgres/ && /image: ghcr.io\/dnd-side-project\/dnd-15th-3-postgis@sha256:0f769879a66f6ea0b8352644b7a60cb5623c9534b015ae928ae53de4deb658eb/ { found = 1 } END { exit !found }' "$render_dir/postgres-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /name: momo-postgres/ && /image: ghcr.io\/dnd-side-project\/dnd-15th-3-postgis@sha256:0f769879a66f6ea0b8352644b7a60cb5623c9534b015ae928ae53de4deb658eb/ { found = 1 } END { exit !found }' "$render_dir/postgres-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: SealedSecret/ && /namespace: dnd-15th-3-dev/ && /name: momo-postgres-backup-storage/ { found = 1 } END { exit !found }' "$render_dir/postgres-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: SealedSecret/ && /namespace: dnd-15th-3-prod/ && /name: momo-postgres-backup-storage/ { found = 1 } END { exit !found }' "$render_dir/postgres-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /namespace: dnd-15th-3-dev/ && /name: momo-statistics-postgres/ && /serviceName: momo-statistics-postgres/ && /name: momo-statistics-postgres-auth/ && /image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193/ && /preferredDuringSchedulingIgnoredDuringExecution/ && /weight: 100/ && /values:[[:space:]]+- momo-postgres/ && /volumeClaimTemplates:[[:space:]]+- metadata:[[:space:]]+name: data/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /namespace: dnd-15th-3-prod/ && /name: momo-statistics-postgres/ && /serviceName: momo-statistics-postgres/ && /name: momo-statistics-postgres-auth/ && /image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193/ && /preferredDuringSchedulingIgnoredDuringExecution/ && /weight: 100/ && /values:[[:space:]]+- momo-postgres/ && /volumeClaimTemplates:[[:space:]]+- metadata:[[:space:]]+name: data/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Service/ && /namespace: dnd-15th-3-dev/ && /name: momo-statistics-postgres/ && /selector:[[:space:]]+app.kubernetes.io\/name: momo-statistics-postgres/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Service/ && /namespace: dnd-15th-3-prod/ && /name: momo-statistics-postgres/ && /selector:[[:space:]]+app.kubernetes.io\/name: momo-statistics-postgres/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-main.yaml"
+          if awk 'BEGIN { RS = "---" } /kind: CronJob/ && /name: momo-statistics-postgres-backup/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-develop.yaml" "$render_dir/statistics-postgres-main.yaml"; then
+            echo 'Statistics backup must not be scheduled before its external storage credentials exist.' >&2
+            exit 1
+          fi
+          awk 'BEGIN { RS = "---" } /kind: Application/ && /name: dnd-15th-3-statistics-postgres-dev/ && /path: deploy\/k8s\/statistics-postgres\/overlays\/develop/ { found = 1 } END { exit !found }' "$render_dir/argocd.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Application/ && /name: dnd-15th-3-statistics-postgres-prod/ && /path: deploy\/k8s\/statistics-postgres\/overlays\/main/ { found = 1 } END { exit !found }' "$render_dir/argocd.yaml"

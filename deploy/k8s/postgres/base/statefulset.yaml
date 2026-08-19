@@ -19,9 +19,11 @@ spec:
         app.kubernetes.io/name: momo-postgres
     spec:
       terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr-credentials
       containers:
         - name: postgres
-          image: postgres:17-alpine
+          image: ghcr.io/dnd-side-project/dnd-15th-3-postgis:bootstrap
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres

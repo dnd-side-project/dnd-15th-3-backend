@@ -1,40 +1,56 @@
 [tools]
 node = "24"
 pnpm = "11.15.1"
-postgres = "17"
 redis = "7"
 terraform = "latest"
+kubectl = "latest"
 
 [env]
 _.file = ".env.development"
-PGDATA = ".mise/data/postgres"
 
 [tasks.setup]
 description = "최초 프로젝트 환경 세팅"
 run = [
   "mise install",
   "pnpm install",
-  "mise run db-init",
+  "cp -n .env.example .env.development",
 ]
 
-[tasks.db-init]
-description = "PostgreSQL 데이터 디렉토리 초기화 (최초 1회)"
-run = [
-  "mkdir -p .mise/data/postgres",
-  "pg_ctl initdb -D .mise/data/postgres",
-]
+[tasks.dev]
+description = "개발 모드 시작 (로컬 DB + migration + API)"
+env = { NODE_ENV = "development" }
+run = "bash scripts/dev-local.sh"
 
 [tasks.db-start]
-description = "로컬 PostgreSQL 시작"
-run = "pg_ctl start -D .mise/data/postgres -l .mise/data/postgres/logfile -o '-k /tmp'"
+description = "로컬 PostgreSQL 시작 (PostGIS, 127.0.0.1:15432)"
+run = "bash scripts/dev-db-local.sh"
 
 [tasks.db-stop]
 description = "로컬 PostgreSQL 중지"
-run = "pg_ctl stop -D .mise/data/postgres"
+run = "docker compose stop"
 
 [tasks.db-psql]
-description = "PostgreSQL CLI 접속"
-run = "psql -h /tmp"
+description = "로컬 PostgreSQL psql 접속"
+run = "docker compose exec postgres psql -U postgres momo"
+
+[tasks.db-reset]
+description = "로컬 PostgreSQL 초기화 (데이터 전체 삭제)"
+run = [
+  "docker compose down --volumes",
+  "bash scripts/dev-db-local.sh",
+]
+
+[tasks.cluster-check]
+description = "개발 클러스터 접속 확인 (kubectl·kubeconfig·권한)"
+run = "bash scripts/dev-cluster-check.sh"
+
+[tasks.db-forward-dev]
+description = "개발 클러스터 PostgreSQL port-forward"
+run = "bash scripts/dev-db-forward.sh"
+
+[tasks.stats-db-forward]
+description = "개발 클러스터 통계 PostgreSQL port-forward"
+run = "bash scripts/dev-stats-db-forward.sh"
 
 [tasks.redis-start]
 description = "로컬 Redis 시작"
@@ -47,6 +63,19 @@ run = "redis-cli shutdown"
 [tasks.redis-cli]
 description = "Redis CLI 접속"
 run = "redis-cli"
+
+[tasks.dev-api]
+description = "개발 API와 클러스터 DB tunnel 실행 (감시 모드)"
+env = { NODE_ENV = "development" }
+run = "bash scripts/dev-api-cluster.sh"
+
+[tasks.prod-api]
+description = "프로덕션 API 서버 빌드 및 실행"
+env = { NODE_ENV = "production" }
+run = [
+  "pnpm build",
+  "pnpm start:prod",
+]
 
 [tasks.ci]
 description = "로컬에서 CI와 동일한 검증 실행"

@@ -14,11 +14,19 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "start:place-sync": "node dist/place/place-sync-worker.js",
+    "dev": "mise run dev",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "migration:generate": "node -r ts-node/register -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts migration:generate src/database/migrations/SchemaMigration",
+    "migration:run": "node -r ts-node/register -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts migration:run",
+    "migration:revert": "node -r ts-node/register -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts migration:revert",
+    "migration:show": "node -r ts-node/register -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts migration:show",
+    "migration:run:prod": "node node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js",
+    "migration:show:prod": "node node_modules/typeorm/cli.js migration:show -d dist/database/data-source.js",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
@@ -32,7 +40,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",
-    "@aws-sdk/s3-request-presigner": "^3.1097.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
@@ -40,6 +47,8 @@
     "@nestjs/swagger": "^11.4.6",
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/typeorm": "^11.0.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -75,8 +84,12 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    },
     "collectCoverageFrom": ["**/*.(t|j)s"],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": ["<rootDir>/../test/jest-setup.ts"]
   }
 }

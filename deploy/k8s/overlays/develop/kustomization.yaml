@@ -3,6 +3,8 @@ kind: Kustomization
 namespace: dnd-15th-3-dev
 resources:
   - ../../base
+  - db-access.yaml
+  - media-storage-secret.yaml
 images:
   # develop 환경의 실제 태그는 Argo CD Image Updater가 Application 파라미터로
   # 자동 관리한다 (deploy/argocd/image-updater.yaml 참고).
@@ -12,3 +14,4 @@ images:
 patches:
   - path: ingress.yaml
   - path: environment.yaml
+  - path: worker-environment.yaml

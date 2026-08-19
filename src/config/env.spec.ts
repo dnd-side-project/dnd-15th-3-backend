@@ -11,6 +11,11 @@ const baseConfig = {
   OCI_S3_ACCESS_KEY: 'access-key',
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OCI_S3_SECRET_KEY: 'secret-key',
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  MEDIA_BUCKET_NAME: 'momo-media-test',
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  MEDIA_PUBLIC_BASE_URL:
+    'https://objectstorage.ap-hyderabad-1.oraclecloud.com/n/namespace/b/momo-media-test/o/',
 }
 
 describe('validateEnv', () => {
@@ -23,8 +28,11 @@ describe('validateEnv', () => {
       expect(env.DB_USERNAME).toBe('postgres')
       expect(env.DB_DATABASE).toBe('postgres')
       expect(env.OCI_REGION).toBe('ap-hyderabad-1')
-      expect(env.OCI_BUCKET_NAME_DEV).toBe('momo-bucket-dev')
-      expect(env.OCI_BUCKET_NAME_PROD).toBe('momo-bucket-prod')
+      expect(env.MEDIA_BUCKET_NAME).toBe('momo-media-test')
+      expect(env.MEDIA_PUBLIC_BASE_URL).toContain('/momo-media-test/o/')
+      expect(env.KAKAO_REST_API_KEY).toBe('')
+      expect(env.GOOGLE_PLACES_API_KEY).toBe('')
+      expect(env.INVITATION_BASE_URL).toBe('https://momo.example/invite')
     })
 
     it('defaults NODE_ENV to development when not provided', () => {
@@ -108,5 +116,45 @@ describe('validateEnv', () => {
     it('does not require OCI_S3_ENDPOINT', () => {
       expect(() => validateEnv(baseConfig)).not.toThrow()
     })
+
+    it('requires a media bucket name', () => {
+      const { MEDIA_BUCKET_NAME, ...config } = baseConfig
+      expect(() => validateEnv(config)).toThrow('Invalid environment variables')
+    })
+
+    it('requires an OCI native public base URL ending in /o/', () => {
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          MEDIA_PUBLIC_BASE_URL:
+            'https://objectstorage.example/n/namespace/b/momo-media-test',
+        }),
+      ).toThrow('Invalid environment variables')
+    })
+
+    it('requires the public base URL to identify the configured media bucket', () => {
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          MEDIA_PUBLIC_BASE_URL:
+            'https://objectstorage.example/n/namespace/b/another-bucket/o/',
+        }),
+      ).toThrow('Invalid environment variables')
+    })
+
+    it.each(['?', '#', '?token=unexpected', '#unexpected'])(
+      'rejects a public base URL with %s',
+      (suffix) => {
+        expect(() =>
+          validateEnv({
+            ...baseConfig,
+            // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+            MEDIA_PUBLIC_BASE_URL: `${baseConfig.MEDIA_PUBLIC_BASE_URL}${suffix}`,
+          }),
+        ).toThrow('Invalid environment variables')
+      },
+    )
   })
 })

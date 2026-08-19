@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: momo-place-sync-worker
+  labels:
+    app.kubernetes.io/name: momo-place-sync-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: momo-place-sync-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: momo-place-sync-worker
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-credentials
+      containers:
+        - name: worker
+          image: ghcr.io/dnd-side-project/dnd-15th-3-backend:bootstrap
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - dist/place/place-sync-worker.js
+          envFrom:
+            - secretRef:
+                name: momo-api-env
+            - secretRef:
+                name: momo-media-storage
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

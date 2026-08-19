@@ -4,6 +4,10 @@ namespace: dnd-15th-3-prod
 resources:
   - ../../base
   - postgres-secret.yaml
+  - backup-storage-secret.yaml
+images:
+  - name: ghcr.io/dnd-side-project/dnd-15th-3-postgis
+    digest: sha256:0f769879a66f6ea0b8352644b7a60cb5623c9534b015ae928ae53de4deb658eb
 patches:
   - path: resources.yaml
   - path: backup.yaml

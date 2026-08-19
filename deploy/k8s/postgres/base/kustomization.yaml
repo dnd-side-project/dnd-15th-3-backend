@@ -4,3 +4,6 @@ resources:
   - service.yaml
   - statefulset.yaml
   - backup-cronjob.yaml
+images:
+  - name: ghcr.io/dnd-side-project/dnd-15th-3-postgis
+    newTag: 17-3.5.7-arm64-2bcd236e3af9ec6e668db51eb37162a79f0eaeaa
