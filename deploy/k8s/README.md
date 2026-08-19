@@ -57,3 +57,37 @@ PostgreSQL if the remaining failure domain must be strictly isolated.
 Kubernetes readiness continues to call `/health`, which covers the database and
 PostGIS dependencies. OCI media diagnostics are available separately at
 `/health/storage` and must not be configured as a readiness or liveness probe.
+
+## Read-only database access
+
+Backend developers who only need to inspect Core PostgreSQL tables must not
+receive `momo-postgres-auth` or a cluster-admin kubeconfig. The shared base
+manifest creates a developer-specific ServiceAccount and binds it to the
+`db-reader` Role in each application namespace. That Role can only get and
+port-forward the stable `momo-postgres-0` Pod. It cannot list Pods, read
+Secrets, access the statistics database, or mutate Kubernetes resources.
+
+An infrastructure administrator issues access with:
+
+```bash
+bash scripts/provision-db-reader.sh dev shname /secure/output/dev
+bash scripts/provision-db-reader.sh prod shname /secure/output/prod
+```
+
+The script creates or rotates the matching PostgreSQL login, grants only
+`CONNECT`, schema `USAGE`, and table/sequence `SELECT`, and sets read-only
+and timeout defaults. It also grants default `SELECT` privileges for tables
+created later by the application database owner. The generated Kubernetes token
+is valid for seven days by default; override `DB_READER_TOKEN_DURATION` when a
+shorter window is appropriate.
+
+Each output bundle contains a kubeconfig, a `.pgpass` file, and connection
+instructions. All generated files and archives use owner-only permissions and
+are ignored by Git. Transfer the archive through an approved encrypted channel,
+then remove both sender and recipient copies when access is no longer needed.
+
+The recipient must separately have network reachability to the Kubernetes API
+through Tailscale. Grant only the cluster-device/API path needed for this task;
+do not expose unrelated personal tailnet devices. To revoke access immediately,
+delete and recreate the developer ServiceAccount to invalidate its outstanding
+tokens, then drop or disable the matching PostgreSQL role.

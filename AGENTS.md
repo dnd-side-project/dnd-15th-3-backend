@@ -10,6 +10,7 @@ This file contains only the repository rules that are easy to miss when working 
 - Use `mise run dev` (or `pnpm dev`) for normal development. It starts the Docker Compose PostGIS database on `127.0.0.1:15432`, runs migrations, and starts the API in watch mode.
 - Cluster database access is an explicit diagnostic path. Run `mise run cluster-check` first, then use `mise run db-forward-dev` or `mise run dev-api` with the restricted developer kubeconfig.
 - Use `mise run stats-db-forward` only when direct access to the development statistics database is required.
+- Issue table-inspection access with `scripts/provision-db-reader.sh`. It creates a developer-specific PostgreSQL read-only role and a short-lived, namespace-scoped kubeconfig; never share application DB credentials for read-only work.
 - Redis commands are `mise run redis-start`, `mise run redis-stop`, and `mise run redis-cli`.
 - The API global prefix is `/api/v1`. The readiness/startup endpoints `GET /health` and `GET /health/live` are excluded from the prefix. Swagger is available at `/api/v1/docs`.
 
