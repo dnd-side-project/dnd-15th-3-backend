@@ -3,6 +3,7 @@ node = "24"
 pnpm = "11.15.1"
 redis = "7"
 terraform = "latest"
+kubectl = "latest"
 
 [env]
 _.file = ".env.development"
@@ -14,9 +15,17 @@ run = [
   "pnpm install",
 ]
 
+[tasks.cluster-check]
+description = "개발 클러스터 접속 확인 (kubectl·kubeconfig·권한)"
+run = "bash scripts/dev-cluster-check.sh"
+
 [tasks.db-forward-dev]
 description = "개발 클러스터 PostgreSQL port-forward"
 run = "bash scripts/dev-db-forward.sh"
+
+[tasks.stats-db-forward]
+description = "개발 클러스터 통계 PostgreSQL port-forward"
+run = "bash scripts/dev-stats-db-forward.sh"
 
 [tasks.redis-start]
 description = "로컬 Redis 시작"
