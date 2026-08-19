@@ -3,7 +3,7 @@ import { CourseConfirmedPayloadSchema } from './course-confirmed-payload.schema'
 
 const validPayload = {
   meetingId: '1',
-  meetingCategoryId: '2',
+  meetingTypeId: '2',
   meetingDate: '2026-08-21',
   meetingTime: '18:30:00',
   courseVersion: 1,
@@ -25,10 +25,7 @@ describe('CourseConfirmedPayloadSchema', () => {
 
   describe.each([
     ['meetingId', (id: string) => ({ ...validPayload, meetingId: id })],
-    [
-      'meetingCategoryId',
-      (id: string) => ({ ...validPayload, meetingCategoryId: id }),
-    ],
+    ['meetingTypeId', (id: string) => ({ ...validPayload, meetingTypeId: id })],
     [
       'placeId',
       (id: string) => ({

@@ -13,7 +13,8 @@ const idString = z
 export const CourseConfirmedPayloadSchema = z
   .object({
     meetingId: idString,
-    meetingCategoryId: idString,
+    // MEETING_PREFERRED 태그(모임 유형별 선택률) 계산에 쓰이는 모임 유형(meetingType) 참조값.
+    meetingTypeId: idString,
     // 주말/평일 통계 계산용 원본 날짜. 주말 여부는 미리 계산해서 넣지 않고 날짜를 유지
     // 날짜 정보를 이용해 추가 활용 가능(Ex.겨울에 많이 방문하는 장소)
     meetingDate: z.iso.date(),
