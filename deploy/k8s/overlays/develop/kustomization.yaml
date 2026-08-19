@@ -4,6 +4,7 @@ namespace: dnd-15th-3-dev
 resources:
   - ../../base
   - migration-job.yaml
+  - db-access.yaml
   - media-storage-secret.yaml
 images:
   # develop 환경의 실제 태그는 Argo CD Image Updater가 Application 파라미터로
