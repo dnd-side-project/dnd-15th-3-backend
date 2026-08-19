@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 # Infrastructure admin only: issues a restricted developer kubeconfig for the
-# dev namespace. The generated kubeconfig can only read the DB auth secrets
-# and create port-forwards; it cannot do anything else in the cluster.
+# dev namespace. The generated kubeconfig can discover database workloads,
+# read only the named DB auth secrets, and create pod port-forwards. It has no
+# write access to application or database resources.
 #
 # Usage: bash scripts/make-db-kubeconfig.sh [output-file]
 
