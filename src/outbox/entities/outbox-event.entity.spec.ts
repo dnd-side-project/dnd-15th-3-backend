@@ -19,6 +19,10 @@ describe('OutboxEvent entity', () => {
       type: 'timestamp',
       nullable: true,
     })
+    expect(optionsByProperty.get('startedAt')).toMatchObject({
+      type: 'timestamp',
+      nullable: true,
+    })
   })
 
   it('status 컬럼이 OutboxEventStatus enum과 기본값 Pending으로 등록된다', () => {
@@ -51,6 +55,7 @@ describe('OutboxEvent entity', () => {
         `("status" = '${OutboxEventStatus.Processed}') = ("processed_at" IS NOT NULL)`,
         `"status" NOT IN ('${OutboxEventStatus.Failed}', '${OutboxEventStatus.DeadLetter}') OR "error_message" IS NOT NULL`,
         `"next_retry_at" >= "created_at"`,
+        `"status" <> '${OutboxEventStatus.Processing}' OR "started_at" IS NOT NULL`,
       ].sort(),
     )
   })

@@ -15,6 +15,7 @@ import { OutboxEventStatus } from '../enums/outbox-event-status.enum'
   `"status" NOT IN ('FAILED', 'DEAD_LETTER') OR "error_message" IS NOT NULL`,
 )
 @Check(`"next_retry_at" >= "created_at"`)
+@Check(`"status" <> 'PROCESSING' OR "started_at" IS NOT NULL`)
 export class OutboxEvent extends BaseEntity {
   @Column({ name: 'event_type' })
   eventType: OutboxEventType
@@ -46,4 +47,9 @@ export class OutboxEvent extends BaseEntity {
 
   @Column({ name: 'next_retry_at', default: () => 'CURRENT_TIMESTAMP' })
   nextRetryAt: Date
+
+  // 해당 이벤트를 처리를 시작한(Processing으로 바뀐) 시각. 재시도마다 갱신된
+  // 이 값이 오래됐는데 status가 여전히 Processing이면 워커가 죽은 것으로 보고 자동 복구
+  @Column({ type: 'timestamp', name: 'started_at', nullable: true })
+  startedAt: Date | null
 }
