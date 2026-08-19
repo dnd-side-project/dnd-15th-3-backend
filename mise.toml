@@ -12,7 +12,13 @@ description = "최초 프로젝트 환경 세팅"
 run = [
   "mise install",
   "pnpm install",
+  "cp -n .env.example .env.development",
 ]
+
+[tasks.dev]
+description = "개발 모드 시작 (로컬 DB + migration + API)"
+env = { NODE_ENV = "development" }
+run = "bash scripts/dev-local.sh"
 
 [tasks.db-start]
 description = "로컬 PostgreSQL 시작 (PostGIS, 127.0.0.1:15432)"
