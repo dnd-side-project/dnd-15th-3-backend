@@ -11,11 +11,14 @@ Create `momo-media-storage` in each application namespace with these keys:
 - `OCI_S3_ACCESS_KEY`
 - `OCI_S3_SECRET_KEY`
 
-The media credentials should be limited to the environment's media bucket. They
-need bucket inspection plus object create, read, and compensation-delete access,
-but no object listing or access to other buckets. The buckets are public for
-object reads without list access; the old `momo-bucket-*` buckets remain private
-and are used only for PostgreSQL backups.
+The media credentials are limited to the environment's media bucket with OCI
+IAM policies granting `read buckets` and `manage objects`. `manage objects` is
+the practical minimum because the application uses object listing as well as
+create, read, and compensation-delete operations. OCI's cumulative object verbs
+therefore make listing available to the authenticated application. The buckets
+use `ObjectReadWithoutList`, so anonymous clients can read known object URLs but
+cannot list objects. The old `momo-bucket-*` buckets remain private and are used
+only for PostgreSQL backups.
 
 The PostgreSQL backup CronJob loads its Object Storage configuration from a
 separate `momo-postgres-backup-storage` Secret in each database namespace. It
