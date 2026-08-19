@@ -23,7 +23,14 @@ only for PostgreSQL backups.
 The PostgreSQL backup CronJob loads its Object Storage configuration from a
 separate `momo-postgres-backup-storage` Secret in each database namespace. It
 requires `OCI_REGION`, `OCI_NAMESPACE`, `OCI_S3_ACCESS_KEY`,
-`OCI_S3_SECRET_KEY`, and `OCI_BUCKET_NAME`.
+`OCI_S3_SECRET_KEY`, and `OCI_BUCKET_NAME`. Each PostgreSQL overlay includes a
+strict-scoped SealedSecret for this credential, independent of the application
+Secret.
+
+The shared application base also includes `momo-api-migration` as an Argo CD
+`PreSync` Hook. Both dev and prod therefore run pending TypeORM migrations
+before the API and worker sync. PostgreSQL must be on the pinned PostGIS image
+before a release containing spatial migrations is promoted.
 
 ## Statistics PostgreSQL
 

@@ -3,7 +3,6 @@ kind: Kustomization
 namespace: dnd-15th-3-dev
 resources:
   - ../../base
-  - migration-job.yaml
   - db-access.yaml
   - media-storage-secret.yaml
 images:
