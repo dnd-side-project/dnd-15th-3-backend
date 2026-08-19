@@ -13,6 +13,31 @@ description = "최초 프로젝트 환경 세팅"
 run = [
   "mise install",
   "pnpm install",
+  "cp -n .env.example .env.development",
+]
+
+[tasks.dev]
+description = "개발 모드 시작 (로컬 DB + migration + API)"
+env = { NODE_ENV = "development" }
+run = "bash scripts/dev-local.sh"
+
+[tasks.db-start]
+description = "로컬 PostgreSQL 시작 (PostGIS, 127.0.0.1:15432)"
+run = "bash scripts/dev-db-local.sh"
+
+[tasks.db-stop]
+description = "로컬 PostgreSQL 중지"
+run = "docker compose stop"
+
+[tasks.db-psql]
+description = "로컬 PostgreSQL psql 접속"
+run = "docker compose exec postgres psql -U postgres momo"
+
+[tasks.db-reset]
+description = "로컬 PostgreSQL 초기화 (데이터 전체 삭제)"
+run = [
+  "docker compose down --volumes",
+  "bash scripts/dev-db-local.sh",
 ]
 
 [tasks.cluster-check]
