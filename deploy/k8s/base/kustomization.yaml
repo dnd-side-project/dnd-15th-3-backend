@@ -5,3 +5,4 @@ resources:
   - place-sync-worker.yaml
   - service.yaml
   - ingress.yaml
+  - db-readonly-access.yaml
