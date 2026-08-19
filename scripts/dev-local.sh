@@ -31,5 +31,5 @@ export DB_SYNCHRONIZE=false
 
 pnpm migration:run
 
-echo "Starting API at http://localhost:3000 (Swagger UI: /api/docs)"
+echo "Starting API at http://localhost:3000 (Swagger UI: /api/v1/docs)"
 pnpm start:dev
