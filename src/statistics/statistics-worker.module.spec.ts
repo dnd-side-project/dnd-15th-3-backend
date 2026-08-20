@@ -1,9 +1,11 @@
 import { MODULE_METADATA } from '@nestjs/common/constants'
 import { AppModule } from 'src/app.module'
 import {
-  createStatsTypeOrmOptions,
   STATISTICS_ENTITIES_GLOB,
   STATISTICS_MIGRATIONS_GLOB,
+} from 'src/database/database.options'
+import {
+  createStatsTypeOrmOptions,
   StatisticsWorkerModule,
 } from './statistics-worker.module'
 

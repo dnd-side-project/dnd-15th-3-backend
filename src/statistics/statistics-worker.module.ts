@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm'
-import { createDatabaseOptions } from 'src/database/database.options'
+import {
+  createDatabaseOptions,
+  STATISTICS_ENTITIES_GLOB,
+  STATISTICS_MIGRATIONS_GLOB,
+} from 'src/database/database.options'
 import {
   type StatisticsWorkerEnv,
   validateStatisticsWorkerEnv,
 } from './config/statistics-worker.env'
-
-export const STATISTICS_ENTITIES_GLOB = '**/*.stats-entity{.ts,.js}'
-export const STATISTICS_MIGRATIONS_GLOB =
-  'database/statistics-migrations/*{.ts,.js}'
 
 export function createStatsTypeOrmOptions(
   config: ConfigService<StatisticsWorkerEnv, true>,

@@ -21,6 +21,10 @@ export type DatabaseOptionsGlobs = {
 export const CORE_ENTITIES_GLOB = '**/*.entity{.ts,.js}'
 export const CORE_MIGRATIONS_GLOB = 'database/migrations/*{.ts,.js}'
 
+export const STATISTICS_ENTITIES_GLOB = '**/*.stats-entity{.ts,.js}'
+export const STATISTICS_MIGRATIONS_GLOB =
+  'database/statistics-migrations/*{.ts,.js}'
+
 export function createDatabaseOptions(
   config: DatabaseConnectionConfig,
   rootDirectory: string,
@@ -61,5 +65,23 @@ export function readDatabaseConfig(
     synchronize:
       environment.DB_SYNCHRONIZE === 'true' ||
       environment.DB_SYNCHRONIZE === '1',
+  }
+}
+
+export function readStatisticsDatabaseConfig(
+  environment: NodeJS.ProcessEnv = process.env,
+): DatabaseConnectionConfig {
+  return {
+    host: environment.STATS_DB_HOST || 'localhost',
+    port: Number(environment.STATS_DB_PORT || 5432),
+    username: environment.STATS_DB_USERNAME || 'postgres',
+    password: environment.STATS_DB_PASSWORD || '',
+    database: environment.STATS_DB_DATABASE || 'postgres',
+    ssl:
+      environment.STATS_DB_SSL === 'true' || environment.STATS_DB_SSL === '1',
+    sslCa: environment.STATS_DB_SSL_CA,
+    synchronize:
+      environment.STATS_DB_SYNCHRONIZE === 'true' ||
+      environment.STATS_DB_SYNCHRONIZE === '1',
   }
 }
