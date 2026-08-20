@@ -1,10 +1,12 @@
 import { Meeting } from 'src/meeting/entities/meeting.entity'
+import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { CourseRepository } from './course.repository'
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { CourseCategoryStep } from './entities/course-category-step.entity'
 
 function createManagerMocks() {
   const meetingQueryBuilder = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     setLock: jest.fn().mockReturnThis(),
     getOne: jest.fn(),
@@ -30,10 +32,14 @@ function createManagerMocks() {
   const placeRepository = {
     createQueryBuilder: jest.fn(() => placeDeleteQueryBuilder),
   }
+  const participantRepository = {
+    count: jest.fn(),
+  }
   const repositories = new Map<unknown, unknown>([
     [Meeting, meetingRepository],
     [CourseCategoryStep, categoryStepRepository],
     [CourseCandidatePlace, placeRepository],
+    [MeetingParticipant, participantRepository],
   ])
   const manager = {
     getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
@@ -47,6 +53,7 @@ function createManagerMocks() {
     categoryStepRepository,
     placeDeleteQueryBuilder,
     placeRepository,
+    participantRepository,
   }
 }
 
@@ -60,6 +67,10 @@ describe('CourseRepository', () => {
 
       await expect(repository.lockMeeting(manager as never, '1')).resolves.toBe(
         meeting,
+      )
+      expect(meetingQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'meeting.meetingType',
+        'meetingType',
       )
       expect(meetingQueryBuilder.where).toHaveBeenCalledWith(
         'meeting.id = :meetingId',
@@ -110,6 +121,21 @@ describe('CourseRepository', () => {
         { courseCandidateId: '2' },
       )
       expect(placeDeleteQueryBuilder.execute).toHaveBeenCalled()
+    })
+  })
+
+  describe('countParticipants', () => {
+    it('meetingId에 해당하는 참여자 수를 센다', async () => {
+      const repository = new CourseRepository()
+      const { manager, participantRepository } = createManagerMocks()
+      participantRepository.count.mockResolvedValue(3)
+
+      await expect(
+        repository.countParticipants(manager as never, '1'),
+      ).resolves.toBe(3)
+      expect(participantRepository.count).toHaveBeenCalledWith({
+        where: { meeting: { id: '1' } },
+      })
     })
   })
 })

@@ -7,6 +7,8 @@ import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.ent
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { MeetingException } from 'src/meeting/exception/meeting.exception'
+import { OutboxAggregateType } from 'src/outbox/constants/outbox-aggregate-type.constant'
+import { OutboxEventType } from 'src/outbox/constants/outbox-event-type.constant'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
@@ -37,6 +39,7 @@ function createService() {
   const meetingAccessService = { findParticipant: jest.fn() }
   const voteRepository = {
     getPreferenceSummaries: jest.fn().mockResolvedValue(new Map()),
+    getVoteCountsByRecommendation: jest.fn().mockResolvedValue(new Map()),
   }
   const recommendationRepository = {
     findExcludedFromCourse: jest.fn().mockResolvedValue([]),
@@ -62,6 +65,10 @@ function createService() {
     lockMeeting: jest.fn(),
     deleteCourseCategorySteps: jest.fn().mockResolvedValue(undefined),
     deleteCourseCandidatePlaces: jest.fn().mockResolvedValue(undefined),
+    countParticipants: jest.fn(),
+  }
+  const outboxEventRepository = {
+    create: jest.fn().mockResolvedValue({ id: '1' }),
   }
   const service = new CourseService(
     dataSource as never,
@@ -74,6 +81,7 @@ function createService() {
     placeImageService as never,
     kakaoWalkingCourseService as never,
     courseRepository as never,
+    outboxEventRepository as never,
   )
 
   return {
@@ -88,6 +96,7 @@ function createService() {
     placeImageService,
     kakaoWalkingCourseService,
     courseRepository,
+    outboxEventRepository,
   }
 }
 
@@ -100,10 +109,12 @@ function createConfirmTransactionMocks() {
     findOne: jest.fn(),
     save: jest.fn().mockImplementation((value) => value),
   }
+  const placeRepository = { find: jest.fn() }
   const repositories = new Map<unknown, unknown>([
     [MeetingParticipant, participantRepository],
     [Meeting, meetingRepository],
     [CourseCandidate, candidateRepository],
+    [CourseCandidatePlace, placeRepository],
   ])
   const manager = {
     getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
@@ -114,6 +125,7 @@ function createConfirmTransactionMocks() {
     participantRepository,
     meetingRepository,
     candidateRepository,
+    placeRepository,
   }
 }
 
@@ -1094,13 +1106,39 @@ describe('CourseService', () => {
       })
     })
 
-    it('검증을 통과하면 코스 후보를 확정하고 모임 상태를 전환한다', async () => {
-      const { service, dataSource, courseRepository } = createService()
+    function createConfirmedSteps() {
+      return [
+        {
+          order: 1,
+          meetingPlaceRecommendation: {
+            id: 'rec-1',
+            place: { id: '101', category: { id: '201' } },
+          },
+        },
+        {
+          order: 2,
+          meetingPlaceRecommendation: {
+            id: 'rec-2',
+            place: { id: '102', category: { id: '202' } },
+          },
+        },
+      ]
+    }
+
+    it('검증을 통과하면 코스 후보를 확정하고 모임 상태를 전환하며 outbox 이벤트를 기록한다', async () => {
+      const {
+        service,
+        dataSource,
+        courseRepository,
+        voteRepository,
+        outboxEventRepository,
+      } = createService()
       const {
         manager,
         participantRepository,
         meetingRepository,
         candidateRepository,
+        placeRepository,
       } = createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
@@ -1109,9 +1147,22 @@ describe('CourseService', () => {
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meeting.id = '1'
+      meeting.date = '2026-08-22'
+      meeting.time = '18:00:00'
+      meeting.courseVersion = 2
+      meeting.meetingType = { id: '5' } as never
       courseRepository.lockMeeting.mockResolvedValue(meeting)
       const candidate = createCandidate({ id: '2', isSelected: false })
       candidateRepository.findOne.mockResolvedValue(candidate)
+      placeRepository.find.mockResolvedValue(createConfirmedSteps())
+      courseRepository.countParticipants.mockResolvedValue(3)
+      voteRepository.getVoteCountsByRecommendation.mockResolvedValue(
+        new Map([
+          ['rec-1', { likeCount: 2, dislikeCount: 0 }],
+          ['rec-2', { likeCount: 1, dislikeCount: 1 }],
+        ]),
+      )
 
       await expect(service.confirmCourse('1', '2', 'token')).resolves.toEqual({
         status: MeetingStatus.CourseConfirmed,
@@ -1128,6 +1179,182 @@ describe('CourseService', () => {
       expect(candidateRepository.save).toHaveBeenCalledWith(candidate)
       expect(meeting.status).toBe(MeetingStatus.CourseConfirmed)
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
+      expect(voteRepository.getVoteCountsByRecommendation).toHaveBeenCalledWith(
+        manager,
+        ['rec-1', 'rec-2'],
+      )
+      expect(outboxEventRepository.create).toHaveBeenCalledWith(manager, {
+        eventType: OutboxEventType.courseConfirmed,
+        aggregateType: OutboxAggregateType.meeting,
+        aggregateId: '1',
+        payload: {
+          meetingId: '1',
+          meetingTypeId: '5',
+          meetingDate: '2026-08-22',
+          meetingTime: '18:00:00',
+          courseVersion: 2,
+          payloadVersion: 1,
+          participantCount: 3,
+          places: [
+            {
+              placeId: '101',
+              placeCategoryId: '201',
+              likeCount: 2,
+              dislikeCount: 0,
+            },
+            {
+              placeId: '102',
+              placeCategoryId: '202',
+              likeCount: 1,
+              dislikeCount: 1,
+            },
+          ],
+        },
+      })
+    })
+
+    it('outbox payload 검증에 실패하면 코스 확정 자체를 실패시키고 이벤트를 저장하지 않는다', async () => {
+      const {
+        service,
+        dataSource,
+        courseRepository,
+        voteRepository,
+        outboxEventRepository,
+      } = createService()
+      const {
+        manager,
+        participantRepository,
+        candidateRepository,
+        placeRepository,
+      } = createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meeting.id = '1'
+      meeting.date = '2026-08-22'
+      meeting.time = '18:00:00'
+      meeting.courseVersion = 1
+      meeting.meetingType = { id: '5' } as never
+      courseRepository.lockMeeting.mockResolvedValue(meeting)
+      const candidate = createCandidate({ id: '2', isSelected: false })
+      candidateRepository.findOne.mockResolvedValue(candidate)
+      placeRepository.find.mockResolvedValue(createConfirmedSteps())
+      courseRepository.countParticipants.mockResolvedValue(1)
+      voteRepository.getVoteCountsByRecommendation.mockResolvedValue(
+        new Map([['rec-1', { likeCount: 2, dislikeCount: 0 }]]),
+      )
+
+      const promise = service.confirmCourse('1', '2', 'token')
+
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
+      await expect(promise).rejects.toThrow(
+        '코스 확정 이벤트 payload 검증에 실패해 코스 확정이 취소된 데이터 정합성 오류입니다.',
+      )
+      expect(outboxEventRepository.create).not.toHaveBeenCalled()
+    })
+
+    it('투표가 하나도 없는 장소는 좋아요/싫어요 개수를 0으로 채워서 기록한다', async () => {
+      const {
+        service,
+        dataSource,
+        courseRepository,
+        voteRepository,
+        outboxEventRepository,
+      } = createService()
+      const {
+        manager,
+        participantRepository,
+        candidateRepository,
+        placeRepository,
+      } = createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meeting.id = '1'
+      meeting.date = '2026-08-22'
+      meeting.time = '18:00:00'
+      meeting.courseVersion = 1
+      meeting.meetingType = { id: '5' } as never
+      courseRepository.lockMeeting.mockResolvedValue(meeting)
+      const candidate = createCandidate({ id: '2', isSelected: false })
+      candidateRepository.findOne.mockResolvedValue(candidate)
+      placeRepository.find.mockResolvedValue(createConfirmedSteps())
+      courseRepository.countParticipants.mockResolvedValue(3)
+      voteRepository.getVoteCountsByRecommendation.mockResolvedValue(
+        new Map([['rec-1', { likeCount: 2, dislikeCount: 0 }]]),
+      )
+
+      await expect(service.confirmCourse('1', '2', 'token')).resolves.toEqual({
+        status: MeetingStatus.CourseConfirmed,
+        confirmedCourseCandidateId: '2',
+      })
+      expect(outboxEventRepository.create).toHaveBeenCalledWith(
+        manager,
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            places: [
+              expect.objectContaining({
+                placeId: '101',
+                likeCount: 2,
+                dislikeCount: 0,
+              }),
+              expect.objectContaining({
+                placeId: '102',
+                likeCount: 0,
+                dislikeCount: 0,
+              }),
+            ],
+          }),
+        }),
+      )
+    })
+
+    it('코스 후보에 장소가 하나도 없으면 코스 확정을 실패시키고 이벤트를 저장하지 않는다', async () => {
+      const {
+        service,
+        dataSource,
+        courseRepository,
+        voteRepository,
+        outboxEventRepository,
+      } = createService()
+      const {
+        manager,
+        participantRepository,
+        candidateRepository,
+        placeRepository,
+      } = createConfirmTransactionMocks()
+      dataSource.transaction.mockImplementation((callback: never) =>
+        (callback as (manager: unknown) => unknown)(manager),
+      )
+      participantRepository.findOne.mockResolvedValue(
+        createParticipant({ role: ParticipantRole.Host }),
+      )
+      const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
+      meeting.id = '1'
+      meeting.meetingType = { id: '5' } as never
+      courseRepository.lockMeeting.mockResolvedValue(meeting)
+      const candidate = createCandidate({ id: '2', isSelected: false })
+      candidateRepository.findOne.mockResolvedValue(candidate)
+      placeRepository.find.mockResolvedValue([])
+
+      const promise = service.confirmCourse('1', '2', 'token')
+
+      await expect(promise).rejects.toBeInstanceOf(CourseException)
+      await expect(promise).rejects.toThrow(
+        '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
+      )
+      expect(
+        voteRepository.getVoteCountsByRecommendation,
+      ).not.toHaveBeenCalled()
+      expect(outboxEventRepository.create).not.toHaveBeenCalled()
     })
   })
 

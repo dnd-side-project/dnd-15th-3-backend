@@ -41,4 +41,10 @@ export const CourseErrorCode = {
     message:
       '코스를 편집하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
   },
+  courseConfirmedEventInvalid: {
+    code: 'COURSE_CONFIRMED_EVENT_INVALID',
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    message:
+      '코스 확정 이벤트 payload 검증에 실패해 코스 확정이 취소된 데이터 정합성 오류입니다.',
+  },
 } as const satisfies Record<string, ErrorCode>

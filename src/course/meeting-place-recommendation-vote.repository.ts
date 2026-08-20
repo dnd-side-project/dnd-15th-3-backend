@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { DataSource } from 'typeorm'
+import { DataSource, type EntityManager } from 'typeorm'
 import { MeetingPlaceRecommendationVote } from './entities/meeting-place-recommendation-vote.entity'
 import { PreferenceType } from './enums/preference-type.enum'
 
@@ -62,6 +62,48 @@ export class MeetingPlaceRecommendationVoteRepository {
           likeCount: Number(row.likeCount),
           dislikeCount: Number(row.dislikeCount),
           myPreference: row.myPreference,
+        },
+      ]),
+    )
+  }
+
+  async getVoteCountsByRecommendation(
+    manager: EntityManager,
+    recommendationIds: readonly string[],
+  ): Promise<Map<string, PreferenceCounts>> {
+    if (recommendationIds.length === 0) {
+      return new Map()
+    }
+
+    const rows = await manager
+      .getRepository(MeetingPlaceRecommendationVote)
+      .createQueryBuilder('vote')
+      .select('vote.recommendation', 'recommendationId')
+      .addSelect('COUNT(*) FILTER (WHERE vote.preference = :like)', 'likeCount')
+      .addSelect(
+        'COUNT(*) FILTER (WHERE vote.preference = :dislike)',
+        'dislikeCount',
+      )
+      .where('vote.recommendation IN (:...recommendationIds)', {
+        recommendationIds,
+      })
+      .setParameters({
+        like: PreferenceType.Like,
+        dislike: PreferenceType.Dislike,
+      })
+      .groupBy('vote.recommendation')
+      .getRawMany<{
+        recommendationId: string
+        likeCount: string
+        dislikeCount: string
+      }>()
+
+    return new Map(
+      rows.map((row) => [
+        row.recommendationId,
+        {
+          likeCount: Number(row.likeCount),
+          dislikeCount: Number(row.dislikeCount),
         },
       ]),
     )
