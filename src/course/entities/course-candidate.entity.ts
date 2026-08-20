@@ -27,4 +27,8 @@ export class CourseCandidate extends BaseEntity {
 
   @Column({ default: false })
   isSelected: boolean
+
+  select(): void {
+    this.isSelected = true
+  }
 }

@@ -24,6 +24,7 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -393,20 +394,24 @@ export class MeetingController {
       '이마저 실패하면 COURSE_GENERATION_FAILED로 전환됩니다.',
   })
   @ApiOkResponse({ type: MeetingStatusResponseDto })
-  @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
   @ApiErrorResponse(
-    CommonErrorCode.notImplemented,
-    '실제 데이터 연동 전까지 제공되지 않는 API',
+    CommonErrorCode.validationError,
+    'meetingId 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임을 찾을 수 없음')
+  @ApiErrorResponse(
+    MeetingErrorCode.confirmedCourseCandidateNotFound,
+    '모임이 코스 확정 상태인데 확정된 코스 후보를 찾을 수 없는 데이터 정합성 오류',
   )
   getMeetingStatus(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new CommonException(CommonErrorCode.notImplemented)
+    @Query('accessToken') accessToken: string,
+  ): Promise<MeetingStatusResponseDto> {
+    return this.meetingService.getMeetingStatus(meetingId, accessToken)
   }
 
   @Get(':meetingId/places/pins')
@@ -430,24 +435,28 @@ export class MeetingController {
       '코스가 생성 완료되었거나 확정된 상태에서는 호출할 수 없습니다.',
   })
   @ApiOkResponse({ type: MapPinsResponseDto })
-  @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임을 찾을 수 없습니다.' })
-  @ApiConflictResponse({
-    description:
-      '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없습니다.',
-  })
   @ApiErrorResponse(
-    CommonErrorCode.notImplemented,
-    '실제 데이터 연동 전까지 제공되지 않는 API',
+    CommonErrorCode.validationError,
+    'meetingId 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.notFound, '모임을 찾을 수 없음')
+  @ApiErrorResponse(
+    MeetingErrorCode.mapPinsNotVisible,
+    '모임이 코스 생성 완료 또는 확정된 상태여서 지도 핀을 조회할 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.meetingLocationDataMissing,
+    '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류',
   )
   getMapPins(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new CommonException(CommonErrorCode.notImplemented)
+    @Query('accessToken') accessToken: string,
+  ): Promise<MapPinsResponseDto> {
+    return this.meetingService.getMapPins(meetingId, accessToken)
   }
 
   @Patch(':meetingId/places/:recommendationId/preference')
@@ -477,31 +486,34 @@ export class MeetingController {
   })
   @ApiBody({ type: UpdatePlacePreferenceRequestDto })
   @ApiOkResponse({ type: PlacePreferenceResponseDto })
-  @ApiBadRequestResponse({
-    description:
-      'meetingId, recommendationId 형식이 올바르지 않거나 preference 값이 유효하지 않습니다.',
-  })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({
-    description: '모임 또는 추천 장소를 찾을 수 없습니다.',
-  })
-  @ApiConflictResponse({
-    description:
-      '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없습니다.',
-  })
   @ApiErrorResponse(
-    CommonErrorCode.notImplemented,
-    '실제 데이터 연동 전까지 제공되지 않는 API',
+    CommonErrorCode.validationError,
+    'meetingId, recommendationId 형식이 올바르지 않거나 preference 값이 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    [MeetingErrorCode.notFound, MeetingErrorCode.recommendationNotFound],
+    '모임 또는 추천 장소를 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.placePreferenceNotEditable,
+    '모임이 코스 생성 중이거나 코스가 확정된 상태여서 반응을 변경할 수 없음',
   )
   updatePlacePreference(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('recommendationId', BigIntStringPipe) recommendationId: string,
-    @Query('accessToken') _accessToken: string,
-    @Body() _dto: UpdatePlacePreferenceRequestDto,
-  ): never {
-    throw new CommonException(CommonErrorCode.notImplemented)
+    @Query('accessToken') accessToken: string,
+    @Body() dto: UpdatePlacePreferenceRequestDto,
+  ): Promise<PlacePreferenceResponseDto> {
+    return this.meetingService.updatePlacePreference(
+      meetingId,
+      recommendationId,
+      accessToken,
+      dto.preference,
+    )
   }
 
   @Put(':meetingId/course-image')
@@ -658,30 +670,38 @@ export class MeetingController {
       '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있습니다.',
   })
   @ApiOkResponse({ type: SimilarPlaceResponseDto, isArray: true })
-  @ApiBadRequestResponse({
-    description:
-      'meetingId, placeId 형식이 올바르지 않거나 excludeIds, size 값이 유효하지 않습니다.',
-  })
-  @ApiUnauthorizedResponse({
-    description: 'accessToken이 없거나 유효하지 않습니다.',
-  })
-  @ApiNotFoundResponse({ description: '모임 또는 장소를 찾을 수 없습니다.' })
-  @ApiConflictResponse({
-    description:
-      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없습니다.',
-  })
   @ApiErrorResponse(
-    CommonErrorCode.notImplemented,
-    '실제 데이터 연동 전까지 제공되지 않는 API',
+    CommonErrorCode.validationError,
+    'meetingId, placeId 형식이 올바르지 않거나 excludeIds, size 값이 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    'accessToken이 없거나 유효하지 않음',
+  )
+  @ApiErrorResponse(
+    [MeetingErrorCode.notFound, MeetingErrorCode.placeNotFound],
+    '모임 또는 장소를 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.similarPlacesNotRecommendable,
+    '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태가 아니어서 비슷한 장소를 추천받을 수 없음',
   )
   getSimilarPlaces(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
     @Param('placeId', BigIntStringPipe) placeId: string,
-    @Query('accessToken') _accessToken: string,
-    @Query('excludeIds', BigIntStringArrayPipe) excludeIds?: string[],
-    @Query('size', new PositiveIntPipe(5)) size?: number,
-  ): never {
-    throw new CommonException(CommonErrorCode.notImplemented)
+    @Query('accessToken') accessToken: string,
+    @Query('excludeIds', BigIntStringArrayPipe) excludeIds:
+      | string[]
+      | undefined,
+    @Query('size', new PositiveIntPipe(5)) size: number,
+  ): Promise<SimilarPlaceResponseDto[]> {
+    return this.meetingService.getSimilarPlaces(
+      meetingId,
+      placeId,
+      accessToken,
+      excludeIds,
+      size,
+    )
   }
 }
 

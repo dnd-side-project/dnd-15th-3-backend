@@ -6,24 +6,30 @@ import { PlaceController } from './place.controller'
 import { PlaceService } from './place.service'
 
 describe('PlaceController', () => {
-  it('실제 데이터 연동 전까지 501을 반환한다', () => {
-    const placeService = { searchPlaces: jest.fn() }
+  it('장소 상세 조회를 서비스에 위임한다', async () => {
+    const placeService = {
+      getPlaceDetail: jest.fn().mockResolvedValue({ placeId: '1' }),
+    }
     const kakaoLocal = { searchAddressPlaces: jest.fn() }
     const controller = new PlaceController(
       placeService as unknown as PlaceService,
       kakaoLocal as unknown as KakaoLocalService,
     )
 
-    expect(() => controller.getPlaceDetail('1', 'token')).toThrow(
-      CommonException,
-    )
+    await expect(
+      controller.getPlaceDetail('1', 'token'),
+    ).resolves.toMatchObject({ placeId: '1' })
+    expect(placeService.getPlaceDetail).toHaveBeenCalledWith('1', 'token')
   })
 
   it('Swagger 문서에 모든 응답 코드와 응답 스키마가 포함된다', async () => {
     const moduleFixture = await Test.createTestingModule({
       controllers: [PlaceController],
       providers: [
-        { provide: PlaceService, useValue: { searchPlaces: jest.fn() } },
+        {
+          provide: PlaceService,
+          useValue: { searchPlaces: jest.fn(), getPlaceDetail: jest.fn() },
+        },
         {
           provide: KakaoLocalService,
           useValue: { searchAddressPlaces: jest.fn() },
@@ -43,7 +49,6 @@ describe('PlaceController', () => {
     expect(placeDetailPath?.get?.responses).toHaveProperty('400')
     expect(placeDetailPath?.get?.responses).toHaveProperty('401')
     expect(placeDetailPath?.get?.responses).toHaveProperty('404')
-    expect(placeDetailPath?.get?.responses).toHaveProperty('501')
 
     type SchemaWithProperties = {
       properties?: Record<string, { type?: string; nullable?: boolean }>

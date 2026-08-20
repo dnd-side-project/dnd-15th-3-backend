@@ -1,13 +1,18 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { Repository } from 'typeorm'
+import type { PlaceSearchResultDto } from './dto/place-search-result.dto'
+import { Place } from './entities/place.entity'
 import { PlaceException } from './exception/place.exception'
 import { PlaceErrorCode } from './exception/place-error-code'
 import { PlaceRepository } from './place.repository'
+import { PlaceImageService } from './place-image.service'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
 import {
   type PlaceSearchResponse,
@@ -22,8 +27,11 @@ export class PlaceService {
     private readonly meetingLocationRepository: Repository<MeetingLocation>,
     @InjectRepository(MeetingParticipant)
     private readonly participantRepository: Repository<MeetingParticipant>,
-    private readonly placeRepository: PlaceRepository,
+    @InjectRepository(Place)
+    private readonly placeRepository: Repository<Place>,
+    private readonly placeSearchRepository: PlaceRepository,
     private readonly placeSyncService: PlaceSyncService,
+    private readonly placeImageService: PlaceImageService,
   ) {}
 
   async searchPlaces(
@@ -48,7 +56,7 @@ export class PlaceService {
       throw new PlaceException(PlaceErrorCode.meetingLocationNotFound)
     }
 
-    const result = await this.placeRepository.findNearby(
+    const result = await this.placeSearchRepository.findNearby(
       request,
       meetingLocation.latitude,
       meetingLocation.longitude,
@@ -74,5 +82,38 @@ export class PlaceService {
     }
 
     return parsedResponse.data
+  }
+
+  async getPlaceDetail(
+    placeId: string,
+    accessToken: string,
+  ): Promise<PlaceSearchResultDto> {
+    assertAccessToken(accessToken)
+    const participant = await this.participantRepository.findOne({
+      where: { accessToken: accessToken.trim() },
+    })
+    if (!participant) {
+      throw new CommonException(CommonErrorCode.authenticationFailed)
+    }
+
+    const place = await this.placeRepository.findOne({
+      where: { id: placeId },
+      relations: { category: true },
+    })
+    if (!place) {
+      throw new PlaceException(PlaceErrorCode.notFound)
+    }
+
+    const imageUrls = await this.placeImageService.getImageUrls(placeId)
+
+    return {
+      placeId: place.id,
+      category: place.category.name,
+      categorySlug: place.category.slug as CategorySlug,
+      name: place.name,
+      address: place.address,
+      imageUrls,
+      previewUrl: place.previewUrl as string,
+    }
   }
 }

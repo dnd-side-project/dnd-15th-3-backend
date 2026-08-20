@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! kubectl config current-context >/dev/null 2>&1; then
+  echo "kubeconfig not found. Run 'mise run cluster-check' for setup guidance." >&2
+  exit 1
+fi
+
 namespace=dnd-15th-3-dev
 secret_name=momo-postgres-auth
 

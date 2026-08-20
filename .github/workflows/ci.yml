@@ -110,12 +110,24 @@ jobs:
           kubectl kustomize deploy/k8s/overlays/main >"$render_dir/app-main.yaml"
           kubectl kustomize deploy/k8s/postgres/overlays/develop >"$render_dir/postgres-develop.yaml"
           kubectl kustomize deploy/k8s/postgres/overlays/main >"$render_dir/postgres-main.yaml"
+          kubectl kustomize deploy/k8s/statistics-postgres/overlays/develop >"$render_dir/statistics-postgres-develop.yaml"
+          kubectl kustomize deploy/k8s/statistics-postgres/overlays/main >"$render_dir/statistics-postgres-main.yaml"
+          kubectl kustomize deploy/argocd >"$render_dir/argocd.yaml"
 
           awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-api-migration/ && /argocd.argoproj.io\/hook: PreSync/ { found = 1 } END { exit !found }' "$render_dir/app-develop.yaml"
-          if awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-api-migration/ { found = 1 } END { exit !found }' "$render_dir/app-main.yaml"; then
-            echo 'Migration Job must not render in the main overlay.' >&2
-            exit 1
-          fi
+          awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-api-migration/ && /argocd.argoproj.io\/hook: PreSync/ { found = 1 } END { exit !found }' "$render_dir/app-main.yaml"
 
           awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /name: momo-postgres/ && /image: ghcr.io\/dnd-side-project\/dnd-15th-3-postgis@sha256:0f769879a66f6ea0b8352644b7a60cb5623c9534b015ae928ae53de4deb658eb/ { found = 1 } END { exit !found }' "$render_dir/postgres-develop.yaml"
-          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /name: momo-postgres/ && /image: postgres:17-alpine/ { found = 1 } END { exit !found }' "$render_dir/postgres-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /name: momo-postgres/ && /image: ghcr.io\/dnd-side-project\/dnd-15th-3-postgis@sha256:0f769879a66f6ea0b8352644b7a60cb5623c9534b015ae928ae53de4deb658eb/ { found = 1 } END { exit !found }' "$render_dir/postgres-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: SealedSecret/ && /namespace: dnd-15th-3-dev/ && /name: momo-postgres-backup-storage/ { found = 1 } END { exit !found }' "$render_dir/postgres-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: SealedSecret/ && /namespace: dnd-15th-3-prod/ && /name: momo-postgres-backup-storage/ { found = 1 } END { exit !found }' "$render_dir/postgres-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /namespace: dnd-15th-3-dev/ && /name: momo-statistics-postgres/ && /serviceName: momo-statistics-postgres/ && /name: momo-statistics-postgres-auth/ && /image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193/ && /preferredDuringSchedulingIgnoredDuringExecution/ && /weight: 100/ && /values:[[:space:]]+- momo-postgres/ && /volumeClaimTemplates:[[:space:]]+- metadata:[[:space:]]+name: data/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /namespace: dnd-15th-3-prod/ && /name: momo-statistics-postgres/ && /serviceName: momo-statistics-postgres/ && /name: momo-statistics-postgres-auth/ && /image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193/ && /preferredDuringSchedulingIgnoredDuringExecution/ && /weight: 100/ && /values:[[:space:]]+- momo-postgres/ && /volumeClaimTemplates:[[:space:]]+- metadata:[[:space:]]+name: data/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Service/ && /namespace: dnd-15th-3-dev/ && /name: momo-statistics-postgres/ && /selector:[[:space:]]+app.kubernetes.io\/name: momo-statistics-postgres/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Service/ && /namespace: dnd-15th-3-prod/ && /name: momo-statistics-postgres/ && /selector:[[:space:]]+app.kubernetes.io\/name: momo-statistics-postgres/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-main.yaml"
+          if awk 'BEGIN { RS = "---" } /kind: CronJob/ && /name: momo-statistics-postgres-backup/ { found = 1 } END { exit !found }' "$render_dir/statistics-postgres-develop.yaml" "$render_dir/statistics-postgres-main.yaml"; then
+            echo 'Statistics backup must not be scheduled before its external storage credentials exist.' >&2
+            exit 1
+          fi
+          awk 'BEGIN { RS = "---" } /kind: Application/ && /name: dnd-15th-3-statistics-postgres-dev/ && /path: deploy\/k8s\/statistics-postgres\/overlays\/develop/ { found = 1 } END { exit !found }' "$render_dir/argocd.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Application/ && /name: dnd-15th-3-statistics-postgres-prod/ && /path: deploy\/k8s\/statistics-postgres\/overlays\/main/ { found = 1 } END { exit !found }' "$render_dir/argocd.yaml"

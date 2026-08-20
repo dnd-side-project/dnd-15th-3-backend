@@ -13,4 +13,8 @@ export abstract class BaseEntity {
 
   @UpdateDateColumn()
   updatedAt: Date
+
+  equals(other: BaseEntity): boolean {
+    return this.id === other.id
+  }
 }
