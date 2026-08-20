@@ -13,9 +13,18 @@ export type DatabaseConnectionConfig = {
   synchronize: boolean
 }
 
+export type DatabaseOptionsGlobs = {
+  entitiesGlob: string
+  migrationsGlob: string
+}
+
+export const CORE_ENTITIES_GLOB = '**/*.entity{.ts,.js}'
+export const CORE_MIGRATIONS_GLOB = 'database/migrations/*{.ts,.js}'
+
 export function createDatabaseOptions(
   config: DatabaseConnectionConfig,
   rootDirectory: string,
+  globs: DatabaseOptionsGlobs,
 ): DataSourceOptions {
   return {
     type: 'postgres',
@@ -30,8 +39,8 @@ export function createDatabaseOptions(
           rejectUnauthorized: true,
         }
       : false,
-    entities: [join(rootDirectory, '**/*.entity{.ts,.js}')],
-    migrations: [join(rootDirectory, 'database/migrations/*{.ts,.js}')],
+    entities: [join(rootDirectory, globs.entitiesGlob)],
+    migrations: [join(rootDirectory, globs.migrationsGlob)],
     migrationsTableName: 'typeorm_migrations',
     namingStrategy: new SnakeNamingStrategy(),
     synchronize: config.synchronize,

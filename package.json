@@ -15,6 +15,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "start:place-sync": "node dist/place/place-sync-worker.js",
+    "start:statistics-worker": "node dist/statistics/statistics-worker.js",
+    "start:statistics-worker:dev": "node -r ts-node/register -r tsconfig-paths/register src/statistics/statistics-worker.ts",
     "dev": "mise run dev",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -34,6 +36,8 @@
     "typecheck": "tsc --noEmit",
     "db:start": "mise run db-start",
     "db:stop": "mise run db-stop",
+    "stats-db:start": "mise run stats-db-start",
+    "stats-db:stop": "mise run stats-db-stop",
     "redis:start": "mise run redis-start",
     "redis:stop": "mise run redis-stop",
     "ci": "mise run ci"
