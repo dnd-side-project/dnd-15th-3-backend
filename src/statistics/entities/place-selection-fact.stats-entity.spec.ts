@@ -58,4 +58,26 @@ describe('PlaceSelectionFact entity', () => {
     expect(indices).toHaveLength(1)
     expect(indices[0].columns).toEqual(['meetingId', 'courseVersion'])
   })
+
+  it('createdAt이 생성 시각 컬럼으로 등록된다', () => {
+    const columns = getMetadataArgsStorage().columns.filter(
+      (column) => column.target === PlaceSelectionFact,
+    )
+    const createdAtColumn = columns.find(
+      (column) => column.propertyName === 'createdAt',
+    )
+
+    expect(createdAtColumn?.mode).toBe('createDate')
+  })
+
+  it('updatedAt이 수정 시각 컬럼으로 등록된다', () => {
+    const columns = getMetadataArgsStorage().columns.filter(
+      (column) => column.target === PlaceSelectionFact,
+    )
+    const updatedAtColumn = columns.find(
+      (column) => column.propertyName === 'updatedAt',
+    )
+
+    expect(updatedAtColumn?.mode).toBe('updateDate')
+  })
 })

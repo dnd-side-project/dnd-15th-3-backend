@@ -1,4 +1,12 @@
-import { Check, Column, Entity, Index, PrimaryColumn } from 'typeorm'
+import {
+  Check,
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm'
 
 // 원본 사실 테이블. 코스 하나가 확정되면 그 코스에 포함된 장소마다 row가 하나씩 생성
 // 집계는 해당 원본 사실 테이블을 바탕으로 계산
@@ -52,4 +60,10 @@ export class PlaceSelectionFact {
 
   @Column({ name: 'dislike_count' })
   dislikeCount: number
+
+  @CreateDateColumn()
+  createdAt: Date
+
+  @UpdateDateColumn()
+  updatedAt: Date
 }
