@@ -5,6 +5,7 @@ import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { CommonException } from 'src/common/exception/common.exception'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
+import { MeetingStatus } from './enums/meeting-status.enum'
 import { MeetingTypeCode } from './enums/meeting-type-code.enum'
 import {
   MeetingController,
@@ -23,6 +24,10 @@ function createController() {
     previewInvitation: jest.fn().mockResolvedValue({}),
     joinMeeting: jest.fn().mockResolvedValue({}),
     getMeetingDetail: jest.fn().mockResolvedValue({}),
+    getMeetingStatus: jest.fn().mockResolvedValue({}),
+    getMapPins: jest.fn().mockResolvedValue({}),
+    updatePlacePreference: jest.fn().mockResolvedValue({}),
+    getSimilarPlaces: jest.fn().mockResolvedValue([]),
     storeCourseImage: jest.fn().mockResolvedValue({}),
     downloadCourseImage: jest.fn().mockResolvedValue({
       body: Readable.from(Buffer.from('image')),
@@ -37,24 +42,82 @@ function createController() {
 }
 
 describe('MeetingController', () => {
-  it('실제 데이터 연동 전까지 미구현 엔드포인트가 501을 반환한다', () => {
-    const { controller } = createController()
+  it('모임 상태 조회는 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = {
+      status: MeetingStatus.RecommendationCollecting,
+      confirmedCourseCandidateId: null,
+    }
+    ;(meetingService.getMeetingStatus as jest.Mock).mockResolvedValue(expected)
 
-    expect(() => controller.getMeetingStatus('1', 'token')).toThrow(
-      CommonException,
+    await expect(controller.getMeetingStatus('1', 'token')).resolves.toEqual(
+      expected,
     )
-    expect(() => controller.getMapPins('1', 'token')).toThrow(CommonException)
-    expect(() =>
+    expect(meetingService.getMeetingStatus).toHaveBeenCalledWith('1', 'token')
+  })
+
+  it('전체 지도 핀 조회는 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = {
+      startPlace: { name: '강남역', longitude: 127.0276, latitude: 37.4979 },
+      sharedPlaces: [],
+    }
+    ;(meetingService.getMapPins as jest.Mock).mockResolvedValue(expected)
+
+    await expect(controller.getMapPins('1', 'token')).resolves.toEqual(expected)
+    expect(meetingService.getMapPins).toHaveBeenCalledWith('1', 'token')
+  })
+
+  it('장소 반응 설정은 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = {
+      likeCount: 1,
+      dislikeCount: 0,
+      myPreference: PreferenceType.Like,
+    }
+    ;(meetingService.updatePlacePreference as jest.Mock).mockResolvedValue(
+      expected,
+    )
+
+    await expect(
       controller.updatePlacePreference('1', '2', 'token', {
         preference: PreferenceType.Like,
       }),
-    ).toThrow(CommonException)
-    expect(() => controller.getSimilarPlaces('1', '2', 'token')).toThrow(
-      CommonException,
+    ).resolves.toEqual(expected)
+    expect(meetingService.updatePlacePreference).toHaveBeenCalledWith(
+      '1',
+      '2',
+      'token',
+      PreferenceType.Like,
     )
-    expect(() =>
+  })
+
+  it('비슷한 장소 추천은 MeetingService에 위임한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = [
+      {
+        id: '10',
+        categoryId: '1',
+        name: '성수 카페 모모',
+        address: '서울 성동구 성수이로 1',
+        latitude: 37.5446,
+        longitude: 127.0557,
+        primaryImageUrl: null,
+        previewUrl: null,
+      },
+    ]
+    ;(meetingService.getSimilarPlaces as jest.Mock).mockResolvedValue(expected)
+
+    await expect(
       controller.getSimilarPlaces('1', '2', 'token', ['3', '4'], 5),
-    ).toThrow(CommonException)
+    ).resolves.toEqual(expected)
+    expect(meetingService.getSimilarPlaces).toHaveBeenCalledWith(
+      '1',
+      '2',
+      'token',
+      ['3', '4'],
+      5,
+    )
   })
 
   it('Swagger 문서에 미구현 엔드포인트의 경로와 응답 코드가 포함된다', async () => {
@@ -72,6 +135,10 @@ describe('MeetingController', () => {
             updateCoursePlan: jest.fn(),
             previewInvitation: jest.fn(),
             joinMeeting: jest.fn(),
+            getMeetingStatus: jest.fn(),
+            getMapPins: jest.fn(),
+            updatePlacePreference: jest.fn(),
+            getSimilarPlaces: jest.fn(),
             storeCourseImage: jest.fn(),
             downloadCourseImage: jest.fn(),
           },
@@ -99,21 +166,21 @@ describe('MeetingController', () => {
       | PathOperations
       | undefined
     expect(responseCodes(meetingStatusPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '501'].sort(),
+      ['200', '400', '401', '404', '500'].sort(),
     )
 
     const mapPinsPath = document.paths?.['/meetings/{meetingId}/places/pins'] as
       | PathOperations
       | undefined
     expect(responseCodes(mapPinsPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409', '500'].sort(),
     )
 
     const preferencePath = document.paths?.[
       '/meetings/{meetingId}/places/{recommendationId}/preference'
     ] as PathOperations | undefined
     expect(responseCodes(preferencePath?.patch?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409'].sort(),
     )
 
     const courseImagePath = document.paths?.[
@@ -133,7 +200,7 @@ describe('MeetingController', () => {
       '/meetings/{meetingId}/places/{placeId}/similar'
     ] as PathOperations | undefined
     expect(responseCodes(similarPlacesPath?.get?.responses)).toEqual(
-      ['200', '400', '401', '404', '409', '501'].sort(),
+      ['200', '400', '401', '404', '409'].sort(),
     )
 
     expect(document.components?.schemas?.PreferenceType).toMatchObject({
@@ -163,6 +230,19 @@ describe('MeetingController', () => {
     expect(Object.keys(mapPinsSchema?.properties ?? {})).toEqual(
       expect.arrayContaining(['startPlace', 'sharedPlaces']),
     )
+
+    const mapPinSchema = document.components?.schemas?.MapPinDto as
+      | (SchemaWithProperties & { required?: string[] })
+      | undefined
+    expect(Object.keys(mapPinSchema?.properties ?? {})).toEqual([
+      'placeId',
+      'name',
+      'category',
+      'categorySlug',
+      'longitude',
+      'latitude',
+    ])
+    expect(mapPinSchema?.required).toEqual(['name', 'longitude', 'latitude'])
 
     const updatePreferenceRequestSchema = document.components?.schemas
       ?.UpdatePlacePreferenceRequestDto as
@@ -210,6 +290,9 @@ describe('MeetingController', () => {
     expect(
       similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
     ).toBe(true)
+    expect(similarPlaceResponseSchema?.properties?.previewUrl?.nullable).toBe(
+      true,
+    )
 
     await app.close()
   })
@@ -311,6 +394,7 @@ describe('MeetingController', () => {
             previewInvitation: jest.fn(),
             joinMeeting: jest.fn(),
             getMeetingDetail: jest.fn(),
+            getMeetingStatus: jest.fn(),
             storeCourseImage: jest.fn(),
             downloadCourseImage: jest.fn(),
           },

@@ -9,7 +9,6 @@ import {
 import { FirstMeetingPlaceResponseDto } from 'src/catalog/dto/first-meeting-place-response.dto'
 import { firstMeetingSearchRequestSchema } from 'src/catalog/schema/first-meeting-search-request.schema'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
-import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { createValidationException } from 'src/common/exception/validation-exception.factory'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
@@ -154,15 +153,11 @@ export class PlaceController {
     CommonErrorCode.authenticationFailed,
     '참여자 토큰이 유효하지 않음',
   )
-  @ApiErrorResponse(CommonErrorCode.resourceNotFound, '장소를 찾을 수 없음')
-  @ApiErrorResponse(
-    CommonErrorCode.notImplemented,
-    '실제 데이터 연동 전까지 제공되지 않는 API',
-  )
-  getPlaceDetail(
+  @ApiErrorResponse(PlaceErrorCode.notFound, '장소를 찾을 수 없음')
+  async getPlaceDetail(
     @Param('placeId', BigIntStringPipe) placeId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new CommonException(CommonErrorCode.notImplemented)
+    @Query('accessToken') accessToken: string,
+  ): Promise<PlaceSearchResultDto> {
+    return await this.placeService.getPlaceDetail(placeId, accessToken)
   }
 }

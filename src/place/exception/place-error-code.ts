@@ -2,6 +2,11 @@ import { HttpStatus } from '@nestjs/common'
 import type { ErrorCode } from 'src/common/exception/error-code.type'
 
 export const PlaceErrorCode = {
+  notFound: {
+    code: 'PLACE_NOT_FOUND',
+    status: HttpStatus.NOT_FOUND,
+    message: '장소를 찾을 수 없습니다.',
+  },
   meetingLocationNotFound: {
     code: 'PLACE_MEETING_LOCATION_NOT_FOUND',
     status: HttpStatus.NOT_FOUND,

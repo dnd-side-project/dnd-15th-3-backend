@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs'
 import { loadEnvFile } from 'node:process'
-import { Module } from '@nestjs/common'
+import { Module, ValidationPipe } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
-import { APP_FILTER } from '@nestjs/core'
+import { APP_FILTER, APP_PIPE } from '@nestjs/core'
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
@@ -62,6 +62,10 @@ const infrastructureModules = [
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({ transform: true }),
+    },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
   ],
 })

@@ -23,9 +23,38 @@ type RawCountRow = {
   total: string
 }
 
+type RawSimilarPlaceRow = {
+  id: string
+  name: string
+  address: string
+  latitude: number | string
+  longitude: number | string
+  previewUrl: string | null
+}
+
 export type NearbyPlacesPage = {
   items: PlaceSearchItem[]
   total: number
+}
+
+export type SimilarPlace = {
+  id: string
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  previewUrl: string | null
+}
+
+const SIMILAR_PLACE_CANDIDATE_POOL_SIZE = 200
+
+export function shuffle<T>(items: readonly T[]): T[] {
+  const result = [...items]
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
 }
 
 @Injectable()
@@ -108,5 +137,55 @@ export class PlaceRepository {
       })),
       total: Number(countRows[0]?.total ?? 0),
     }
+  }
+
+  async findSimilar(
+    categoryId: string,
+    excludedPlaceIds: readonly string[],
+    latitude: number,
+    longitude: number,
+    radiusMeters: number,
+    limit: number,
+  ): Promise<SimilarPlace[]> {
+    const rows = (await this.dataSource.query(
+      `
+        SELECT
+          "place"."id" AS "id",
+          "place"."name" AS "name",
+          "place"."address" AS "address",
+          "place"."latitude" AS "latitude",
+          "place"."longitude" AS "longitude",
+          "place"."preview_url" AS "previewUrl"
+        FROM "place" AS "place"
+        WHERE "place"."category_id" = $1
+          AND "place"."id" <> ALL($2::bigint[])
+          AND ST_DWithin(
+            "place"."location",
+            ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
+            $5
+          )
+        ORDER BY "place"."location" <-> ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography
+        LIMIT $6
+      `,
+      [
+        categoryId,
+        excludedPlaceIds,
+        longitude,
+        latitude,
+        radiusMeters,
+        SIMILAR_PLACE_CANDIDATE_POOL_SIZE,
+      ],
+    )) as RawSimilarPlaceRow[]
+
+    const candidates = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      address: row.address,
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      previewUrl: row.previewUrl,
+    }))
+
+    return shuffle(candidates).slice(0, limit)
   }
 }

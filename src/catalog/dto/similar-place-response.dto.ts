@@ -31,8 +31,10 @@ export class SimilarPlaceResponseDto {
   primaryImageUrl!: string | null
 
   @ApiProperty({
-    description: '미리보기 URL',
+    description: '미리보기 URL. 아직 수집되지 않았다면 null입니다.',
+    type: 'string',
     example: 'https://...',
+    nullable: true,
   })
-  previewUrl!: string
+  previewUrl!: string | null
 }
