@@ -4,4 +4,5 @@ export enum ProfileAvatarId {
   MomoPurple = 'momo-purple',
   MomoPink = 'momo-pink',
   MomoGreen = 'momo-green',
+  MomoMint = 'momo-mint',
 }
