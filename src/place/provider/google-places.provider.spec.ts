@@ -1,4 +1,5 @@
 import type { ConfigService } from '@nestjs/config'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import type { Env } from 'src/config/env'
 import { PlaceErrorCode } from '../exception/place-error-code'
 import { GooglePlacesProvider } from './google-places.provider'
@@ -39,7 +40,7 @@ describe('GooglePlacesProvider', () => {
         latitude: 37.5,
         longitude: 127,
         radiusMeters: 750,
-        providerTypes: ['cafe'],
+        categorySlug: CategorySlug.Cafe,
       }),
     ).resolves.toEqual({
       places: [
@@ -64,6 +65,9 @@ describe('GooglePlacesProvider', () => {
       'X-Goog-Api-Key': 'google-key',
     })
     expect(options?.headers).toHaveProperty('X-Goog-FieldMask')
+    expect(JSON.parse(String(options?.body))).toMatchObject({
+      includedTypes: ['cafe'],
+    })
   })
 
   it('API 키가 없으면 외부 API를 호출하지 않는다', async () => {
@@ -74,9 +78,14 @@ describe('GooglePlacesProvider', () => {
         latitude: 37.5,
         longitude: 127,
         radiusMeters: 750,
-        providerTypes: ['cafe'],
+        categorySlug: CategorySlug.Cafe,
       }),
     ).rejects.toMatchObject({ errorCode: PlaceErrorCode.providerUnavailable })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('Provider 타입이 있는 카테고리만 지원한다', () => {
+    expect(createProvider().supportsCategory(CategorySlug.Other)).toBe(false)
+    expect(createProvider().supportsCategory(CategorySlug.Cafe)).toBe(true)
   })
 })

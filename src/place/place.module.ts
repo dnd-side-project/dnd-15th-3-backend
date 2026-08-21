@@ -14,6 +14,7 @@ import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
 import { PlaceImageService } from './place-image.service'
 import { GooglePlacesProvider } from './provider/google-places.provider'
+import { KakaoPlacesProvider } from './provider/kakao-places.provider'
 import { PlaceSyncService } from './sync/place-sync.service'
 import { PLACE_PROVIDER } from './sync/place-sync.tokens'
 import { PlaceSyncWorker } from './sync/place-sync.worker'
@@ -38,6 +39,9 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
     PlaceService,
     PlaceImageService,
     GooglePlacesProvider,
+    KakaoPlacesProvider,
+    // Kakao Local 검색 결과는 장소 ID와 URL 외에는 영구 저장할 수 없다.
+    // 별도 허가 전까지 DB 수집 작업은 Google Provider만 사용한다.
     { provide: PLACE_PROVIDER, useExisting: GooglePlacesProvider },
     PlaceSyncService,
     PlaceSyncWorker,
