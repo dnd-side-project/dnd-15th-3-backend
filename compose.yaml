@@ -16,5 +16,23 @@ services:
       timeout: 3s
       retries: 10
 
+  statistics-postgres:
+    image: postgres:17
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:15433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: momo
+      POSTGRES_DB: momo_statistics
+    volumes:
+      - statistics-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d momo_statistics"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   db-data:
+  statistics-db-data:

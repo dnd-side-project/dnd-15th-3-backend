@@ -20,6 +20,9 @@ source .env.development
 set +a
 
 bash scripts/dev-db-local.sh
+if ! bash scripts/dev-stats-db-local.sh; then
+  echo "Warning: local statistics PostgreSQL failed to start; continuing without it." >&2
+fi
 
 export DB_HOST=127.0.0.1
 export DB_PORT=15432
@@ -29,7 +32,19 @@ export DB_DATABASE=momo
 export DB_SSL=false
 export DB_SYNCHRONIZE=false
 
+export STATS_DB_HOST=127.0.0.1
+export STATS_DB_PORT=15433
+export STATS_DB_USERNAME=postgres
+export STATS_DB_PASSWORD=momo
+export STATS_DB_DATABASE=momo_statistics
+export STATS_DB_SSL=false
+export STATS_DB_SYNCHRONIZE=false
+
 pnpm migration:run
+
+pnpm start:statistics-worker:dev &
+statistics_worker_pid=$!
+trap 'kill "$statistics_worker_pid" 2>/dev/null' EXIT
 
 echo "Starting API at http://localhost:3000 (Swagger UI: /api/v1/docs)"
 pnpm start:dev
