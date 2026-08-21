@@ -23,6 +23,7 @@ describe('MeetingParticipant entity', () => {
       'momo-purple',
       'momo-pink',
       'momo-green',
+      'momo-mint',
     ])
   })
 })

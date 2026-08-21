@@ -6,4 +6,5 @@ export const PROFILE_AVATAR_DEFINITIONS = [
   { id: ProfileAvatarId.MomoPurple, name: '보라 모모', displayOrder: 3 },
   { id: ProfileAvatarId.MomoPink, name: '분홍 모모', displayOrder: 4 },
   { id: ProfileAvatarId.MomoGreen, name: '초록 모모', displayOrder: 5 },
+  { id: ProfileAvatarId.MomoMint, name: '민트 모모', displayOrder: 6 },
 ] as const
