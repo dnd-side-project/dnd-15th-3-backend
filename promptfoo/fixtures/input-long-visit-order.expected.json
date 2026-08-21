@@ -1,0 +1,43 @@
+{
+  "routes": [
+    {
+      "routeId": 1,
+      "strategy": "distance_minimization",
+      "places": [
+        { "placeId": "6", "order": 1, "category": "식당" },
+        { "placeId": "10", "order": 2, "category": "카페" },
+        { "placeId": "7", "order": 3, "category": "액티비티" },
+        { "placeId": "4", "order": 4, "category": "술/바" },
+        { "placeId": "5", "order": 5, "category": "카페" },
+        { "placeId": "1", "order": 6, "category": "식당" },
+        { "placeId": "8", "order": 7, "category": "술/바" }
+      ]
+    },
+    {
+      "routeId": 2,
+      "strategy": "preference_first",
+      "places": [
+        { "placeId": "9", "order": 1, "category": "식당" },
+        { "placeId": "2", "order": 2, "category": "카페" },
+        { "placeId": "3", "order": 3, "category": "액티비티" },
+        { "placeId": "4", "order": 4, "category": "술/바" },
+        { "placeId": "5", "order": 5, "category": "카페" },
+        { "placeId": "1", "order": 6, "category": "식당" },
+        { "placeId": "8", "order": 7, "category": "술/바" }
+      ]
+    },
+    {
+      "routeId": 3,
+      "strategy": "balanced",
+      "places": [
+        { "placeId": "9", "order": 1, "category": "식당" },
+        { "placeId": "2", "order": 2, "category": "카페" },
+        { "placeId": "3", "order": 3, "category": "액티비티" },
+        { "placeId": "8", "order": 4, "category": "술/바" },
+        { "placeId": "10", "order": 5, "category": "카페" },
+        { "placeId": "6", "order": 6, "category": "식당" },
+        { "placeId": "4", "order": 7, "category": "술/바" }
+      ]
+    }
+  ]
+}
