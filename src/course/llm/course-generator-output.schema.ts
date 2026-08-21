@@ -1,23 +1,35 @@
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { z } from 'zod'
 import {
   buildCourseRoutePlan,
   COURSE_STRATEGIES,
   type CourseRoutePlan,
   calculateRouteMetrics,
-  getRouteSequenceKey,
-  validateStrategySelection,
 } from './course-generator.planner'
 import type { CourseGeneratorInput } from './course-generator-input.schema'
+
+const COURSE_NAME_MIN_LENGTH = 5
+const COURSE_NAME_MAX_LENGTH = 10
+
+const categorySlugSchema = z.enum(
+  Object.values(CategorySlug) as [CategorySlug, ...CategorySlug[]],
+)
 
 const coursePlaceSchema = z.strictObject({
   placeId: z.string().min(1),
   order: z.number().int().positive(),
-  category: z.string().min(1),
+  category: categorySlugSchema,
 })
 
 const courseRouteSchema = z.strictObject({
   routeId: z.number().int().positive(),
-  strategy: z.enum(COURSE_STRATEGIES),
+  name: z
+    .string()
+    .min(COURSE_NAME_MIN_LENGTH)
+    .max(COURSE_NAME_MAX_LENGTH)
+    .refine((name) => name.trim().length > 0, {
+      message: '코스 이름은 공백만으로 구성될 수 없습니다.',
+    }),
   places: z.array(coursePlaceSchema).refine(
     (places) => {
       const ids = places.map((place) => place.placeId)
@@ -30,11 +42,11 @@ const courseRouteSchema = z.strictObject({
 export type CourseGeneratorOutput = {
   routes: {
     routeId: number
-    strategy: string
+    name: string
     places: {
       placeId: string
       order: number
-      category: string
+      category: CategorySlug
     }[]
   }[]
 }
@@ -47,9 +59,6 @@ export function createCourseGeneratorOutputSchema(
   const candidateIds = new Set(input.places.map((place) => place.id))
   const candidatePlaces = new Map(
     input.places.map((place) => [place.id, place]),
-  )
-  const routeCandidateKeys = new Set(
-    plan.routeCandidates.map((route) => getRouteSequenceKey(route.placeIds)),
   )
   const visitOrder = input.visitOrder
 
@@ -117,30 +126,12 @@ export function createCourseGeneratorOutputSchema(
 
       for (const [routeIndex, route] of routes.entries()) {
         const placeIds = route.places.map((place) => place.placeId)
-        const sequenceKey = getRouteSequenceKey(placeIds)
-        const candidate = plan.routeCandidates.find(
-          (routeCandidate) =>
-            getRouteSequenceKey(routeCandidate.placeIds) === sequenceKey,
-        )
         const verified = calculateRouteMetrics(placeIds, input)
 
-        if (!routeCandidateKeys.has(sequenceKey) || !candidate || !verified) {
+        if (!verified) {
           ctx.addIssue({
             code: 'custom',
-            message: `${routeIndex + 1}번째 코스가 서버가 계산한 유효 코스 후보에 없습니다.`,
-          })
-          continue
-        }
-
-        if (
-          Math.abs(
-            candidate.totalDistanceMeters - verified.totalDistanceMeters,
-          ) > 1e-9 ||
-          Math.abs(candidate.totalScore - verified.totalScore) > 1e-9
-        ) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `${routeIndex + 1}번째 코스의 서버 계산 거리 또는 점수가 일치하지 않습니다.`,
+            message: `${routeIndex + 1}번째 코스가 서버 데이터로 검증되지 않는 경로입니다.`,
           })
         }
       }
@@ -172,23 +163,12 @@ export function createCourseGeneratorOutputSchema(
         })
       }
 
-      const strategies = routes.map((route) => route.strategy)
-      if (new Set(strategies).size !== strategies.length) {
+      const names = routes.map((route) => route.name.trim())
+      if (new Set(names).size !== names.length) {
         ctx.addIssue({
           code: 'custom',
-          message: '전략(strategy)은 서로 달라야 합니다.',
+          message: '코스 이름은 서로 달라야 합니다.',
         })
-      }
-
-      const strategyIssues = validateStrategySelection(
-        routes.map((route) => ({
-          strategy: route.strategy,
-          placeIds: route.places.map((place) => place.placeId),
-        })),
-        plan,
-      )
-      for (const message of strategyIssues) {
-        ctx.addIssue({ code: 'custom', message })
       }
     })
 }
