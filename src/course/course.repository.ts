@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
+import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import type { EntityManager } from 'typeorm'
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { CourseCategoryStep } from './entities/course-category-step.entity'
@@ -13,6 +14,7 @@ export class CourseRepository {
     return manager
       .getRepository(Meeting)
       .createQueryBuilder('meeting')
+      .leftJoinAndSelect('meeting.meetingType', 'meetingType')
       .where('meeting.id = :meetingId', { meetingId })
       .setLock('pessimistic_write')
       .getOne()
@@ -42,5 +44,14 @@ export class CourseRepository {
       .from(CourseCandidatePlace)
       .where('course_candidate_id = :courseCandidateId', { courseCandidateId })
       .execute()
+  }
+
+  countParticipants(
+    manager: EntityManager,
+    meetingId: string,
+  ): Promise<number> {
+    return manager
+      .getRepository(MeetingParticipant)
+      .count({ where: { meeting: { id: meetingId } } })
   }
 }

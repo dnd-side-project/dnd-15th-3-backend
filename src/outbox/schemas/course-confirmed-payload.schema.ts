@@ -3,6 +3,8 @@ import { z } from 'zod'
 
 const BIGINT_MAX = 9223372036854775807n
 
+export const COURSE_CONFIRMED_PAYLOAD_VERSION = 1
+
 const idString = z
   .string()
   .regex(/^[1-9]\d*$/)
@@ -23,7 +25,7 @@ export const CourseConfirmedPayloadSchema = z
     // 코스 재확정 기능이 추가될 경우 같은 meetingId로 이벤트가 또 발생할 수 있어, 최신 버전만 집계하도록 구분하는 값
     courseVersion: z.number().int().min(1),
     // 이 payload 구조 자체의 버전. 나중에 필드가 바뀌어도 이미 저장된 옛날 이벤트를 버전별로 구분해 파싱하기 위함
-    payloadVersion: z.literal(1),
+    payloadVersion: z.literal(COURSE_CONFIRMED_PAYLOAD_VERSION),
     participantCount: z.number().int().min(1),
     places: z
       .array(
