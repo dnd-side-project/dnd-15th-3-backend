@@ -2,7 +2,6 @@ import {
   COURSE_STRATEGY_LABELS,
   type CourseRoutePlan,
   type CourseStrategy,
-  getRouteCompositionKey,
   type RouteCandidate,
 } from './course-generator.planner'
 import type {
@@ -18,46 +17,42 @@ const COURSE_SELECTOR_SYSTEM_PROMPT =
 const FEEDBACK_INTERPRETER_SYSTEM_PROMPT =
   '당신은 모임 코스에 대한 자연어 댓글을 구조화된 제약 조건으로 변환하는 AI입니다. 입력에 없는 장소나 속성을 추측하지 말고 JSON 객체 하나만 반환하세요.'
 
-const COURSE_SELECTOR_PROMPT = `당신은 서버가 사전 계산한 유효 코스 후보 중에서 모임 방문 코스를 선택하는 AI입니다.
+const COURSE_SELECTOR_PROMPT = `당신은 서버가 계산한 유효 코스 후보 중에서 모임 방문 코스를 선택하는 AI입니다.
 
 ## 절대 규칙
 
-- 거리나 점수를 직접 계산하지 마세요.
-- 입력에 있는 routeCandidates와 selectionPools의 값을 그대로 사용하세요.
-- placeIds는 서버가 전달한 후보의 배열을 순서 그대로 복사하세요.
-- 후보에 없는 장소를 만들거나 장소 순서를 바꾸지 마세요.
+- 거리나 점수를 직접 계산하지 마세요. 반드시 routeCandidates 안에 있는 조합(placeIds)만, 배열 순서 그대로 선택하세요. 후보에 없는 조합을 새로 만들지 마세요.
 - 출력은 JSON 객체 하나만 반환하고 설명이나 마크다운을 포함하지 마세요.
 
 ## 선택 규칙
 
- - generationMode가 initial이면 각 전략에서 최대 1개씩 선택하세요.
- - generationMode가 regenerate-one이면 targetStrategy의 코스 1개만 선택하세요.
- - routes의 개수는 입력의 maxUniqueRoutes를 넘지 말고, 가능한 고유 후보가 있는 만큼만 반환하세요.
- - 각 코스의 strategy는 다음 안정적인 ID 중 하나만 사용하세요: distance_minimization, preference_first, balanced.
- - selectionPools는 각 전략에서 허용된 Top-K 후보입니다. 반드시 해당 전략의 selectionPools 안에서 선택하세요.
- - 동일한 장소 구성의 코스를 중복 출력하지 마세요. 순서가 달라도 같은 장소 집합이면 중복입니다.
- - 모든 전략의 후보가 같은 장소 구성을 가리키면 그 구성은 한 번만 출력하세요.
- - variationSeed가 있으면 같은 후보만 반복하지 말고, 허용된 후보 중 seed에 맞는 서로 다른 선택을 우선하세요.
- - variationSeed가 없으면 strategyDefaults의 서로 다른 기본 후보를 우선 사용하세요.
-- 댓글 제약이 있으면 서버가 해석한 feedbackConstraints를 따르세요.
-
-## 전략 라벨
-
-- distance_minimization: 이동거리최소화
-- preference_first: 선호도우선
-- balanced: 균형
+- routeCandidates 중 서로 다른 장소 구성과 성격을 가지도록 최대 3개를 고르세요.
+- routes의 개수는 입력의 maxUniqueRoutes를 넘지 마세요.
+- 순서만 다르고 장소 집합이 같으면 같은 코스입니다. 예: [식당A,카페B,액티비티C,액티비티D]와 [식당A,카페B,액티비티D,액티비티C]는 액티비티 두 곳 순서만 다를 뿐 동일한 코스이니 중복 출력하지 마세요.
+- qna(질문-답변)가 있으면 가장 먼저 고려하세요.
+- qna가 없거나 판단이 어려우면 tags를 참고하세요.
+- meetingType과 isWeekend는 qna·tags를 해석할 때 참고하는 배경 맥락으로만 쓰세요.
+- totalScore는 참가자들의 선호도(좋아요·싫어요 가중 점수)이며, 값이 높을수록 선호도가 높습니다.
+- qna·tags로 우열을 가리기 어려우면 totalScore가 높은 쪽을 우선하세요.
+- totalScore도 같으면 totalDistanceMeters가 짧은 쪽을 우선하세요.
+- 완벽히 맞는 조합이 없어도 빈 배열을 반환하지 말고 가장 가까운 조합을 선택하세요.
+- generationMode가 regenerate-one이면 targetStrategy의 코스 1개만 선택하세요.
+- variationSeed가 있으면 기존과 다른 선택을 우선하고, 없으면 strategyDefaults를 우선 사용하세요.
+- feedbackConstraints가 있으면 그 제약을 따르세요.
 
 ## 출력 제약
 
 - places의 길이는 visitOrder의 길이와 같아야 합니다.
-- places의 category는 visitOrder와 같은 순서여야 합니다.
 - placeId는 문자열입니다.
 - order는 1부터 순차적으로 증가해야 합니다.
+- routeId는 1부터 순차적으로 증가해야 합니다.
 - 출발지는 places에 포함하지 않습니다.
 
 ## 입력 데이터
 
+\`\`\`json
 {{inputJson}}
+\`\`\`
 
 ## 출력 형식
 
@@ -65,12 +60,10 @@ const COURSE_SELECTOR_PROMPT = `당신은 서버가 사전 계산한 유효 코�
   "routes": [
     {
       "routeId": 1,
-      "strategy": "distance_minimization",
       "places": [
         {
           "placeId": "place-id",
-          "order": 1,
-          "category": "식당"
+          "order": 1
         }
       ]
     }
@@ -114,32 +107,22 @@ const FEEDBACK_INTERPRETER_PROMPT = `다음 댓글을 코스 재생성에 사용
 
 type CourseGeneratorModelInput = {
   generationMode: CourseGenerationOptions['mode']
-  targetStrategy?: CourseStrategy
   variationSeed?: string
   startNodeId: CourseGeneratorInput['startNodeId']
+  meetingType: CourseGeneratorInput['meetingType']
+  isWeekend: CourseGeneratorInput['isWeekend']
+  qna: CourseGeneratorInput['qna']
   visitOrder: CourseGeneratorInput['visitOrder']
   places: CourseGeneratorInput['places']
+  distanceMatrix: CourseGeneratorInput['distanceMatrix']
   strategyConfig: CourseGeneratorInput['strategyConfig']
   maxUniqueRoutes: number
   routeCandidates: RouteCandidate[]
-  selectionPools: CourseRoutePlan['selectionPools']
   strategyDefaults: {
     strategy: CourseStrategy
     placeIds: string[]
   }[]
   feedbackConstraints?: CourseFeedbackInterpretation
-}
-
-function getPromptCandidates(
-  selectionPools: CourseRoutePlan['selectionPools'],
-): RouteCandidate[] {
-  const candidates = new Map<string, RouteCandidate>()
-  for (const pool of Object.values(selectionPools)) {
-    for (const candidate of pool) {
-      candidates.set(getRouteCompositionKey(candidate.placeIds), candidate)
-    }
-  }
-  return [...candidates.values()]
 }
 
 export function getCourseSelectorSystemPrompt(): string {
@@ -156,26 +139,19 @@ export function buildCourseGeneratorPrompt(
   options: CourseGenerationOptions = {},
   feedback?: CourseFeedbackInterpretation,
 ): string {
-  const promptCandidates = getPromptCandidates(plan.selectionPools)
   const modelInput: CourseGeneratorModelInput = {
     generationMode: options.mode ?? 'initial',
-    ...(options.targetStrategy
-      ? { targetStrategy: options.targetStrategy }
-      : {}),
     ...(options.variationSeed ? { variationSeed: options.variationSeed } : {}),
     startNodeId: input.startNodeId,
+    meetingType: input.meetingType,
+    isWeekend: input.isWeekend,
+    qna: input.qna,
     visitOrder: input.visitOrder,
     places: input.places,
-    strategyConfig: {
-      balancedMaxDistanceRatio: input.strategyConfig.balancedMaxDistanceRatio,
-      variationTopK: input.strategyConfig.variationTopK,
-      beamWidth: input.strategyConfig.beamWidth,
-      maxSearchStates: input.strategyConfig.maxSearchStates,
-    },
-    maxUniqueRoutes:
-      options.mode === 'regenerate-one' ? 1 : promptCandidates.length,
-    routeCandidates: promptCandidates,
-    selectionPools: plan.selectionPools,
+    distanceMatrix: input.distanceMatrix,
+    strategyConfig: input.strategyConfig,
+    maxUniqueRoutes: plan.routeCandidates.length,
+    routeCandidates: plan.routeCandidates,
     strategyDefaults: plan.selectedRoutes.map(({ strategy, placeIds }) => ({
       strategy,
       placeIds,

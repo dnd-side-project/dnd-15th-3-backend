@@ -50,7 +50,6 @@ function buildFallbackOutput(
   return {
     routes: plan.selectedRoutes.map((route, routeIndex) => ({
       routeId: routeIndex + 1,
-      strategy: route.strategy,
       places: route.placeIds.map((placeId, placeIndex) => ({
         placeId,
         order: placeIndex + 1,

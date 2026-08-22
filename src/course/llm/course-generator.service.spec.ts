@@ -90,11 +90,12 @@ describe('CourseGeneratorService', () => {
 
       const [systemPrompt, userPrompt] = mockChat.mock.calls[0]
       expect(systemPrompt).toContain('유효 코스 후보 중 최적')
-      expect(userPrompt).toContain('"식당"')
       expect(userPrompt).toContain('"startNodeId":"start"')
+      expect(userPrompt).toContain('"meetingType"')
+      expect(userPrompt).toContain('"distanceMatrix"')
       expect(userPrompt).toContain('"routeCandidates"')
       expect(userPrompt).toContain('"totalDistanceMeters"')
-      expect(userPrompt).toContain('"selectionPools"')
+      expect(userPrompt).not.toContain('"selectionPools"')
       expect(userPrompt).not.toContain('"feedbackConstraints"')
     })
 
@@ -157,7 +158,6 @@ describe('CourseGeneratorService', () => {
       const service = new CourseGeneratorService(client as unknown as LlmClient)
       const output = await service.generate(input)
 
-      expect(output.routes[0].strategy).toBe('distance_minimization')
       expect(output.routes[0].places.map((place) => place.placeId)).toEqual([
         '1',
         '4',
