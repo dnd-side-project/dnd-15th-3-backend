@@ -19,14 +19,18 @@ import { MapPinDto } from 'src/place/dto/map-pin.dto'
 import { MapPinsResponseDto } from 'src/place/dto/map-pins-response.dto'
 import { Place } from 'src/place/entities/place.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
 import { PlaceRepository } from 'src/place/place.repository'
 import { PlaceImageService } from 'src/place/place-image.service'
 import {
+  PlaceLiveDataService,
+  type ResolvedPlace,
+} from 'src/place/place-live-data.service'
+import {
   haversineDistanceMeters,
   PLACE_SYNC_RADIUS_METERS,
 } from 'src/place/sync/place-sync.constants'
-import { PlaceSyncService } from 'src/place/sync/place-sync.service'
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
@@ -76,7 +80,6 @@ export class MeetingService {
   constructor(
     private readonly config: ConfigService<Env, true>,
     private readonly dataSource: DataSource,
-    private readonly placeSyncService: PlaceSyncService,
     private readonly mediaService: MediaService,
     @InjectRepository(MeetingParticipant)
     private readonly participantRepository: Repository<MeetingParticipant>,
@@ -92,6 +95,7 @@ export class MeetingService {
     private readonly meetingAccessService: MeetingAccessService,
     private readonly placeSearchRepository: PlaceRepository,
     private readonly placeImageService: PlaceImageService,
+    private readonly placeLiveDataService: PlaceLiveDataService,
   ) {}
 
   async createMeeting(
@@ -191,13 +195,6 @@ export class MeetingService {
           accessToken: this.generateParticipantToken(),
           profileAvatarId: request.host.profileAvatarId,
         }),
-      )
-
-      await this.placeSyncService.createJobs(
-        manager,
-        meeting,
-        location,
-        categories,
       )
 
       return { meeting, location, steps, participant, user }
@@ -553,18 +550,6 @@ export class MeetingService {
         })
         .execute()
 
-      const meeting = location.meeting
-      const steps = await manager.getRepository(CourseCategoryStep).find({
-        where: { meeting: { id: meetingId } },
-        relations: { category: true },
-      })
-      await this.placeSyncService.createJobs(
-        manager,
-        meeting,
-        updated,
-        steps.map((step) => step.category),
-      )
-
       return this.toMeetingLocationResponse(updated)
     })
   }
@@ -599,6 +584,11 @@ export class MeetingService {
       throw new MeetingException(MeetingErrorCode.placeNotFound)
     }
 
+    const resolvedPlace = await this.placeLiveDataService.resolvePlace(place, {
+      latitude: location.latitude,
+      longitude: location.longitude,
+    })
+
     const categoryStep = await this.dataSource
       .getRepository(CourseCategoryStep)
       .findOne({
@@ -615,8 +605,8 @@ export class MeetingService {
       haversineDistanceMeters(
         location.latitude,
         location.longitude,
-        place.latitude,
-        place.longitude,
+        resolvedPlace.latitude,
+        resolvedPlace.longitude,
       ) > PLACE_SYNC_RADIUS_METERS
     ) {
       throw new MeetingException(MeetingErrorCode.placeOutsideRange)
@@ -645,7 +635,7 @@ export class MeetingService {
       throw error
     }
 
-    return this.toRecommendationResponse(recommendation)
+    return this.toRecommendationResponse(recommendation, resolvedPlace)
   }
 
   async getRecommendations(
@@ -661,15 +651,38 @@ export class MeetingService {
       throw new CommonException(CommonErrorCode.authenticationFailed)
     }
 
-    const recommendations = await this.recommendationRepository.find({
-      where: { meeting: { id: meetingId } },
-      relations: { place: { category: true }, recommendedBy: true },
-      order: { createdAt: 'ASC' },
-    })
+    const [recommendations, location] = await Promise.all([
+      this.recommendationRepository.find({
+        where: { meeting: { id: meetingId } },
+        relations: { place: { category: true }, recommendedBy: true },
+        order: { createdAt: 'ASC' },
+      }),
+      this.dataSource.getRepository(MeetingLocation).findOne({
+        where: { meeting: { id: meetingId } },
+      }),
+    ])
+    if (!location) {
+      throw new MeetingException(MeetingErrorCode.locationNotFound)
+    }
+    const [resolved, preferences] = await Promise.all([
+      this.placeLiveDataService.resolvePlaces(
+        recommendations.map((recommendation) => recommendation.place),
+        location,
+      ),
+      this.voteRepository.getPreferenceSummaries(
+        recommendations.map((recommendation) => recommendation.id),
+        participant.id,
+      ),
+    ])
 
-    return recommendations.map((recommendation) =>
-      this.toRecommendationResponse(recommendation),
-    )
+    return recommendations.map((recommendation) => {
+      const summary = preferences.get(recommendation.id)
+      return this.toRecommendationResponse(
+        recommendation,
+        resolved.get(recommendation.place.id)!,
+        summary,
+      )
+    })
   }
 
   async getMeetingStatus(
@@ -798,8 +811,10 @@ export class MeetingService {
           .slug as MeetingScreenResponseDto['categorySlugs'][number],
         order: step.order,
       })),
-      recommendations: recommendations.map((recommendation) =>
-        this.toRecommendationResponse(recommendation),
+      recommendations: await this.toRecommendationResponses(
+        recommendations,
+        meeting.meetingLocation,
+        viewer.id,
       ),
       selectedCourse: null,
     }
@@ -960,22 +975,56 @@ export class MeetingService {
 
   private toRecommendationResponse(
     recommendation: MeetingPlaceRecommendation,
+    place: ResolvedPlace,
+    preference: {
+      likeCount: number
+      dislikeCount: number
+      myPreference: PreferenceType | null
+    } = { likeCount: 0, dislikeCount: 0, myPreference: null },
   ): RecommendationPreviewDto {
     return {
       id: recommendation.id,
-      categoryId: recommendation.place.category.id,
+      categoryId: place.category.id,
       place: {
-        id: recommendation.place.id,
-        name: recommendation.place.name,
-        address: recommendation.place.address,
-        latitude: recommendation.place.latitude,
-        longitude: recommendation.place.longitude,
+        id: place.id,
+        name: place.name,
+        address: place.address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        source: place.source,
+        providerPlaceId: place.providerPlaceId,
+        placeUrl: place.placeUrl,
       },
       recommendedByParticipantId: recommendation.recommendedBy.id,
-      likeCount: 0,
-      dislikeCount: 0,
-      viewerPreference: null,
+      likeCount: preference.likeCount,
+      dislikeCount: preference.dislikeCount,
+      viewerPreference: preference.myPreference,
     }
+  }
+
+  private async toRecommendationResponses(
+    recommendations: MeetingPlaceRecommendation[],
+    location: MeetingLocation,
+    viewerId: string,
+  ): Promise<RecommendationPreviewDto[]> {
+    if (recommendations.length === 0) return []
+    const [resolved, preferences] = await Promise.all([
+      this.placeLiveDataService.resolvePlaces(
+        recommendations.map((recommendation) => recommendation.place),
+        location,
+      ),
+      this.voteRepository.getPreferenceSummaries(
+        recommendations.map((recommendation) => recommendation.id),
+        viewerId,
+      ),
+    ])
+    return recommendations.map((recommendation) =>
+      this.toRecommendationResponse(
+        recommendation,
+        resolved.get(recommendation.place.id)!,
+        preferences.get(recommendation.id),
+      ),
+    )
   }
 
   private toMeetingScreenResponse(
@@ -1072,11 +1121,15 @@ export class MeetingService {
       throw new MeetingException(MeetingErrorCode.notFound)
     }
     meetingWithLocation.assertHasLocation()
+    const resolved = await this.placeLiveDataService.resolvePlaces(
+      recommendations.map((recommendation) => recommendation.place),
+      meetingWithLocation.meetingLocation,
+    )
 
     return {
       startPlace: this.toStartPlacePin(meetingWithLocation.meetingLocation),
       sharedPlaces: recommendations.map((recommendation) =>
-        this.toPlacePin(recommendation.place),
+        this.toPlacePin(resolved.get(recommendation.place.id)!),
       ),
     }
   }
@@ -1089,7 +1142,7 @@ export class MeetingService {
     }
   }
 
-  private toPlacePin(place: Place): MapPinDto {
+  private toPlacePin(place: ResolvedPlace): MapPinDto {
     return {
       placeId: place.id,
       name: place.name,
@@ -1152,7 +1205,6 @@ export class MeetingService {
       this.placeRepository.findOne({
         where: { id: placeId },
         relations: { category: true },
-        select: { latitude: true, longitude: true, category: { id: true } },
       }),
       this.recommendationRepository.find({
         where: { meeting: { id: meetingId } },
@@ -1169,6 +1221,37 @@ export class MeetingService {
     const recommendedPlaceIds = alreadyRecommended.map(
       (recommendation) => recommendation.place.id,
     )
+    if (place.source === PlaceSource.Kakao) {
+      const location = await this.dataSource
+        .getRepository(MeetingLocation)
+        .findOne({ where: { meeting: { id: meetingId } } })
+      if (!location) {
+        throw new MeetingException(MeetingErrorCode.locationNotFound)
+      }
+      const liveResult = await this.placeLiveDataService.searchKakao(location, [
+        place.category,
+      ])
+      const excluded = new Set([
+        placeId,
+        ...displayedIds,
+        ...recommendedPlaceIds,
+      ])
+      return liveResult.places
+        .filter((candidate) => !excluded.has(candidate.id))
+        .slice(0, limit)
+        .map((candidate) => ({
+          id: candidate.id,
+          categoryId: candidate.category.id,
+          name: candidate.name,
+          address: candidate.address,
+          latitude: candidate.latitude,
+          longitude: candidate.longitude,
+          primaryImageUrl: null,
+          previewUrl: null,
+          placeUrl: candidate.placeUrl,
+        }))
+    }
+
     const similar = await this.placeSearchRepository.findSimilar(
       place.category.id,
       [placeId, ...displayedIds, ...recommendedPlaceIds],

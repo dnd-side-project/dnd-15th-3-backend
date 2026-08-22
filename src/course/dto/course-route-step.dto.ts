@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 
 export class CourseRouteStepDto {
   @ApiProperty({
@@ -58,4 +59,13 @@ export class CourseRouteStepDto {
     nullable: true,
   })
   walkDurationToNextMin!: number | null
+
+  @ApiProperty({ enum: PlaceSource, example: PlaceSource.Kakao })
+  source!: PlaceSource
+
+  @ApiProperty({ description: '외부 장소 ID', nullable: true })
+  providerPlaceId!: string | null
+
+  @ApiProperty({ description: '외부 장소 상세 URL', nullable: true })
+  placeUrl!: string | null
 }

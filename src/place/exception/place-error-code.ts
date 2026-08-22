@@ -32,4 +32,9 @@ export const PlaceErrorCode = {
     status: HttpStatus.BAD_GATEWAY,
     message: '장소 검색 서비스 응답을 처리하지 못했습니다.',
   },
+  providerPlaceUnavailable: {
+    code: 'PLACE_PROVIDER_PLACE_UNAVAILABLE',
+    status: HttpStatus.BAD_GATEWAY,
+    message: '저장된 장소의 최신 정보를 불러오지 못했습니다.',
+  },
 } as const satisfies Record<string, ErrorCode>

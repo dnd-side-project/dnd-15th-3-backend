@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { normalizeQueryRows } from 'src/common/database/normalize-query-rows'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import {
@@ -325,7 +326,7 @@ export class PlaceSyncService {
     tileKey: string,
     ownerToken: string,
   ): Promise<boolean> {
-    const rows = await this.dataSource.query(
+    const result = await this.dataSource.query(
       `INSERT INTO "place_sync_tile_lease" ("category_id", "source", "tile_key", "owner_token", "expires_at")
        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP + ($5 * INTERVAL '1 millisecond'))
        ON CONFLICT ("source", "category_id", "tile_key") DO UPDATE
@@ -334,7 +335,7 @@ export class PlaceSyncService {
        RETURNING "id"`,
       [categoryId, source, tileKey, ownerToken, PLACE_SYNC_TILE_LEASE_TTL_MS],
     )
-    return rows.length > 0
+    return normalizeQueryRows<{ id: string }>(result).length > 0
   }
 
   private async releaseTileLease(ownerToken: string): Promise<void> {

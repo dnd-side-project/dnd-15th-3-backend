@@ -6,7 +6,7 @@ describe('CourseGenerationWorker', () => {
       query: jest
         .fn()
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ id: '70' }]),
+        .mockResolvedValueOnce([[{ id: '70' }], 1]),
     }
     const processor = { processRun: jest.fn().mockResolvedValue(undefined) }
     const worker = new CourseGenerationWorker(
@@ -21,7 +21,7 @@ describe('CourseGenerationWorker', () => {
 
   it('처리할 run이 없으면 false를 반환한다', async () => {
     const dataSource = {
-      query: jest.fn().mockResolvedValue([]),
+      query: jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([[], 0]),
     }
     const processor = { processRun: jest.fn() }
     const worker = new CourseGenerationWorker(

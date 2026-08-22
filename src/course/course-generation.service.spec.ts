@@ -4,6 +4,7 @@ import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.ent
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { QuestionnaireSource } from 'src/questionnaire/enums/questionnaire-source.enum'
 import {
   QuestionnaireDimensionCode,
@@ -167,6 +168,47 @@ describe('CourseGenerationService', () => {
     expect(context.answerRepository.save).not.toHaveBeenCalled()
     expect(meeting.status).toBe(MeetingStatus.CourseGenerating)
     expect(context.meetingRepository.save).toHaveBeenCalledWith(meeting)
+  })
+
+  it('Kakao 장소는 생성 스냅샷에 ID와 URL만 보존한다', async () => {
+    const context = createService()
+    arrangeGeneratableMeeting(context)
+    const category = { id: '20', slug: CategorySlug.Cafe }
+    context.recommendationRepository.find.mockResolvedValue([
+      Object.assign(new MeetingPlaceRecommendation(), {
+        id: '40',
+        place: {
+          id: '50',
+          category,
+          source: PlaceSource.Kakao,
+          providerPlaceId: '12345',
+          placeUrl: 'https://place.map.kakao.com/12345',
+          name: '12345',
+          address: 'KAKAO_PLACE_REFERENCE',
+          latitude: 0,
+          longitude: 0,
+        },
+      }),
+    ])
+
+    await context.service.generateCourse('10', 'host-token', {
+      customization: { type: CourseGenerationCustomizationType.Skip },
+    })
+
+    const createdRun = context.runRepository.create.mock.calls[0][0]
+    expect(createdRun.inputSnapshot.recommendations).toEqual([
+      {
+        recommendationId: '40',
+        placeId: '50',
+        placeCategoryId: '20',
+        categorySlug: CategorySlug.Cafe,
+        likeCount: 2,
+        dislikeCount: 1,
+        source: PlaceSource.Kakao,
+        providerPlaceId: '12345',
+        placeUrl: 'https://place.map.kakao.com/12345',
+      },
+    ])
   })
 
   it('최종 응답 제출과 생성 run·답변 row 저장을 같은 트랜잭션에서 처리한다', async () => {

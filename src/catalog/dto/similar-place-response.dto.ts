@@ -37,4 +37,12 @@ export class SimilarPlaceResponseDto {
     nullable: true,
   })
   previewUrl!: string | null
+
+  @ApiProperty({
+    description: 'Kakao 장소 상세 URL',
+    type: 'string',
+    nullable: true,
+    required: false,
+  })
+  placeUrl?: string | null
 }

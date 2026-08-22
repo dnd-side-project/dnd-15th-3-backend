@@ -286,6 +286,7 @@ describe('MeetingController', () => {
       'longitude',
       'primaryImageUrl',
       'previewUrl',
+      'placeUrl',
     ])
     expect(
       similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,

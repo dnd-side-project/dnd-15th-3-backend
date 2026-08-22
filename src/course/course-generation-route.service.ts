@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { haversineDistanceMeters } from 'src/common/geo/haversine-distance'
 import { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
-import type { CourseGenerationInputSnapshot } from './schema/course-generation-input.schema'
+import type { CourseGenerationRuntimeInput } from './schema/course-generation-input.schema'
 
-type Recommendation = CourseGenerationInputSnapshot['recommendations'][number]
+type Recommendation = CourseGenerationRuntimeInput['recommendations'][number]
 
 export type CourseGenerationLeg = {
   travelTimeToNext: number | null

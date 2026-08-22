@@ -1,5 +1,6 @@
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { QuestionnaireSource } from 'src/questionnaire/enums/questionnaire-source.enum'
 import {
   QUESTIONNAIRE_OPTION_CODES_BY_DIMENSION,
@@ -53,6 +54,39 @@ const questionnaireSnapshotSchema = z
   })
   .strict()
 
+const recommendationCommonFields = {
+  recommendationId: idString,
+  placeId: idString,
+  placeCategoryId: idString,
+  categorySlug: z.enum(CategorySlug),
+  likeCount: z.number().int().min(0),
+  dislikeCount: z.number().int().min(0),
+}
+
+const persistedRecommendationSchema = z
+  .object({
+    ...recommendationCommonFields,
+    name: z.string().min(1).max(100),
+    address: z.string().min(1).max(255),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+  })
+  .strict()
+
+const kakaoRecommendationReferenceSchema = z
+  .object({
+    ...recommendationCommonFields,
+    source: z.literal(PlaceSource.Kakao),
+    providerPlaceId: z.string().trim().min(1).max(255),
+    placeUrl: z.string().url().max(500).nullable(),
+  })
+  .strict()
+
+const recommendationSnapshotSchema = z.union([
+  kakaoRecommendationReferenceSchema,
+  persistedRecommendationSchema,
+])
+
 export const courseGenerationInputSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -82,22 +116,7 @@ export const courseGenerationInputSchema = z
         })
         .strict(),
     ),
-    recommendations: z.array(
-      z
-        .object({
-          recommendationId: idString,
-          placeId: idString,
-          placeCategoryId: idString,
-          categorySlug: z.enum(CategorySlug),
-          name: z.string().min(1).max(100),
-          address: z.string().min(1).max(255),
-          latitude: z.number().min(-90).max(90),
-          longitude: z.number().min(-180).max(180),
-          likeCount: z.number().int().min(0),
-          dislikeCount: z.number().int().min(0),
-        })
-        .strict(),
-    ),
+    recommendations: z.array(recommendationSnapshotSchema),
     questionnaire: questionnaireSnapshotSchema.nullable(),
   })
   .strict()
@@ -105,3 +124,18 @@ export const courseGenerationInputSchema = z
 export type CourseGenerationInputSnapshot = z.infer<
   typeof courseGenerationInputSchema
 >
+
+export type CourseGenerationRuntimeRecommendation =
+  CourseGenerationInputSnapshot['recommendations'][number] & {
+    name: string
+    address: string
+    latitude: number
+    longitude: number
+  }
+
+export type CourseGenerationRuntimeInput = Omit<
+  CourseGenerationInputSnapshot,
+  'recommendations'
+> & {
+  recommendations: CourseGenerationRuntimeRecommendation[]
+}

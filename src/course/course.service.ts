@@ -33,7 +33,12 @@ import {
   CourseConfirmedPayloadSchema,
 } from 'src/outbox/schemas/course-confirmed-payload.schema'
 import type { Place } from 'src/place/entities/place.entity'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { PlaceImageService } from 'src/place/place-image.service'
+import {
+  PlaceLiveDataService,
+  type ResolvedPlace,
+} from 'src/place/place-live-data.service'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { CourseRepository } from './course.repository'
 import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
@@ -74,6 +79,7 @@ export class CourseService {
     @InjectRepository(CourseCandidatePlace)
     private readonly courseCandidatePlaceRepository: Repository<CourseCandidatePlace>,
     private readonly placeImageService: PlaceImageService,
+    private readonly placeLiveDataService: PlaceLiveDataService,
     private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
     private readonly courseRepository: CourseRepository,
     private readonly outboxEventRepository: OutboxEventRepository,
@@ -141,7 +147,7 @@ export class CourseService {
       throw new CourseException(CourseErrorCode.routeMissing)
     }
 
-    return this.buildCourseDetailResponse(candidate, steps)
+    return this.buildCourseDetailResponse(meetingId, candidate, steps)
   }
 
   async getCourseComments(
@@ -389,22 +395,32 @@ export class CourseService {
       (recommendation) => recommendation.id,
     )
 
-    const [preferenceSummaries, primaryImageUrls] = await Promise.all([
-      this.voteRepository.getPreferenceSummaries(recommendationIds, viewer.id),
-      this.placeImageService.getPrimaryImageUrls(
-        recommendations.map((recommendation) => recommendation.place.id),
-      ),
-    ])
+    const [preferenceSummaries, primaryImageUrls, resolved] = await Promise.all(
+      [
+        this.voteRepository.getPreferenceSummaries(
+          recommendationIds,
+          viewer.id,
+        ),
+        this.placeImageService.getPrimaryImageUrls(
+          recommendations.map((recommendation) => recommendation.place.id),
+        ),
+        this.resolvePlacesForMeeting(
+          meetingId,
+          recommendations.map((recommendation) => recommendation.place),
+        ),
+      ],
+    )
 
     const items: MeetingPlaceRecommendationDto[] = recommendations.map(
       (recommendation) => {
         const summary = preferenceSummaries.get(recommendation.id)
+        const place = resolved.get(recommendation.place.id)!
         return {
           recommendationId: recommendation.id,
-          category: recommendation.place.category.name,
-          categorySlug: recommendation.place.category.slug as CategorySlug,
-          name: recommendation.place.name,
-          address: recommendation.place.address,
+          category: place.category.name,
+          categorySlug: place.category.slug as CategorySlug,
+          name: place.name,
+          address: place.address,
           primaryImageUrl: primaryImageUrls.get(recommendation.place.id),
           likeCount: summary?.likeCount ?? 0,
           dislikeCount: summary?.dislikeCount ?? 0,
@@ -470,7 +486,7 @@ export class CourseService {
       },
     )
 
-    return this.buildCourseDetailResponse(candidate, steps)
+    return this.buildCourseDetailResponse(meetingId, candidate, steps)
   }
 
   async updateCoursePlaces(
@@ -517,7 +533,7 @@ export class CourseService {
       },
     )
 
-    return this.buildCourseDetailResponse(candidate, steps)
+    return this.buildCourseDetailResponse(meetingId, candidate, steps)
   }
 
   private async assertHostParticipant(
@@ -626,8 +642,14 @@ export class CourseService {
     const { meeting, meetingId, courseCandidateId, steps, recommendation } =
       params
     const lastStep = steps[steps.length - 1]
-    const lastPlace = lastStep.meetingPlaceRecommendation.place
-    const newPlace = recommendation.place
+    const lastReference = lastStep.meetingPlaceRecommendation.place
+    const newReference = recommendation.place
+    const resolved = await this.resolvePlacesForMeeting(meetingId, [
+      lastReference,
+      newReference,
+    ])
+    const lastPlace = resolved.get(lastReference.id)!
+    const newPlace = resolved.get(newReference.id)!
 
     const walkingCourse = await this.getWalkingCourseOrThrow(
       lastPlace,
@@ -703,13 +725,16 @@ export class CourseService {
   }
 
   private async getWalkingLegsOrThrow(
+    meetingId: string,
     places: Place[],
   ): Promise<Array<{ totalTime: number; totalDistance: number } | null>> {
+    const resolved = await this.resolvePlacesForMeeting(meetingId, places)
+    const livePlaces = places.map((place) => resolved.get(place.id)!)
     const legs = await Promise.all(
-      places
+      livePlaces
         .slice(0, -1)
         .map((place, index) =>
-          this.getWalkingCourseOrThrow(place, places[index + 1]),
+          this.getWalkingCourseOrThrow(place, livePlaces[index + 1]),
         ),
     )
     return [...legs, null]
@@ -745,7 +770,7 @@ export class CourseService {
   ): Promise<CourseCandidatePlace[]> {
     const { meeting, meetingId, courseCandidateId, recommendations } = params
     const places = recommendations.map((recommendation) => recommendation.place)
-    const legs = await this.getWalkingLegsOrThrow(places)
+    const legs = await this.getWalkingLegsOrThrow(meetingId, places)
 
     await this.courseRepository.deleteCourseCandidatePlaces(
       manager,
@@ -783,8 +808,8 @@ export class CourseService {
   }
 
   private async getWalkingCourseOrThrow(
-    origin: Place,
-    destination: Place,
+    origin: ResolvedPlace,
+    destination: ResolvedPlace,
   ): Promise<{ totalTime: number; totalDistance: number }> {
     let walkingCourse: KakaoWalkingCourseResponse
     try {
@@ -833,12 +858,17 @@ export class CourseService {
   }
 
   private async buildCourseDetailResponse(
+    meetingId: string,
     candidate: CourseCandidate,
     steps: CourseCandidatePlace[],
   ): Promise<CourseDetailResponseDto> {
-    const primaryImageUrls = await this.placeImageService.getPrimaryImageUrls(
-      steps.map((step) => step.meetingPlaceRecommendation.place.id),
-    )
+    const places = steps.map((step) => step.meetingPlaceRecommendation.place)
+    const [primaryImageUrls, resolved] = await Promise.all([
+      this.placeImageService.getPrimaryImageUrls(
+        places.map((place) => place.id),
+      ),
+      this.resolvePlacesForMeeting(meetingId, places),
+    ])
 
     const totalDistanceMeters = steps.reduce(
       (sum, step) => sum + (step.distanceToNextMeters ?? 0),
@@ -850,7 +880,8 @@ export class CourseService {
       totalDistanceKm: metersToKilometers(totalDistanceMeters),
       totalCount: steps.length,
       route: steps.map((step) => {
-        const place = step.meetingPlaceRecommendation.place
+        const reference = step.meetingPlaceRecommendation.place
+        const place = resolved.get(reference.id)!
         return {
           recommendationId: step.meetingPlaceRecommendation.id,
           placeId: place.id,
@@ -859,12 +890,39 @@ export class CourseService {
           category: place.category.name,
           categorySlug: place.category.slug as CategorySlug,
           address: place.address,
-          primaryImageUrl: primaryImageUrls.get(place.id) ?? null,
+          primaryImageUrl: primaryImageUrls.get(reference.id) ?? null,
           longitude: place.longitude,
           latitude: place.latitude,
           walkDurationToNextMin: secondsToMinutes(step.travelTimeToNext),
+          source: place.source,
+          providerPlaceId: place.providerPlaceId,
+          placeUrl: place.placeUrl,
         }
       }),
     }
+  }
+
+  private async resolvePlacesForMeeting(
+    meetingId: string,
+    places: Place[],
+  ): Promise<Map<string, ResolvedPlace>> {
+    if (places.every((place) => place.source !== PlaceSource.Kakao)) {
+      return this.placeLiveDataService.resolvePlaces(places, {
+        latitude: 0,
+        longitude: 0,
+      })
+    }
+    const meeting = await this.dataSource.getRepository(Meeting).findOne({
+      where: { id: meetingId },
+      relations: { meetingLocation: true },
+    })
+    if (!meeting) {
+      throw new MeetingException(MeetingErrorCode.notFound)
+    }
+    meeting.assertHasLocation()
+    return this.placeLiveDataService.resolvePlaces(
+      places,
+      meeting.meetingLocation,
+    )
   }
 }

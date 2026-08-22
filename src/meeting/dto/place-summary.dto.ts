@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 
 export class PlaceSummaryDto {
   @ApiProperty({ description: '장소 ID', example: '101' })
@@ -15,4 +16,17 @@ export class PlaceSummaryDto {
 
   @ApiProperty({ description: '경도', example: 127.0557 })
   longitude!: number
+
+  @ApiProperty({ enum: PlaceSource, example: PlaceSource.Kakao })
+  source!: PlaceSource
+
+  @ApiProperty({
+    description: '외부 장소 ID',
+    nullable: true,
+    example: '12345',
+  })
+  providerPlaceId!: string | null
+
+  @ApiProperty({ description: '외부 장소 상세 URL', nullable: true })
+  placeUrl!: string | null
 }

@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
-import { DataSource } from 'typeorm'
+import { Place } from 'src/place/entities/place.entity'
+import { PlaceLiveDataService } from 'src/place/place-live-data.service'
+import { DataSource, In } from 'typeorm'
 import { COURSE_CANDIDATE_GENERATOR } from './course-generation.tokens'
 import {
   type CourseGenerationLeg,
@@ -15,6 +17,7 @@ import { CourseGenerationRunStatus } from './enums/course-generation-run-status.
 import type { CourseCandidateGenerator } from './provider/course-candidate.generator'
 import {
   type CourseGenerationInputSnapshot,
+  type CourseGenerationRuntimeInput,
   courseGenerationInputSchema,
 } from './schema/course-generation-input.schema'
 import {
@@ -24,7 +27,7 @@ import {
 
 type PreparedCandidate = {
   name: string
-  recommendations: CourseGenerationInputSnapshot['recommendations']
+  recommendations: CourseGenerationRuntimeInput['recommendations']
   legs: CourseGenerationLeg[]
 }
 
@@ -37,6 +40,7 @@ export class CourseGenerationProcessor {
     @Inject(COURSE_CANDIDATE_GENERATOR)
     private readonly generator: CourseCandidateGenerator,
     private readonly routeService: CourseGenerationRouteService,
+    private readonly placeLiveDataService: PlaceLiveDataService,
   ) {}
 
   async processRun(runId: string): Promise<void> {
@@ -49,10 +53,14 @@ export class CourseGenerationProcessor {
       if (!run || run.status !== CourseGenerationRunStatus.Processing) return
 
       const input = courseGenerationInputSchema.parse(run.inputSnapshot)
+      const runtimeInput = await this.hydrateInput(input)
       const output = courseGenerationOutputSchema.parse(
-        await this.generator.generate(input),
+        await this.generator.generate(runtimeInput),
       )
-      const preparedCandidates = await this.prepareCandidates(input, output)
+      const preparedCandidates = await this.prepareCandidates(
+        runtimeInput,
+        output,
+      )
       await this.completeRun(
         runId,
         input.meeting.meetingId,
@@ -69,7 +77,7 @@ export class CourseGenerationProcessor {
   }
 
   private prepareCandidates(
-    input: CourseGenerationInputSnapshot,
+    input: CourseGenerationRuntimeInput,
     output: CourseGenerationOutputSnapshot,
   ): Promise<PreparedCandidate[]> {
     const recommendationsById = new Map(
@@ -106,6 +114,49 @@ export class CourseGenerationProcessor {
         }
       }),
     )
+  }
+
+  private async hydrateInput(
+    input: CourseGenerationInputSnapshot,
+  ): Promise<CourseGenerationRuntimeInput> {
+    const unresolved = input.recommendations.filter(
+      (recommendation) => !('name' in recommendation),
+    )
+    if (unresolved.length === 0) {
+      return input as CourseGenerationRuntimeInput
+    }
+
+    const places = await this.dataSource.getRepository(Place).find({
+      where: {
+        id: In(unresolved.map((recommendation) => recommendation.placeId)),
+      },
+      relations: { category: true },
+    })
+    if (places.length !== unresolved.length) {
+      throw new Error('Course generation place references are missing')
+    }
+    const resolved = await this.placeLiveDataService.resolvePlaces(
+      places,
+      input.meeting.location,
+    )
+
+    return {
+      ...input,
+      recommendations: input.recommendations.map((recommendation) => {
+        if ('name' in recommendation) return recommendation
+        const place = resolved.get(recommendation.placeId)
+        if (!place) {
+          throw new Error('Kakao place could not be resolved')
+        }
+        return {
+          ...recommendation,
+          name: place.name,
+          address: place.address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+        }
+      }),
+    }
   }
 
   private completeRun(

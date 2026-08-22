@@ -1,8 +1,8 @@
-import type { CourseGenerationInputSnapshot } from '../schema/course-generation-input.schema'
+import type { CourseGenerationRuntimeInput } from '../schema/course-generation-input.schema'
 import type { CourseGenerationOutputSnapshot } from '../schema/course-generation-output.schema'
 
 export interface CourseCandidateGenerator {
   generate(
-    input: CourseGenerationInputSnapshot,
+    input: CourseGenerationRuntimeInput,
   ): Promise<CourseGenerationOutputSnapshot>
 }

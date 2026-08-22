@@ -12,6 +12,7 @@ import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { MeetingException } from 'src/meeting/exception/meeting.exception'
 import { MeetingErrorCode } from 'src/meeting/exception/meeting-error-code'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { QuestionnaireService } from 'src/questionnaire/questionnaire.service'
 import { DataSource, type EntityManager } from 'typeorm'
 import { CourseRepository } from './course.repository'
@@ -149,17 +150,33 @@ export class CourseGenerationService {
         })),
         recommendations: recommendations.map((recommendation) => {
           const counts = voteCounts.get(recommendation.id)
-          return {
+          const common = {
             recommendationId: recommendation.id,
             placeId: recommendation.place.id,
             placeCategoryId: recommendation.place.category.id,
             categorySlug: recommendation.place.category.slug as CategorySlug,
+            likeCount: counts?.likeCount ?? 0,
+            dislikeCount: counts?.dislikeCount ?? 0,
+          }
+          if (recommendation.place.source === PlaceSource.Kakao) {
+            if (!recommendation.place.providerPlaceId) {
+              throw new CourseException(
+                CourseErrorCode.generationInputIncomplete,
+              )
+            }
+            return {
+              ...common,
+              source: PlaceSource.Kakao,
+              providerPlaceId: recommendation.place.providerPlaceId,
+              placeUrl: recommendation.place.placeUrl,
+            }
+          }
+          return {
+            ...common,
             name: recommendation.place.name,
             address: recommendation.place.address,
             latitude: recommendation.place.latitude,
             longitude: recommendation.place.longitude,
-            likeCount: counts?.likeCount ?? 0,
-            dislikeCount: counts?.dislikeCount ?? 0,
           }
         }),
         questionnaire: questionnaireResult?.snapshot ?? null,

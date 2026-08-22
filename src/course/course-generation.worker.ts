@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { normalizeQueryRows } from 'src/common/database/normalize-query-rows'
 import { DataSource } from 'typeorm'
 import { CourseGenerationProcessor } from './course-generation.processor'
 
 const POLL_INTERVAL_MS = 2_000
 const STALE_AFTER_MS = 5 * 60 * 1000
+
+type ClaimedCourseGenerationRun = {
+  id: string
+}
 
 @Injectable()
 export class CourseGenerationWorker {
@@ -27,7 +32,7 @@ export class CourseGenerationWorker {
       [STALE_AFTER_MS],
     )
 
-    const rows = await this.dataSource.query(`
+    const result = await this.dataSource.query(`
       UPDATE "course_generation_run"
       SET "status" = 'PROCESSING',
           "attempt_count" = "attempt_count" + 1,
@@ -44,7 +49,8 @@ export class CourseGenerationWorker {
       )
       RETURNING "id"
     `)
-    const runId = rows[0]?.id as string | undefined
+    const rows = normalizeQueryRows<ClaimedCourseGenerationRun>(result)
+    const runId = rows[0]?.id
     if (!runId) return false
 
     await this.processor.processRun(runId)

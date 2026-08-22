@@ -66,6 +66,13 @@ function createService() {
   const placeImageService = {
     getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
   }
+  const placeLiveDataService = {
+    resolvePlaces: jest
+      .fn()
+      .mockImplementation((places) =>
+        Promise.resolve(new Map(places.map((place) => [place.id, place]))),
+      ),
+  }
   const kakaoWalkingCourseService = { getWalkingCourse: jest.fn() }
   const courseRepository = {
     lockMeeting: jest.fn(),
@@ -85,6 +92,7 @@ function createService() {
     commentRepository as never,
     courseCandidatePlaceRepository as never,
     placeImageService as never,
+    placeLiveDataService as never,
     kakaoWalkingCourseService as never,
     courseRepository as never,
     outboxEventRepository as never,

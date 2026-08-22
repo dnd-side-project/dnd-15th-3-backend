@@ -17,9 +17,13 @@ describe('PlaceController', () => {
     )
 
     await expect(
-      controller.getPlaceDetail('1', 'token'),
+      controller.getPlaceDetail('1', '123', 'token'),
     ).resolves.toMatchObject({ placeId: '1' })
-    expect(placeService.getPlaceDetail).toHaveBeenCalledWith('1', 'token')
+    expect(placeService.getPlaceDetail).toHaveBeenCalledWith(
+      '1',
+      '123',
+      'token',
+    )
   })
 
   it('Swagger 문서에 모든 응답 코드와 응답 스키마가 포함된다', async () => {

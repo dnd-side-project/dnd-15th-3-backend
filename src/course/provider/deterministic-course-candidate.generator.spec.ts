@@ -5,12 +5,15 @@ import {
   QuestionnaireDimensionCode,
   QuestionnaireOptionCode,
 } from 'src/questionnaire/questionnaire.constants'
-import type { CourseGenerationInputSnapshot } from '../schema/course-generation-input.schema'
+import type {
+  CourseGenerationInputSnapshot,
+  CourseGenerationRuntimeInput,
+} from '../schema/course-generation-input.schema'
 import { DeterministicCourseCandidateGenerator } from './deterministic-course-candidate.generator'
 
 function createInput(
   answers: CourseGenerationInputSnapshot['questionnaire'] = null,
-): CourseGenerationInputSnapshot {
+): CourseGenerationRuntimeInput {
   return {
     schemaVersion: 1,
     meeting: {
@@ -96,6 +99,10 @@ describe('DeterministicCourseCandidateGenerator', () => {
         name: '가까운 동선 코스',
         recommendationIds: ['101', '202'],
       },
+      {
+        name: '새로운 발견 코스',
+        recommendationIds: ['102', '202'],
+      },
     ])
   })
 
@@ -142,6 +149,10 @@ describe('DeterministicCourseCandidateGenerator', () => {
     expect(result.candidates[1]).toEqual({
       name: '빠른 동선 코스',
       recommendationIds: ['101', '202'],
+    })
+    expect(result.candidates[2]).toEqual({
+      name: '모두의 취향 코스',
+      recommendationIds: ['101', '201'],
     })
   })
 })

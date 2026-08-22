@@ -2,6 +2,8 @@ import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
+import { Place } from 'src/place/entities/place.entity'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { CourseGenerationProcessor } from './course-generation.processor'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
@@ -101,11 +103,13 @@ function createContext() {
     create: jest.fn().mockImplementation((value) => value),
     save: jest.fn().mockImplementation((value) => value),
   }
+  const placeRepository = { find: jest.fn() }
   const repositories = new Map<unknown, unknown>([
     [CourseGenerationRun, runRepository],
     [Meeting, meetingRepository],
     [CourseCandidate, candidateRepository],
     [CourseCandidatePlace, candidatePlaceRepository],
+    [Place, placeRepository],
   ])
   const manager = {
     getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
@@ -124,10 +128,12 @@ function createContext() {
         { travelTimeToNext: null, distanceToNextMeters: null },
       ]),
   }
+  const placeLiveDataService = { resolvePlaces: jest.fn() }
   const processor = new CourseGenerationProcessor(
     dataSource as never,
     generator as never,
     routeService as never,
+    placeLiveDataService as never,
   )
 
   return {
@@ -140,6 +146,8 @@ function createContext() {
     meetingRepository,
     candidateRepository,
     candidatePlaceRepository,
+    placeRepository,
+    placeLiveDataService,
     deleteQueryBuilder,
   }
 }
@@ -176,6 +184,62 @@ describe('CourseGenerationProcessor', () => {
     expect(context.run.status).toBe(CourseGenerationRunStatus.Succeeded)
     expect(context.run.outputSnapshot).toEqual(output)
     expect(context.meeting.status).toBe(MeetingStatus.CourseGenerated)
+  })
+
+  it('Kakao reference는 작업 실행 시 최신 장소 정보로 해석한 뒤 후보를 만든다', async () => {
+    const context = createContext()
+    context.run.inputSnapshot = {
+      ...input,
+      recommendations: [
+        {
+          recommendationId: '40',
+          placeId: '50',
+          placeCategoryId: '20',
+          categorySlug: CategorySlug.Cafe,
+          likeCount: 2,
+          dislikeCount: 0,
+          source: PlaceSource.Kakao,
+          providerPlaceId: '12345',
+          placeUrl: 'https://place.map.kakao.com/12345',
+        },
+      ],
+    }
+    const place = {
+      id: '50',
+      source: PlaceSource.Kakao,
+      providerPlaceId: '12345',
+      category: { id: '20', slug: CategorySlug.Cafe },
+    }
+    context.placeRepository.find.mockResolvedValue([place])
+    context.placeLiveDataService.resolvePlaces.mockResolvedValue(
+      new Map([
+        [
+          '50',
+          {
+            ...place,
+            name: '성수 카페',
+            address: '서울 성동구',
+            latitude: 37.501,
+            longitude: 127.001,
+          },
+        ],
+      ]),
+    )
+
+    await context.processor.processRun('70')
+
+    expect(context.generator.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recommendations: [
+          expect.objectContaining({
+            providerPlaceId: '12345',
+            name: '성수 카페',
+            latitude: 37.501,
+            longitude: 127.001,
+          }),
+        ],
+      }),
+    )
   })
 
   it('생성 결과가 입력 스냅샷과 다르면 run과 모임을 실패 상태로 전환한다', async () => {

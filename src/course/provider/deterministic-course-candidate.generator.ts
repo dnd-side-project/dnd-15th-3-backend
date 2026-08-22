@@ -1,32 +1,37 @@
 import { Injectable } from '@nestjs/common'
 import { haversineDistanceMeters } from 'src/common/geo/haversine-distance'
 import { QuestionnaireOptionCode } from 'src/questionnaire/questionnaire.constants'
-import type { CourseGenerationInputSnapshot } from '../schema/course-generation-input.schema'
+import type { CourseGenerationRuntimeInput } from '../schema/course-generation-input.schema'
 import {
   type CourseGenerationOutputSnapshot,
   courseGenerationOutputSchema,
 } from '../schema/course-generation-output.schema'
 import type { CourseCandidateGenerator } from './course-candidate.generator'
 
-type Recommendation = CourseGenerationInputSnapshot['recommendations'][number]
+type Recommendation = CourseGenerationRuntimeInput['recommendations'][number]
 
 @Injectable()
 export class DeterministicCourseCandidateGenerator
   implements CourseCandidateGenerator
 {
   generate(
-    input: CourseGenerationInputSnapshot,
+    input: CourseGenerationRuntimeInput,
   ): Promise<CourseGenerationOutputSnapshot> {
     const selectedOptions = new Set(
       input.questionnaire?.answers.map((answer) => answer.optionCode) ?? [],
     )
+    const prefersDiscovery = selectedOptions.has(
+      QuestionnaireOptionCode.newExperience,
+    )
     const preferenceRoute = this.buildRoute(
       input,
-      selectedOptions.has(QuestionnaireOptionCode.newExperience)
-        ? 'DISCOVERY'
-        : 'PREFERENCE',
+      prefersDiscovery ? 'DISCOVERY' : 'PREFERENCE',
     )
     const distanceRoute = this.buildRoute(input, 'DISTANCE')
+    const alternativeRoute = this.buildRoute(
+      input,
+      prefersDiscovery ? 'PREFERENCE' : 'DISCOVERY',
+    )
     const candidates = [
       {
         name: this.preferenceCourseName(selectedOptions),
@@ -39,6 +44,12 @@ export class DeterministicCourseCandidateGenerator
           ? '빠른 동선 코스'
           : '가까운 동선 코스',
         recommendationIds: distanceRoute.map(
+          (recommendation) => recommendation.recommendationId,
+        ),
+      },
+      {
+        name: prefersDiscovery ? '모두의 취향 코스' : '새로운 발견 코스',
+        recommendationIds: alternativeRoute.map(
           (recommendation) => recommendation.recommendationId,
         ),
       },
@@ -62,7 +73,7 @@ export class DeterministicCourseCandidateGenerator
   }
 
   private buildRoute(
-    input: CourseGenerationInputSnapshot,
+    input: CourseGenerationRuntimeInput,
     strategy: 'PREFERENCE' | 'DISCOVERY' | 'DISTANCE',
   ): Recommendation[] {
     const used = new Set<string>()
