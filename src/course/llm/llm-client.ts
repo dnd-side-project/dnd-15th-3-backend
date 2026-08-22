@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { APIError, OpenAI } from 'openai'
 
+export type LlmProvider = 'nvidia' | 'openai' | 'cloudflare'
+
 export interface LlmClientOptions {
+  provider: LlmProvider
   apiKey: string
   baseUrl: string
   model: string
@@ -16,8 +19,6 @@ export interface CloudflareLlmClientOptions {
   temperature: number
   maxTokens?: number
 }
-
-export type LlmProvider = 'nvidia' | 'cloudflare'
 
 export interface LlmClientMetadata {
   provider: LlmProvider
@@ -62,6 +63,8 @@ const JSON_FORMAT_UNSUPPORTED_HINTS = [
 
 const DEFAULT_MAX_TOKENS = 2048
 
+export const OPENAI_API_BASE_URL = 'https://api.openai.com/v1'
+
 function isResponseFormatUnsupported(error: unknown): boolean {
   if (!(error instanceof APIError)) return false
   if (error.status === 400) {
@@ -78,7 +81,7 @@ export class LlmClient implements LlmClientPort {
 
   constructor(readonly options: LlmClientOptions) {
     this.metadata = {
-      provider: 'nvidia',
+      provider: options.provider,
       model: options.model,
       endpoint: options.baseUrl,
       isConfigured: options.apiKey.length > 0,

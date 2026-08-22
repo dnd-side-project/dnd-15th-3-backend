@@ -67,6 +67,7 @@ function apiError(message: string, code?: string, status?: number): Error {
 }
 
 const baseOptions = {
+  provider: 'nvidia' as const,
   apiKey: 'test-key',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
   model: 'nvidia/nemotron-3-ultra-550b-a55b',
@@ -79,6 +80,15 @@ describe('LlmClient', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     client = new LlmClient(baseOptions)
+  })
+
+  describe('metadata', () => {
+    it('reflects the configured provider instead of a hardcoded value', () => {
+      expect(client.metadata.provider).toBe('nvidia')
+
+      const openaiClient = new LlmClient({ ...baseOptions, provider: 'openai' })
+      expect(openaiClient.metadata.provider).toBe('openai')
+    })
   })
 
   describe('chat', () => {
