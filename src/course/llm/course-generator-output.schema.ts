@@ -8,8 +8,10 @@ import {
 } from './course-generator.planner'
 import type { CourseGeneratorInput } from './course-generator-input.schema'
 
-const COURSE_NAME_MIN_LENGTH = 5
-const COURSE_NAME_MAX_LENGTH = 10
+// LLM은 접미사를 뺀 설명 부분만 짓고, 서버가 COURSE_NAME_SUFFIX를 붙여 최종 이름을 완성한다.
+const COURSE_NAME_PREFIX_MIN_LENGTH = 2
+const COURSE_NAME_PREFIX_MAX_LENGTH = 9
+const COURSE_NAME_SUFFIX = ' 코스'
 
 const categorySlugSchema = z.enum(
   Object.values(CategorySlug) as [CategorySlug, ...CategorySlug[]],
@@ -25,11 +27,16 @@ const courseRouteSchema = z.strictObject({
   routeId: z.number().int().positive(),
   name: z
     .string()
-    .min(COURSE_NAME_MIN_LENGTH)
-    .max(COURSE_NAME_MAX_LENGTH)
-    .refine((name) => name.trim().length > 0, {
+    .min(COURSE_NAME_PREFIX_MIN_LENGTH)
+    .max(COURSE_NAME_PREFIX_MAX_LENGTH)
+    .refine((prefix) => prefix.trim().length > 0, {
       message: '코스 이름은 공백만으로 구성될 수 없습니다.',
-    }),
+    })
+    .refine((prefix) => !prefix.includes('코스'), {
+      message:
+        '코스 이름에 "코스"를 포함하지 마세요. 서버가 자동으로 붙입니다.',
+    })
+    .transform((prefix) => `${prefix.trim()}${COURSE_NAME_SUFFIX}`),
   places: z.array(coursePlaceSchema).refine(
     (places) => {
       const ids = places.map((place) => place.placeId)

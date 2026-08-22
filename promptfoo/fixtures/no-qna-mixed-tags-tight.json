@@ -2,6 +2,7 @@
   "startNodeId": "start",
   "meetingType": "SOCIAL",
   "isWeekend": false,
+  "qna": [],
   "visitOrder": ["restaurant", "cafe", "activity", "activity", "bar"],
   "places": [
     {
@@ -16,14 +17,14 @@
       "name": "카페 파벤",
       "category": "cafe",
       "score": 5.0,
-      "tags": []
+      "tags": ["SAFE_CHOICE"]
     },
     {
       "id": "3",
       "name": "라운지엑스 볼링장",
       "category": "activity",
       "score": 4.0,
-      "tags": []
+      "tags": ["FREQUENTLY_SELECTED", "CATEGORY_POPULAR"]
     },
     {
       "id": "4",
@@ -37,7 +38,7 @@
       "name": "미도인",
       "category": "bar",
       "score": 5.5,
-      "tags": []
+      "tags": ["HIGH_PREFERENCE"]
     }
   ],
   "distanceMatrix": {

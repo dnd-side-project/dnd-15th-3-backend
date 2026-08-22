@@ -1,7 +1,21 @@
 {
   "startNodeId": "start",
   "meetingType": "SOCIAL",
-  "isWeekend": false,
+  "isWeekend": true,
+  "qna": [
+    {
+      "question": "이번 모임에서 가장 중요하게 생각하는 목적이 무엇인가요?",
+      "answer": "새로운 곳을 경험하기"
+    },
+    {
+      "question": "어떤 분위기의 모임을 원하시나요?",
+      "answer": "조용하고 차분한 분위기"
+    },
+    {
+      "question": "이번 모임 멤버들은 얼마나 자주 만나는 편인가요?",
+      "answer": "거의 매주 만나는 사이예요"
+    }
+  ],
   "visitOrder": [
     "restaurant",
     "cafe",
@@ -17,7 +31,7 @@
       "name": "몽탄",
       "category": "restaurant",
       "score": 6.0,
-      "tags": []
+      "tags": ["WEEKEND_PREFERRED"]
     },
     {
       "id": "2",
@@ -31,21 +45,21 @@
       "name": "서울이스케이프룸",
       "category": "activity",
       "score": 4.5,
-      "tags": []
+      "tags": ["HIGH_PREFERENCE", "WEEKEND_PREFERRED"]
     },
     {
       "id": "4",
       "name": "나누리 잡화점",
       "category": "bar",
       "score": 5.5,
-      "tags": []
+      "tags": ["CATEGORY_POPULAR"]
     },
     {
       "id": "5",
       "name": "대림창고",
       "category": "cafe",
       "score": 4.0,
-      "tags": []
+      "tags": ["SAFE_CHOICE"]
     },
     {
       "id": "6",
@@ -59,7 +73,7 @@
       "name": "코드이스케이프",
       "category": "activity",
       "score": 3.0,
-      "tags": []
+      "tags": ["WEEKDAY_PREFERRED"]
     },
     {
       "id": "8",
@@ -73,14 +87,14 @@
       "name": "진옥화할매원조닭한마리",
       "category": "restaurant",
       "score": 4.0,
-      "tags": []
+      "tags": ["MEETING_PREFERRED", "WEEKEND_PREFERRED"]
     },
     {
       "id": "10",
       "name": "센터커피",
       "category": "cafe",
       "score": 1.0,
-      "tags": []
+      "tags": ["FREQUENTLY_SELECTED"]
     }
   ],
   "distanceMatrix": {

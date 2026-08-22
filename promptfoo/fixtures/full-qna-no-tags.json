@@ -2,6 +2,20 @@
   "startNodeId": "start",
   "meetingType": "SOCIAL",
   "isWeekend": false,
+  "qna": [
+    {
+      "question": "이번 모임에서 가장 중요하게 생각하는 목적이 무엇인가요?",
+      "answer": "새로운 곳을 경험하기"
+    },
+    {
+      "question": "어떤 분위기의 모임을 원하시나요?",
+      "answer": "조용하고 차분한 분위기"
+    },
+    {
+      "question": "이번 모임 멤버들은 얼마나 자주 만나는 편인가요?",
+      "answer": "거의 매주 만나는 사이예요"
+    }
+  ],
   "visitOrder": ["restaurant", "cafe", "activity", "activity", "bar"],
   "places": [
     {

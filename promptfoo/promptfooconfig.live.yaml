@@ -1,13 +1,13 @@
-description: "코스 추천 프롬프트 라이브 평가 (OpenAI gpt-5-nano + NVIDIA NIM, API 키 필요)"
+description: "코스 추천 프롬프트 라이브 평가 (OpenAI gpt-4o-mini + NVIDIA NIM, API 키 필요)"
 
 prompts:
   - file://prompts/course-generator-v2.txt
 
 providers:
-  - id: openai:chat:gpt-5-nano
+  - id: openai:chat:gpt-4o-mini
     config:
       apiKeyEnvar: OPENAI_API_KEY
-      max_completion_tokens: 4096
+      max_completion_tokens: 2048
       response_format:
         type: json_object
   - id: openai:chat:nvidia/nemotron-3-ultra-550b-a55b
@@ -97,3 +97,56 @@ tests:
     vars:
       inputJson: file://fixtures/input-long-visit-order.json
       expectedOutput: file://fixtures/input-long-visit-order.expected.json
+
+  # --- 아래는 qna·tags 기반 판단 검증용 (정답이 없는 판단 영역이라 expectedOutput 없음) ---
+
+  # [테스트 케이스 5] qna 없음, 태그 없음: 순수 베이스라인
+  - description: "qna 없음 · 태그 없음 (베이스라인)"
+    vars:
+      inputJson: file://fixtures/no-qna-no-tags.json
+
+  # [테스트 케이스 6] qna 없음, 태그 혼합(0/1/2개+): 태그만으로 판단하는지
+  - description: "qna 없음 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/no-qna-mixed-tags.json
+
+  # [테스트 케이스 7] qna 3개, 태그 없음: qna만으로 판단하는지
+  - description: "qna 3개 · 태그 없음"
+    vars:
+      inputJson: file://fixtures/full-qna-no-tags.json
+
+  # [테스트 케이스 8] qna 3개, 태그 혼합: 가장 일반적인 실전 조합
+  - description: "qna 3개 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/full-qna-mixed-tags.json
+
+  # [테스트 케이스 9] 후보 부족 상황 + 태그 혼합 (qna 없음)
+  - description: "후보 부족 · qna 없음 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/no-qna-mixed-tags-tight.json
+
+  # [테스트 케이스 10] 후보 부족 상황 + qna 3개 + 태그 혼합
+  - description: "후보 부족 · qna 3개 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/full-qna-mixed-tags-tight.json
+
+  # [테스트 케이스 11] 핵심: 점수 1위 후보에 부정적 신호(CATEGORY_POPULAR·FREQUENTLY_SELECTED) 태그,
+  # 점수 낮은 후보에 SAFE_CHOICE 태그 + "조용한 분위기" qna → qna·태그가 점수를 이겨야 하는 케이스
+  - description: "qna·태그 vs 점수 충돌 (qna 있음)"
+    vars:
+      inputJson: file://fixtures/full-qna-vs-score-conflict.json
+
+  # [테스트 케이스 12] 위와 동일한 충돌 구조이지만 qna 없이 태그만으로 판단
+  - description: "qna·태그 vs 점수 충돌 (qna 없음)"
+    vars:
+      inputJson: file://fixtures/no-qna-vs-score-conflict.json
+
+  # [테스트 케이스 13] 긴 동선 + isWeekend:true + qna 3개 + 태그 혼합 (최대 신호)
+  - description: "긴 동선 · 주말 · qna 3개 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/full-qna-weekend-mixed-tags.json
+
+  # [테스트 케이스 14] 긴 동선 + isWeekend:true만 단독 신호 (qna·태그 없음)
+  - description: "긴 동선 · 주말 신호만 단독"
+    vars:
+      inputJson: file://fixtures/no-qna-weekend-no-tags.json

@@ -2,6 +2,7 @@
   "startNodeId": "start",
   "meetingType": "SOCIAL",
   "isWeekend": false,
+  "qna": [],
   "visitOrder": ["restaurant", "cafe", "activity", "activity", "bar"],
   "places": [
     {

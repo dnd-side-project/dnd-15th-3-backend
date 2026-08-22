@@ -56,7 +56,7 @@ const STUB_PLAN: CourseRoutePlan = {
 function buildRoute(overrides: Record<string, unknown> = {}) {
   return {
     routeId: 1,
-    name: '코스이름1',
+    name: '첫번째',
     places: [
       { placeId: 'p1', order: 1, category: CategorySlug.Restaurant },
       { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -83,10 +83,10 @@ describe('createCourseGeneratorOutputSchema', () => {
   it('장소 구성이 다른 유효한 코스 2개는 통과한다', () => {
     expect(
       isValid([
-        buildRoute({ routeId: 1, name: '코스이름1' }),
+        buildRoute({ routeId: 1, name: '첫번째' }),
         buildRoute({
           routeId: 2,
-          name: '코스이름2',
+          name: '두번째',
           places: [
             { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
             { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -103,10 +103,10 @@ describe('createCourseGeneratorOutputSchema', () => {
 
     it('COURSE_STRATEGIES 개수(3개)까지는 통과한다', () => {
       const routes = [
-        buildRoute({ routeId: 1, name: '코스이름1' }),
+        buildRoute({ routeId: 1, name: '첫번째' }),
         buildRoute({
           routeId: 2,
-          name: '코스이름2',
+          name: '두번째',
           places: [
             { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
             { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -114,7 +114,7 @@ describe('createCourseGeneratorOutputSchema', () => {
         }),
         buildRoute({
           routeId: 3,
-          name: '코스이름3',
+          name: '세번째',
           places: [
             { placeId: 'p9', order: 1, category: CategorySlug.Restaurant },
             { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -127,10 +127,10 @@ describe('createCourseGeneratorOutputSchema', () => {
 
     it('4개 이상이면 거부한다', () => {
       const routes = [
-        buildRoute({ routeId: 1, name: '코스이름1' }),
+        buildRoute({ routeId: 1, name: '첫번째' }),
         buildRoute({
           routeId: 2,
-          name: '코스이름2',
+          name: '두번째',
           places: [
             { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
             { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -138,13 +138,13 @@ describe('createCourseGeneratorOutputSchema', () => {
         }),
         buildRoute({
           routeId: 3,
-          name: '코스이름3',
+          name: '세번째',
           places: [
             { placeId: 'p9', order: 1, category: CategorySlug.Restaurant },
             { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
           ],
         }),
-        buildRoute({ routeId: 4, name: '코스이름4' }),
+        buildRoute({ routeId: 4, name: '네번째' }),
       ]
       expect(isValid(routes)).toBe(false)
     })
@@ -155,10 +155,10 @@ describe('createCourseGeneratorOutputSchema', () => {
       expect(
         isValid(
           [
-            buildRoute({ routeId: 1, name: '코스이름1' }),
+            buildRoute({ routeId: 1, name: '첫번째' }),
             buildRoute({
               routeId: 2,
-              name: '코스이름2',
+              name: '두번째',
               places: [
                 { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
                 { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -259,10 +259,10 @@ describe('createCourseGeneratorOutputSchema', () => {
     it('순서만 다르고 장소 구성이 같으면 거부한다', () => {
       expect(
         isValid([
-          buildRoute({ routeId: 1, name: '코스이름1' }),
+          buildRoute({ routeId: 1, name: '첫번째' }),
           buildRoute({
             routeId: 2,
-            name: '코스이름2',
+            name: '두번째',
             places: [
               { placeId: 'p1', order: 1, category: CategorySlug.Restaurant },
               { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -277,10 +277,10 @@ describe('createCourseGeneratorOutputSchema', () => {
     it('1부터 순차적이지 않으면 거부한다', () => {
       expect(
         isValid([
-          buildRoute({ routeId: 2, name: '코스이름1' }),
+          buildRoute({ routeId: 2, name: '첫번째' }),
           buildRoute({
             routeId: 3,
-            name: '코스이름2',
+            name: '두번째',
             places: [
               { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
               { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -292,12 +292,24 @@ describe('createCourseGeneratorOutputSchema', () => {
   })
 
   describe('코스 이름', () => {
-    it(`최소 길이(5자) 미만이면 거부한다`, () => {
-      expect(isValid([buildRoute({ name: '짧음' })])).toBe(false)
+    it('LLM은 접미사(코스)를 뺀 설명 부분만 입력하고, 서버가 자동으로 붙인다', () => {
+      const result = createCourseGeneratorOutputSchema(
+        buildInput(),
+        STUB_PLAN,
+      ).safeParse({ routes: [buildRoute({ name: '조용한 힐링' })] })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.routes[0].name).toBe('조용한 힐링 코스')
+      }
     })
 
-    it('최대 길이(10자) 초과면 거부한다', () => {
-      expect(isValid([buildRoute({ name: '가나다라마바사아자차카' })])).toBe(
+    it(`최소 길이(2자) 미만이면 거부한다`, () => {
+      expect(isValid([buildRoute({ name: '짧' })])).toBe(false)
+    })
+
+    it('최대 길이(9자) 초과면 거부한다', () => {
+      expect(isValid([buildRoute({ name: '가나다라마바사아자차' })])).toBe(
         false,
       )
     })
@@ -306,13 +318,17 @@ describe('createCourseGeneratorOutputSchema', () => {
       expect(isValid([buildRoute({ name: '          ' })])).toBe(false)
     })
 
+    it(`'코스'라는 글자가 포함되면 거부한다 (서버가 자동으로 붙이므로)`, () => {
+      expect(isValid([buildRoute({ name: '이상한코스' })])).toBe(false)
+    })
+
     it('서로 다른 코스의 이름이 중복되면 거부한다', () => {
       expect(
         isValid([
-          buildRoute({ routeId: 1, name: '코스이름1' }),
+          buildRoute({ routeId: 1, name: '첫번째' }),
           buildRoute({
             routeId: 2,
-            name: '코스이름1',
+            name: '첫번째',
             places: [
               { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
               { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
@@ -322,13 +338,13 @@ describe('createCourseGeneratorOutputSchema', () => {
       ).toBe(false)
     })
 
-    it('앞뒤 공백 차이만 있는 이름도 중복으로 본다 (trim 비교)', () => {
+    it('앞뒤 공백 차이만 있는 이름도 중복으로 본다 (trim 후 접미사 부착)', () => {
       expect(
         isValid([
-          buildRoute({ routeId: 1, name: '코스이름1' }),
+          buildRoute({ routeId: 1, name: '첫번째' }),
           buildRoute({
             routeId: 2,
-            name: '코스이름1 ',
+            name: '첫번째 ',
             places: [
               { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
               { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
