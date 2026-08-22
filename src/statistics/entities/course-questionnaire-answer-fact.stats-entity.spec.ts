@@ -19,8 +19,9 @@ describe('CourseQuestionnaireAnswerFact entity', () => {
       (index) => index.target === CourseQuestionnaireAnswerFact,
     )
 
-    expect(indices).toHaveLength(1)
-    expect(indices[0].columns).toEqual(['meetingId', 'courseVersion'])
+    expect(indices.map((index) => index.columns)).toEqual(
+      expect.arrayContaining([['meetingId', 'courseVersion']]),
+    )
   })
 
   it('핵심 식별자·버전·코드 제약을 등록한다', () => {

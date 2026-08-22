@@ -116,6 +116,10 @@ jobs:
 
           awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-api-migration/ && /argocd.argoproj.io\/hook: PreSync/ { found = 1 } END { exit !found }' "$render_dir/app-develop.yaml"
           awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-api-migration/ && /argocd.argoproj.io\/hook: PreSync/ { found = 1 } END { exit !found }' "$render_dir/app-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-statistics-migration/ && /argocd.argoproj.io\/hook: PreSync/ && /dist\/database\/statistics-data-source.js/ { found = 1 } END { exit !found }' "$render_dir/app-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Job/ && /name: momo-statistics-migration/ && /argocd.argoproj.io\/hook: PreSync/ && /dist\/database\/statistics-data-source.js/ { found = 1 } END { exit !found }' "$render_dir/app-main.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Deployment/ && /name: momo-statistics-worker/ && /dist\/statistics\/statistics-worker.js/ && /name: momo-statistics-postgres-auth/ && /name: momo-postgres-auth/ { found = 1 } END { exit !found }' "$render_dir/app-develop.yaml"
+          awk 'BEGIN { RS = "---" } /kind: Deployment/ && /name: momo-statistics-worker/ && /dist\/statistics\/statistics-worker.js/ && /name: momo-statistics-postgres-auth/ && /name: momo-postgres-auth/ { found = 1 } END { exit !found }' "$render_dir/app-main.yaml"
 
           awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /name: momo-postgres/ && /image: ghcr.io\/dnd-side-project\/dnd-15th-3-postgis@sha256:0f769879a66f6ea0b8352644b7a60cb5623c9534b015ae928ae53de4deb658eb/ { found = 1 } END { exit !found }' "$render_dir/postgres-develop.yaml"
           awk 'BEGIN { RS = "---" } /kind: StatefulSet/ && /name: momo-postgres/ && /image: ghcr.io\/dnd-side-project\/dnd-15th-3-postgis@sha256:0f769879a66f6ea0b8352644b7a60cb5623c9534b015ae928ae53de4deb658eb/ { found = 1 } END { exit !found }' "$render_dir/postgres-main.yaml"

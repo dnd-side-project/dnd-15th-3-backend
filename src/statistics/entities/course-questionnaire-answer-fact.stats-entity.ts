@@ -13,6 +13,7 @@ import {
 // 코스에 최종 포함된 장소의 관계를 재집계할 수 있다.
 @Entity()
 @Index(['meetingId', 'courseVersion'])
+@Index('IDX_questionnaire_fact_question_option', ['questionCode', 'optionCode'])
 @Check(`"outbox_event_id" > 0`)
 @Check(`"meeting_id" > 0`)
 @Check(`"course_generation_run_id" > 0`)

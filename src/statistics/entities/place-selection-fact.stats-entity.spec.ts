@@ -59,8 +59,9 @@ describe('PlaceSelectionFact entity', () => {
       (index) => index.target === PlaceSelectionFact,
     )
 
-    expect(indices).toHaveLength(1)
-    expect(indices[0].columns).toEqual(['meetingId', 'courseVersion'])
+    expect(indices.map((index) => index.columns)).toEqual(
+      expect.arrayContaining([['meetingId', 'courseVersion']]),
+    )
   })
 
   it('createdAt이 생성 시각 컬럼으로 등록된다', () => {

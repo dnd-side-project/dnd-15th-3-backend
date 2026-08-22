@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: momo-statistics-worker
+  labels:
+    app.kubernetes.io/name: momo-statistics-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: momo-statistics-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: momo-statistics-worker
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-credentials
+      containers:
+        - name: worker
+          image: ghcr.io/dnd-side-project/dnd-15th-3-backend:bootstrap
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - dist/statistics/statistics-worker.js
+          env:
+            - name: DB_HOST
+              value: momo-postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: momo-postgres-auth
+                  key: POSTGRES_DB
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: momo-postgres-auth
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: momo-postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: DB_SSL
+              value: "false"
+            - name: STATS_DB_HOST
+              value: momo-statistics-postgres
+            - name: STATS_DB_PORT
+              value: "5432"
+            - name: STATS_DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: momo-statistics-postgres-auth
+                  key: POSTGRES_DB
+            - name: STATS_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: momo-statistics-postgres-auth
+                  key: POSTGRES_USER
+            - name: STATS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: momo-statistics-postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: STATS_DB_SSL
+              value: "false"
+            - name: STATS_DB_SYNCHRONIZE
+              value: "false"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

@@ -15,6 +15,19 @@ import {
 // 나중에 실시간을 위한 캐시 테이블이 필요할 경우 해당 사실 테이블 정보를 바탕으로 캐시 테이블을 생성 가능
 @Entity()
 @Index(['meetingId', 'courseVersion'])
+@Index('IDX_place_selection_fact_place', ['placeId'])
+@Index('IDX_place_selection_fact_meeting_type_place', [
+  'meetingTypeId',
+  'placeId',
+])
+@Index('IDX_place_selection_fact_meeting_date_place', [
+  'meetingDate',
+  'placeId',
+])
+@Index('IDX_place_selection_fact_category_place', [
+  'placeCategoryId',
+  'placeId',
+])
 @Check(`"outbox_event_id" > 0`)
 @Check(`"place_id" > 0`)
 @Check(`"place_category_id" > 0`)
