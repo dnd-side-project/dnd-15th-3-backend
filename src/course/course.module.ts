@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import type { Env } from 'src/config/env'
 import { KakaoModule } from 'src/kakao/kakao.module'
 import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
+import { OutboxModule } from 'src/outbox/outbox.module'
 import { PlaceModule } from 'src/place/place.module'
 import { CourseController } from './course.controller'
 import { CourseRepository } from './course.repository'
@@ -23,6 +24,7 @@ import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recomm
     MeetingAccessModule,
     PlaceModule,
     KakaoModule,
+    OutboxModule,
     TypeOrmModule.forFeature([
       CourseCandidate,
       CourseCandidateComment,

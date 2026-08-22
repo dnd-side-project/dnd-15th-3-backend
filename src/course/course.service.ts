@@ -25,6 +25,13 @@ import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.ent
 import type { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { MeetingException } from 'src/meeting/exception/meeting.exception'
 import { MeetingErrorCode } from 'src/meeting/exception/meeting-error-code'
+import { OutboxAggregateType } from 'src/outbox/constants/outbox-aggregate-type.constant'
+import { OutboxEventType } from 'src/outbox/constants/outbox-event-type.constant'
+import { OutboxEventRepository } from 'src/outbox/outbox-event.repository'
+import {
+  COURSE_CONFIRMED_PAYLOAD_VERSION,
+  CourseConfirmedPayloadSchema,
+} from 'src/outbox/schemas/course-confirmed-payload.schema'
 import type { Place } from 'src/place/entities/place.entity'
 import { PlaceImageService } from 'src/place/place-image.service'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
@@ -69,6 +76,7 @@ export class CourseService {
     private readonly placeImageService: PlaceImageService,
     private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
     private readonly courseRepository: CourseRepository,
+    private readonly outboxEventRepository: OutboxEventRepository,
   ) {}
 
   async getCourseCandidates(
@@ -241,10 +249,73 @@ export class CourseService {
       await candidateRepository.save(candidate)
       await manager.getRepository(Meeting).save(meeting)
 
+      await this.recordCourseConfirmedEvent(
+        manager,
+        meeting,
+        meetingId,
+        courseCandidateId,
+      )
+
       return {
         status: meeting.status,
         confirmedCourseCandidateId: candidate.id,
       }
+    })
+  }
+
+  private async recordCourseConfirmedEvent(
+    manager: EntityManager,
+    meeting: Meeting,
+    meetingId: string,
+    courseCandidateId: string,
+  ): Promise<void> {
+    const steps = await this.loadCourseStepsOrThrow(manager, courseCandidateId)
+    const recommendationIds = steps.map(
+      (step) => step.meetingPlaceRecommendation.id,
+    )
+
+    const [participantCount, voteCounts] = await Promise.all([
+      this.courseRepository.countParticipants(manager, meetingId),
+      this.voteRepository.getVoteCountsByRecommendation(
+        manager,
+        recommendationIds,
+      ),
+    ])
+
+    let payload: Record<string, unknown>
+    try {
+      payload = CourseConfirmedPayloadSchema.parse({
+        meetingId,
+        meetingTypeId: meeting.meetingType.id,
+        meetingDate: meeting.date,
+        meetingTime: meeting.time,
+        courseVersion: meeting.courseVersion,
+        payloadVersion: COURSE_CONFIRMED_PAYLOAD_VERSION,
+        participantCount,
+        places: steps.map((step) => {
+          const place = step.meetingPlaceRecommendation.place
+          const counts = voteCounts.get(step.meetingPlaceRecommendation.id)
+          return {
+            placeId: place.id,
+            placeCategoryId: place.category.id,
+            likeCount: counts?.likeCount ?? 0,
+            dislikeCount: counts?.dislikeCount ?? 0,
+          }
+        }),
+      })
+    } catch (error) {
+      this.logger.error(
+        `코스 확정 outbox 이벤트 payload 검증에 실패했습니다. meetingId=${meetingId} courseCandidateId=${courseCandidateId}`,
+        error instanceof Error ? error.stack : error,
+      )
+      throw new CourseException(CourseErrorCode.courseConfirmedEventInvalid)
+    }
+
+    await this.outboxEventRepository.create(manager, {
+      eventType: OutboxEventType.courseConfirmed,
+      aggregateType: OutboxAggregateType.meeting,
+      aggregateId: meetingId,
+      payload,
     })
   }
 

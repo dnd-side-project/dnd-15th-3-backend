@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const coerceBoolean = z
+export const coerceBoolean = z
   .union([z.boolean(), z.string()])
   .transform((val) => {
     if (typeof val === 'boolean') return val

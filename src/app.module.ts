@@ -10,7 +10,11 @@ import { CatalogModule } from './catalog/catalog.module'
 import { GlobalExceptionFilter } from './common/exception/global-exception.filter'
 import { type Env, validateEnv } from './config/env'
 import { CourseModule } from './course/course.module'
-import { createDatabaseOptions } from './database/database.options'
+import {
+  CORE_ENTITIES_GLOB,
+  CORE_MIGRATIONS_GLOB,
+  createDatabaseOptions,
+} from './database/database.options'
 import { HealthModule } from './health/health.module'
 import { MediaModule } from './media/media.module'
 import { MeetingModule } from './meeting/meeting.module'
@@ -35,6 +39,10 @@ export function createTypeOrmOptions(
       synchronize: config.get('DB_SYNCHRONIZE', { infer: true }),
     },
     __dirname,
+    {
+      entitiesGlob: CORE_ENTITIES_GLOB,
+      migrationsGlob: CORE_MIGRATIONS_GLOB,
+    },
   ) as TypeOrmModuleOptions
 }
 

@@ -27,7 +27,7 @@ run = "bash scripts/dev-db-local.sh"
 
 [tasks.db-stop]
 description = "로컬 PostgreSQL 중지"
-run = "docker compose stop"
+run = "docker compose stop postgres"
 
 [tasks.db-psql]
 description = "로컬 PostgreSQL psql 접속"
@@ -36,8 +36,27 @@ run = "docker compose exec postgres psql -U postgres momo"
 [tasks.db-reset]
 description = "로컬 PostgreSQL 초기화 (데이터 전체 삭제)"
 run = [
-  "docker compose down --volumes",
+  "docker compose down --volumes postgres",
   "bash scripts/dev-db-local.sh",
+]
+
+[tasks.stats-db-start]
+description = "로컬 통계 PostgreSQL 시작 (127.0.0.1:15433)"
+run = "bash scripts/dev-stats-db-local.sh"
+
+[tasks.stats-db-stop]
+description = "로컬 통계 PostgreSQL 중지"
+run = "docker compose stop statistics-postgres"
+
+[tasks.stats-db-psql]
+description = "로컬 통계 PostgreSQL psql 접속"
+run = "docker compose exec statistics-postgres psql -U postgres momo_statistics"
+
+[tasks.stats-db-reset]
+description = "로컬 통계 PostgreSQL 초기화 (데이터 전체 삭제)"
+run = [
+  "docker compose down --volumes statistics-postgres",
+  "bash scripts/dev-stats-db-local.sh",
 ]
 
 [tasks.cluster-check]

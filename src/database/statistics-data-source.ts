@@ -3,10 +3,10 @@ import { join } from 'node:path'
 import { loadEnvFile } from 'node:process'
 import { DataSource } from 'typeorm'
 import {
-  CORE_ENTITIES_GLOB,
-  CORE_MIGRATIONS_GLOB,
   createDatabaseOptions,
-  readDatabaseConfig,
+  readStatisticsDatabaseConfig,
+  STATISTICS_ENTITIES_GLOB,
+  STATISTICS_MIGRATIONS_GLOB,
 } from './database.options'
 
 if (existsSync('.env')) {
@@ -15,11 +15,11 @@ if (existsSync('.env')) {
 
 export default new DataSource(
   createDatabaseOptions(
-    { ...readDatabaseConfig(), synchronize: false },
+    { ...readStatisticsDatabaseConfig(), synchronize: false },
     join(__dirname, '..'),
     {
-      entitiesGlob: CORE_ENTITIES_GLOB,
-      migrationsGlob: CORE_MIGRATIONS_GLOB,
+      entitiesGlob: STATISTICS_ENTITIES_GLOB,
+      migrationsGlob: STATISTICS_MIGRATIONS_GLOB,
     },
   ),
 )
