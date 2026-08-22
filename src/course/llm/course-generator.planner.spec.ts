@@ -55,8 +55,67 @@ describe('course route planner', () => {
     const input = loadInputFixture('input-category-tight')
     const plan = buildCourseRoutePlan(input)
 
-    expect(plan.routeCandidates).toHaveLength(2)
+    // 액티비티가 2곳(3, 4)이라 [1,2,3,4,5]와 [1,2,4,3,5] 두 방문 순서가 모두
+    // 유효하지만, 장소 구성은 동일하므로 후보는 1개로 합쳐져야 한다.
+    expect(plan.routeCandidates).toHaveLength(1)
+    expect(plan.routeCandidates[0].placeIds).toEqual(['1', '2', '3', '4', '5'])
     expect(plan.selectedRoutes).toHaveLength(1)
+  })
+
+  it('dedupes candidates that only differ in the order of interchangeable same-category places', () => {
+    const input = loadInputFixture('input-category-tight')
+    const plan = buildCourseRoutePlan(input)
+
+    const compositions = plan.routeCandidates.map((candidate) =>
+      [...candidate.placeIds].sort().join(','),
+    )
+    expect(new Set(compositions).size).toBe(compositions.length)
+  })
+
+  it('keeps the shorter-distance route when duplicate compositions have different distances', () => {
+    const input = parseCourseGeneratorInput({
+      startNodeId: 'start',
+      meetingType: 'SOCIAL',
+      isWeekend: false,
+      visitOrder: ['restaurant', 'activity', 'activity'],
+      places: [
+        { id: 'r1', name: '식당', category: 'restaurant', score: 1, tags: [] },
+        {
+          id: 'a1',
+          name: '액티비티1',
+          category: 'activity',
+          score: 1,
+          tags: [],
+        },
+        {
+          id: 'a2',
+          name: '액티비티2',
+          category: 'activity',
+          score: 1,
+          tags: [],
+        },
+      ],
+      distanceMatrix: {
+        unit: 'meter',
+        metric: 'walking_network_distance',
+        directed: true,
+        values: {
+          start: { r1: 1 },
+          // start->r1->a1->a2 순서는 총 3, start->r1->a2->a1 순서는 총 21
+          r1: { a1: 1, a2: 10 },
+          a1: { a2: 1 },
+          a2: { a1: 10 },
+        },
+      },
+    })
+
+    const plan = buildCourseRoutePlan(input)
+
+    expect(plan.routeCandidates).toHaveLength(1)
+    expect(plan.routeCandidates[0]).toMatchObject({
+      placeIds: ['r1', 'a1', 'a2'],
+      totalDistanceMeters: 3,
+    })
   })
 
   it('rejects repeated categories without enough distinct places', () => {

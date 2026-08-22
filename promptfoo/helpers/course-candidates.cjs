@@ -16,6 +16,16 @@ function getDistance(input, from, to) {
     : null
 }
 
+function isBetterCandidate(candidate, existing) {
+  if (candidate.distance !== existing.distance) {
+    return candidate.distance < existing.distance
+  }
+  if (candidate.score !== existing.score) {
+    return candidate.score > existing.score
+  }
+  return candidate.sequence.localeCompare(existing.sequence) < 0
+}
+
 function enumerateRoutes(input) {
   const placesByCategory = new Map()
 
@@ -25,18 +35,26 @@ function enumerateRoutes(input) {
     placesByCategory.set(place.category, places)
   }
 
-  const candidates = []
+  // 카테고리가 중복되는 슬롯(예: 액티비티 2곳)이 있으면 방문 순서만 다르고
+  // 장소 구성은 같은 후보가 여러 번 나올 수 있다. composition(정렬된 placeIds)을
+  // 키로 삼아 그중 가장 나은 후보 하나만 남긴다.
+  const candidatesByComposition = new Map()
 
   function visit(index, selected, usedIds, totalDistance, totalScore) {
     if (index === input.visitOrder.length) {
       const placeIds = selected.map((place) => place.id)
-      candidates.push({
+      const composition = compositionKey(placeIds)
+      const candidate = {
         placeIds,
-        composition: compositionKey(placeIds),
+        composition,
         sequence: sequenceKey(placeIds),
         distance: totalDistance,
         score: totalScore,
-      })
+      }
+      const existing = candidatesByComposition.get(composition)
+      if (!existing || isBetterCandidate(candidate, existing)) {
+        candidatesByComposition.set(composition, candidate)
+      }
       return
     }
 
@@ -65,7 +83,7 @@ function enumerateRoutes(input) {
   }
 
   visit(0, [], new Set(), 0, 0)
-  return candidates
+  return [...candidatesByComposition.values()]
 }
 
 function buildRouteCandidates(input) {

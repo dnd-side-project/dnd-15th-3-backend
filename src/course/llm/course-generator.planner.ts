@@ -348,7 +348,18 @@ function searchCandidates(
       ),
     )
 
-  return { candidates, complete }
+  // 카테고리가 중복되는 슬롯(예: 액티비티 2곳)은 방문 순서만 다른 동일한
+  // 장소 구성을 별개 후보로 만들어낸다. 정렬된 구성 기준으로 먼저 나온
+  // (= 이 전략의 정렬 기준상 더 나은) 것만 남기고 중복을 제거한다.
+  const seenCompositions = new Set<string>()
+  const dedupedCandidates = candidates.filter((candidate) => {
+    const compositionKey = getRouteCompositionKey(candidate.placeIds)
+    if (seenCompositions.has(compositionKey)) return false
+    seenCompositions.add(compositionKey)
+    return true
+  })
+
+  return { candidates: dedupedCandidates, complete }
 }
 
 function refineStepCandidates(input: CourseGeneratorInput): CoursePlace[][] {
@@ -502,6 +513,9 @@ export function buildCourseRoutePlan(
   const strategies = options.targetStrategy
     ? [options.targetStrategy]
     : [...COURSE_STRATEGIES]
+  // 전략별로 서로 다른 방문 순서를 찾아내더라도 장소 구성이 같으면 같은
+  // 후보로 취급해야 하므로, 구성(정렬된 placeIds) 기준으로 합치면서
+  // 그중 가장 나은 후보만 남긴다.
   const allCandidates = new Map<string, RouteCandidate>()
   let searchComplete = true
 
@@ -514,7 +528,11 @@ export function buildCourseRoutePlan(
     )
     searchComplete = searchComplete && result.complete
     for (const candidate of result.candidates) {
-      allCandidates.set(getRouteSequenceKey(candidate.placeIds), candidate)
+      const composition = getRouteCompositionKey(candidate.placeIds)
+      const existing = allCandidates.get(composition)
+      if (!existing || compareDistanceThenScore(candidate, existing) < 0) {
+        allCandidates.set(composition, candidate)
+      }
     }
   }
 
