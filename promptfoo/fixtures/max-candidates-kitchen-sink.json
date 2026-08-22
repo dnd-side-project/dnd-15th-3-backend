@@ -1,0 +1,247 @@
+{
+  "startNodeId": "start",
+  "meetingType": "FAMILY",
+  "isWeekend": true,
+  "qna": [
+    {
+      "question": "이번 모임에서 가장 중요하게 생각하는 목적이 무엇인가요?",
+      "answer": "다양한 경험을 함께 하기"
+    },
+    {
+      "question": "어떤 분위기의 모임을 원하시나요?",
+      "answer": "활기차고 다채로운 분위기"
+    },
+    {
+      "question": "이번 모임 멤버들은 얼마나 자주 만나는 편인가요?",
+      "answer": "몇 달에 한 번 만나는 사이예요"
+    }
+  ],
+  "visitOrder": [
+    "restaurant",
+    "cafe",
+    "activity",
+    "culture",
+    "shopping",
+    "bar"
+  ],
+  "places": [
+    {
+      "id": "1",
+      "name": "몽탄",
+      "category": "restaurant",
+      "score": 2.0,
+      "tags": ["FREQUENTLY_SELECTED"]
+    },
+    {
+      "id": "2",
+      "name": "새마을식당",
+      "category": "restaurant",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "진옥화할매원조닭한마리",
+      "category": "restaurant",
+      "score": 6.0,
+      "tags": []
+    },
+    {
+      "id": "4",
+      "name": "대림창고",
+      "category": "cafe",
+      "score": 0.5,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "센터커피",
+      "category": "cafe",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "6",
+      "name": "어니언 성수",
+      "category": "cafe",
+      "score": 5.0,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "7",
+      "name": "라운지엑스 볼링장",
+      "category": "activity",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "8",
+      "name": "메가박스 성수",
+      "category": "activity",
+      "score": 1.0,
+      "tags": []
+    },
+    {
+      "id": "9",
+      "name": "방방콘",
+      "category": "activity",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "10",
+      "name": "비트포비아",
+      "category": "activity",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "11",
+      "name": "국립현대미술관 서울관",
+      "category": "culture",
+      "score": 4.5,
+      "tags": ["CATEGORY_POPULAR"]
+    },
+    {
+      "id": "12",
+      "name": "대림미술관",
+      "category": "culture",
+      "score": 3.5,
+      "tags": []
+    },
+    {
+      "id": "13",
+      "name": "세운상가 전시관",
+      "category": "culture",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "14",
+      "name": "성수동 편집숍",
+      "category": "shopping",
+      "score": 3.0,
+      "tags": []
+    },
+    {
+      "id": "15",
+      "name": "무신사 스탠다드 성수",
+      "category": "shopping",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "16",
+      "name": "더현대서울",
+      "category": "shopping",
+      "score": 4.5,
+      "tags": ["MEETING_PREFERRED"]
+    },
+    {
+      "id": "17",
+      "name": "나누리 잡화점",
+      "category": "bar",
+      "score": 3.5,
+      "tags": []
+    },
+    {
+      "id": "18",
+      "name": "미도인",
+      "category": "bar",
+      "score": 5.5,
+      "tags": []
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 5,
+        "2": 5,
+        "3": 5
+      },
+      "1": {
+        "4": 5,
+        "5": 5,
+        "6": 5
+      },
+      "2": {
+        "4": 5,
+        "5": 5,
+        "6": 5
+      },
+      "3": {
+        "4": 5,
+        "5": 5,
+        "6": 5
+      },
+      "4": {
+        "7": 5,
+        "8": 5,
+        "9": 5,
+        "10": 5
+      },
+      "5": {
+        "7": 5,
+        "8": 5,
+        "9": 5,
+        "10": 5
+      },
+      "6": {
+        "7": 5,
+        "8": 5,
+        "9": 5,
+        "10": 5
+      },
+      "7": {
+        "11": 5,
+        "12": 5,
+        "13": 5
+      },
+      "8": {
+        "11": 5,
+        "12": 5,
+        "13": 5
+      },
+      "9": {
+        "11": 5,
+        "12": 5,
+        "13": 5
+      },
+      "10": {
+        "11": 5,
+        "12": 5,
+        "13": 5
+      },
+      "11": {
+        "14": 5,
+        "15": 5,
+        "16": 5
+      },
+      "12": {
+        "14": 5,
+        "15": 5,
+        "16": 5
+      },
+      "13": {
+        "14": 5,
+        "15": 5,
+        "16": 5
+      },
+      "14": {
+        "17": 5,
+        "18": 5
+      },
+      "15": {
+        "17": 5,
+        "18": 5
+      },
+      "16": {
+        "17": 5,
+        "18": 5
+      }
+    }
+  }
+}
