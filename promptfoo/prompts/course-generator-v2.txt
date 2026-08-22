@@ -7,16 +7,28 @@
 
 ## 선택 규칙
 
-- routeCandidates 중 서로 다른 장소 구성과 성격을 가지도록 최대 3개(입력의 maxUniqueRoutes 이하)를 고르세요.
+- routeCandidates 중 서로 다른 장소 구성과 성격을 가지도록 최대 3개를 고르세요.
+- routes의 개수는 입력의 maxUniqueRoutes를 넘지 마세요.
 - 순서만 다르고 장소 집합이 같으면 같은 코스입니다. 예: [식당A,카페B,액티비티C,액티비티D]와 [식당A,카페B,액티비티D,액티비티C]는 액티비티 두 곳 순서만 다를 뿐 동일한 코스이니 중복 출력하지 마세요.
-- qna(질문-답변)가 있으면 최우선으로, 그다음 tags를 참고해서 조합을 고르세요. meetingType·isWeekend는 이를 해석하는 배경 맥락으로만 쓰세요.
-- totalScore(참가자 선호도, 좋아요·싫어요 가중 점수)가 높을수록 선호도가 높습니다. qna·tags로 우열을 가리기 어려우면 totalScore가 높은 쪽을, 그마저 같으면 totalDistanceMeters가 짧은 쪽을 우선하세요.
+- qna(질문-답변)가 있으면 가장 먼저 고려하세요.
+- qna가 없거나 판단이 어려우면 tags를 참고하세요.
+- meetingType과 isWeekend는 qna·tags를 해석할 때 참고하는 배경 맥락으로만 쓰세요.
+- totalScore는 참가자들의 선호도(좋아요·싫어요 가중 점수)이며, 값이 높을수록 선호도가 높습니다.
+- qna·tags로 우열을 가리기 어려우면 totalScore가 높은 쪽을 우선하세요.
+- totalScore도 같으면 totalDistanceMeters가 짧은 쪽을 우선하세요.
 - 완벽히 맞는 조합이 없어도 빈 배열을 반환하지 말고 가장 가까운 조합을 선택하세요.
-- generationMode가 regenerate-one이면 targetStrategy의 코스 1개만 선택하고, variationSeed가 있으면 기존과 다른 선택을, 없으면 strategyDefaults를 우선 사용하세요. feedbackConstraints가 있으면 그 제약을 따르세요.
+- generationMode가 regenerate-one이면 targetStrategy의 코스 1개만 선택하세요.
+- variationSeed가 있으면 기존과 다른 선택을 우선하고, 없으면 strategyDefaults를 우선 사용하세요.
+- feedbackConstraints가 있으면 그 제약을 따르세요.
 
 ## 출력 제약
 
-- places 길이·category 순서는 visitOrder와 일치해야 합니다. placeId는 문자열, order·routeId는 1부터 순차 증가하며, 출발지는 places에서 제외합니다.
+- places의 길이는 visitOrder의 길이와 같아야 합니다.
+- places의 category는 visitOrder와 같은 순서여야 합니다.
+- placeId는 문자열입니다.
+- order는 1부터 순차적으로 증가해야 합니다.
+- routeId는 1부터 순차적으로 증가해야 합니다.
+- 출발지는 places에 포함하지 않습니다.
 
 ## 입력 데이터
 
