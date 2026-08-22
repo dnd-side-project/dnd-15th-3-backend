@@ -1,7 +1,7 @@
 description: "코스 추천 프롬프트 라이브 평가 (OpenAI gpt-5-nano + NVIDIA NIM, API 키 필요)"
 
 prompts:
-  - file://prompts/course-generator-v1.txt
+  - file://prompts/course-generator-v2.txt
 
 providers:
   - id: openai:chat:gpt-5-nano
