@@ -65,9 +65,9 @@ defaultTest:
     - type: javascript
       value: file://assertions/order-sequential.js
 
-    # 11) routeId와 코스 이름(name)은 출력 규칙을 따라야 함
+    # 11) routeId는 1부터 순차적이어야 함
     - type: javascript
-      value: file://assertions/route-id-name.js
+      value: file://assertions/route-id-sequential.js
 
     # 12) 서버가 계산한 routeCandidates 전체 목록 안에 있는 조합이어야 함
     - type: javascript

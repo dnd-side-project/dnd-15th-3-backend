@@ -5,17 +5,6 @@
 - 거리나 점수를 직접 계산하지 마세요. 반드시 routeCandidates 안에 있는 조합(placeIds)만, 배열 순서 그대로 선택하세요. 후보에 없는 조합을 새로 만들지 마세요.
 - 출력은 JSON 객체 하나만 반환하고 설명이나 마크다운을 포함하지 마세요.
 
-## 코스 이름(name) 작성 규칙
-
-- "코스"는 포함하지 마세요(서버가 자동으로 붙입니다). 공백 포함 2~9자를 반드시 지키고, 한글과 띄어쓰기만 사용하고 욕설·선정적·혐오 표현은 쓰지 마세요.
-- 과장 표현, 의미 없는 이름, 장소 종류 나열을 쓰지 마세요.
-  - 나쁜 예: "맛집 볼링 영화 술집"(장소 나열), "완벽한 하루"(과장), "코스1"(무의미)
-  - 좋은 예(길이·형식 참고용, 그대로 재사용 금지): "조용한 힐링"(4자), "가성비 동선"(5자), "인기 만점"(4자)
-  - 위 좋은 예시는 길이와 형식만 참고하세요. 문구를 그대로 재사용하지 말고, 이 조합만의 실제 qna·tags·점수를 반영해 새로 지으세요.
-- qna가 있으면 그 답변에 실제로 등장하는 단어를 하나 이상 반영하되, 2~9자 제한을 넘기지 마세요.
-- qna가 없으면 tags 값의 의미를 한글로 짧게 풀어 반영하고, 없으면 totalScore·totalDistanceMeters 중 두드러지는 특징을 반영하세요. "OO 최상/최우선"·"최단 OO"·"균형 잡힌 OO" 같은 전략 라벨식 이름은 쓰지 마세요.
-- 서로 다른 코스의 이름은 겹치면 안 됩니다.
-
 ## 선택 규칙
 
 - routeCandidates 중 서로 다른 장소 구성과 성격을 가지도록 최대 3개(입력의 maxUniqueRoutes 이하)를 고르세요.
@@ -23,12 +12,11 @@
 - qna(질문-답변)가 있으면 최우선으로, 그다음 tags를 참고해서 조합을 고르세요. meetingType·isWeekend는 이를 해석하는 배경 맥락으로만 쓰세요.
 - totalScore(참가자 선호도, 좋아요·싫어요 가중 점수)가 높을수록 선호도가 높습니다. qna·tags로 우열을 가리기 어려우면 totalScore가 높은 쪽을, 그마저 같으면 totalDistanceMeters가 짧은 쪽을 우선하세요.
 - 완벽히 맞는 조합이 없어도 빈 배열을 반환하지 말고 가장 가까운 조합을 선택하세요.
-- (코스 재생성 기능용, 현재 미사용) generationMode가 regenerate-one이면 targetStrategy의 코스 1개만 선택하고, variationSeed가 있으면 기존과 다른 선택을, 없으면 strategyDefaults를 우선 사용하세요. feedbackConstraints가 있으면 그 제약을 따르세요.
+- generationMode가 regenerate-one이면 targetStrategy의 코스 1개만 선택하고, variationSeed가 있으면 기존과 다른 선택을, 없으면 strategyDefaults를 우선 사용하세요. feedbackConstraints가 있으면 그 제약을 따르세요.
 
 ## 출력 제약
 
 - places 길이·category 순서는 visitOrder와 일치해야 합니다. placeId는 문자열, order·routeId는 1부터 순차 증가하며, 출발지는 places에서 제외합니다.
-- 코스 이름(name) 형식은 위 "코스 이름(name) 작성 규칙"을 따릅니다.
 
 ## 입력 데이터
 
@@ -42,7 +30,6 @@
   "routes": [
     {
       "routeId": 1,
-      "name": "조용한 힐링",
       "places": [
         {
           "placeId": "place-id",

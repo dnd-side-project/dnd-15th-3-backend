@@ -49,15 +49,6 @@ function hasDuplicateCompositions(routes) {
   return false
 }
 
-// route-id-name.js 규칙과 동일하게, 여기서도 접미사(코스)를 뺀 설명 부분만 둔다.
-const STRATEGY_LABELS = {
-  // biome-ignore lint/style/useNamingConvention: CourseStrategy 값과 동일하게 유지
-  distance_minimization: '최단거리',
-  // biome-ignore lint/style/useNamingConvention: CourseStrategy 값과 동일하게 유지
-  preference_first: '선호도 최우선',
-  balanced: '균형 잡힌',
-}
-
 function buildServerFallback(input) {
   if (!Array.isArray(input?.strategyDefaults)) return undefined
 
@@ -66,7 +57,6 @@ function buildServerFallback(input) {
   )
   const routes = input.strategyDefaults.map((defaultRoute, routeIndex) => ({
     routeId: routeIndex + 1,
-    name: STRATEGY_LABELS[defaultRoute.strategy],
     places: defaultRoute.placeIds.map((placeId, placeIndex) => ({
       placeId: String(placeId),
       order: placeIndex + 1,

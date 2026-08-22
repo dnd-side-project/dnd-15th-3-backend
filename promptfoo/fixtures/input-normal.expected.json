@@ -2,35 +2,92 @@
   "routes": [
     {
       "routeId": 1,
-      "name": "최단거리",
       "places": [
-        { "placeId": "1", "order": 1, "category": "restaurant" },
-        { "placeId": "4", "order": 2, "category": "cafe" },
-        { "placeId": "8", "order": 3, "category": "activity" },
-        { "placeId": "7", "order": 4, "category": "activity" },
-        { "placeId": "10", "order": 5, "category": "bar" }
+        {
+          "placeId": "1",
+          "order": 1,
+          "category": "restaurant"
+        },
+        {
+          "placeId": "4",
+          "order": 2,
+          "category": "cafe"
+        },
+        {
+          "placeId": "8",
+          "order": 3,
+          "category": "activity"
+        },
+        {
+          "placeId": "7",
+          "order": 4,
+          "category": "activity"
+        },
+        {
+          "placeId": "10",
+          "order": 5,
+          "category": "bar"
+        }
       ]
     },
     {
       "routeId": 2,
-      "name": "선호도 최우선",
       "places": [
-        { "placeId": "2", "order": 1, "category": "restaurant" },
-        { "placeId": "3", "order": 2, "category": "cafe" },
-        { "placeId": "5", "order": 3, "category": "activity" },
-        { "placeId": "6", "order": 4, "category": "activity" },
-        { "placeId": "9", "order": 5, "category": "bar" }
+        {
+          "placeId": "2",
+          "order": 1,
+          "category": "restaurant"
+        },
+        {
+          "placeId": "3",
+          "order": 2,
+          "category": "cafe"
+        },
+        {
+          "placeId": "5",
+          "order": 3,
+          "category": "activity"
+        },
+        {
+          "placeId": "6",
+          "order": 4,
+          "category": "activity"
+        },
+        {
+          "placeId": "9",
+          "order": 5,
+          "category": "bar"
+        }
       ]
     },
     {
       "routeId": 3,
-      "name": "균형 잡힌",
       "places": [
-        { "placeId": "1", "order": 1, "category": "restaurant" },
-        { "placeId": "4", "order": 2, "category": "cafe" },
-        { "placeId": "5", "order": 3, "category": "activity" },
-        { "placeId": "6", "order": 4, "category": "activity" },
-        { "placeId": "9", "order": 5, "category": "bar" }
+        {
+          "placeId": "1",
+          "order": 1,
+          "category": "restaurant"
+        },
+        {
+          "placeId": "4",
+          "order": 2,
+          "category": "cafe"
+        },
+        {
+          "placeId": "5",
+          "order": 3,
+          "category": "activity"
+        },
+        {
+          "placeId": "6",
+          "order": 4,
+          "category": "activity"
+        },
+        {
+          "placeId": "9",
+          "order": 5,
+          "category": "bar"
+        }
       ]
     }
   ]
