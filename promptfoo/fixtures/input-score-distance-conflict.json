@@ -1,23 +1,51 @@
 {
   "startNodeId": "start",
-  "visitOrder": ["식당", "카페", "술/바"],
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "visitOrder": ["restaurant", "cafe", "bar"],
   "places": [
     {
       "id": "1",
       "name": "멀지만 인기 맛집",
-      "category": "식당",
-      "score": 10.0
+      "category": "restaurant",
+      "score": 10.0,
+      "tags": []
     },
     {
       "id": "2",
       "name": "가깝지만 무난한 맛집",
-      "category": "식당",
-      "score": 0.1
+      "category": "restaurant",
+      "score": 0.1,
+      "tags": []
     },
-    { "id": "3", "name": "가까운 카페", "category": "카페", "score": 3.0 },
-    { "id": "4", "name": "먼 카페", "category": "카페", "score": 1.0 },
-    { "id": "5", "name": "가까운 술집", "category": "술/바", "score": 2.0 },
-    { "id": "6", "name": "먼 술집", "category": "술/바", "score": 4.0 }
+    {
+      "id": "3",
+      "name": "가까운 카페",
+      "category": "cafe",
+      "score": 3.0,
+      "tags": []
+    },
+    {
+      "id": "4",
+      "name": "먼 카페",
+      "category": "cafe",
+      "score": 1.0,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "가까운 술집",
+      "category": "bar",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "6",
+      "name": "먼 술집",
+      "category": "bar",
+      "score": 4.0,
+      "tags": []
+    }
   ],
   "distanceMatrix": {
     "unit": "meter",

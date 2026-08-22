@@ -3,7 +3,7 @@ module.exports = function (_outputString, context) {
   const rawInput = context?.vars?.inputJson
   const input = typeof rawInput === 'string' ? JSON.parse(rawInput) : rawInput
   const matrix = input?.distanceMatrix
-  const placeKeys = ['category', 'id', 'name', 'score']
+  const placeKeys = ['category', 'id', 'name', 'score', 'tags']
 
   if (
     input?.startNodeId !== 'start' ||

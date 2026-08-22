@@ -1,17 +1,75 @@
 {
   "startNodeId": "start",
-  "visitOrder": ["식당", "카페", "액티비티", "술/바", "카페", "식당", "술/바"],
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "visitOrder": [
+    "restaurant",
+    "cafe",
+    "activity",
+    "bar",
+    "cafe",
+    "restaurant",
+    "bar"
+  ],
   "places": [
-    { "id": "1", "name": "저녁식당1", "category": "식당", "score": 6.0 },
-    { "id": "2", "name": "카페1", "category": "카페", "score": 3.5 },
-    { "id": "3", "name": "액티비티1", "category": "액티비티", "score": 4.5 },
-    { "id": "4", "name": "술집1", "category": "술/바", "score": 5.5 },
-    { "id": "5", "name": "카페2", "category": "카페", "score": 4.0 },
-    { "id": "6", "name": "저녁식당2", "category": "식당", "score": 2.5 },
-    { "id": "7", "name": "액티비티2", "category": "액티비티", "score": 3.0 },
-    { "id": "8", "name": "술집2", "category": "술/바", "score": 4.0 },
-    { "id": "9", "name": "저녁식당3", "category": "식당", "score": 4.0 },
-    { "id": "10", "name": "카페3", "category": "카페", "score": 1.0 }
+    {
+      "id": "1",
+      "name": "저녁식당1",
+      "category": "restaurant",
+      "score": 6.0,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "카페1",
+      "category": "cafe",
+      "score": 3.5,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "액티비티1",
+      "category": "activity",
+      "score": 4.5,
+      "tags": []
+    },
+    { "id": "4", "name": "술집1", "category": "bar", "score": 5.5, "tags": [] },
+    {
+      "id": "5",
+      "name": "카페2",
+      "category": "cafe",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "6",
+      "name": "저녁식당2",
+      "category": "restaurant",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "7",
+      "name": "액티비티2",
+      "category": "activity",
+      "score": 3.0,
+      "tags": []
+    },
+    { "id": "8", "name": "술집2", "category": "bar", "score": 4.0, "tags": [] },
+    {
+      "id": "9",
+      "name": "저녁식당3",
+      "category": "restaurant",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "10",
+      "name": "카페3",
+      "category": "cafe",
+      "score": 1.0,
+      "tags": []
+    }
   ],
   "distanceMatrix": {
     "unit": "meter",

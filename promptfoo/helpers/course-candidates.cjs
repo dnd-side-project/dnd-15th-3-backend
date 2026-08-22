@@ -136,16 +136,6 @@ function buildSelectionPools(input, candidates) {
   return pools
 }
 
-function compactCandidates(selectionPools) {
-  const candidates = new Map()
-  for (const pool of Object.values(selectionPools)) {
-    for (const candidate of pool) {
-      candidates.set(compositionKey(candidate.placeIds), candidate)
-    }
-  }
-  return [...candidates.values()]
-}
-
 function buildStrategyDefaults(selectionPools) {
   const usedCompositions = new Set()
   const defaults = []
@@ -168,7 +158,6 @@ module.exports = {
   buildStrategyDefaults,
   buildRouteCandidates,
   buildSelectionPools,
-  compactCandidates,
   compositionKey,
   enumerateRoutes,
   sequenceKey,

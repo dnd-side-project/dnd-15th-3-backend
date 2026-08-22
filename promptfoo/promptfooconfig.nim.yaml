@@ -59,13 +59,13 @@ defaultTest:
     - type: javascript
       value: file://assertions/order-sequential.js
 
-    # 11) routeId와 전략 이름은 출력 규칙을 따라야 함
+    # 11) routeId와 코스 이름(name)은 출력 규칙을 따라야 함
     - type: javascript
-      value: file://assertions/route-id-strategy.js
+      value: file://assertions/route-id-name.js
 
-    # 12) 서버가 계산한 후보 중 전략별 최적 코스를 선택해야 함
+    # 12) 서버가 계산한 routeCandidates 전체 목록 안에 있는 조합이어야 함
     - type: javascript
-      value: file://assertions/strategy-selection.js
+      value: file://assertions/route-candidate-membership.js
 
 tests:
   # [테스트 케이스 1] 기본 정상 케이스: 10개 장소, 5단계 코스

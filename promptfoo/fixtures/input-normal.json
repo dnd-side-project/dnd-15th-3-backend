@@ -1,17 +1,73 @@
 {
   "startNodeId": "start",
-  "visitOrder": ["식당", "카페", "액티비티", "액티비티", "술/바"],
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "visitOrder": ["restaurant", "cafe", "activity", "activity", "bar"],
   "places": [
-    { "id": "1", "name": "장소A", "category": "식당", "score": 2.0 },
-    { "id": "2", "name": "장소B", "category": "식당", "score": 2.5 },
-    { "id": "3", "name": "장소C", "category": "카페", "score": 5.0 },
-    { "id": "4", "name": "장소D", "category": "카페", "score": 0.5 },
-    { "id": "5", "name": "장소E", "category": "액티비티", "score": 5.5 },
-    { "id": "6", "name": "장소F", "category": "액티비티", "score": 3.0 },
-    { "id": "7", "name": "장소G", "category": "액티비티", "score": 2.0 },
-    { "id": "8", "name": "장소H", "category": "액티비티", "score": 2.5 },
-    { "id": "9", "name": "장소I", "category": "술/바", "score": 3.5 },
-    { "id": "10", "name": "장소J", "category": "술/바", "score": -0.5 }
+    {
+      "id": "1",
+      "name": "장소A",
+      "category": "restaurant",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "장소B",
+      "category": "restaurant",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "장소C",
+      "category": "cafe",
+      "score": 5.0,
+      "tags": []
+    },
+    {
+      "id": "4",
+      "name": "장소D",
+      "category": "cafe",
+      "score": 0.5,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "장소E",
+      "category": "activity",
+      "score": 5.5,
+      "tags": []
+    },
+    {
+      "id": "6",
+      "name": "장소F",
+      "category": "activity",
+      "score": 3.0,
+      "tags": []
+    },
+    {
+      "id": "7",
+      "name": "장소G",
+      "category": "activity",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "8",
+      "name": "장소H",
+      "category": "activity",
+      "score": 2.5,
+      "tags": []
+    },
+    { "id": "9", "name": "장소I", "category": "bar", "score": 3.5, "tags": [] },
+    {
+      "id": "10",
+      "name": "장소J",
+      "category": "bar",
+      "score": -0.5,
+      "tags": []
+    }
   ],
   "distanceMatrix": {
     "unit": "meter",

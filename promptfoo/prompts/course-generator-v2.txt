@@ -15,7 +15,6 @@
 ## 선택 규칙
 
 - generationMode가 initial이면 routeCandidates 중에서 서로 다른 장소 구성과 성격을 가지도록 최대 3개를 고르세요.
-- generationMode가 regenerate-one이면 targetStrategy의 코스 1개만 선택하세요.
 - routes의 개수는 입력의 maxUniqueRoutes를 넘지 말고, 가능한 고유 후보가 있는 만큼만 반환하세요.
 - 동일한 장소 구성의 코스를 중복 출력하지 마세요. 순서가 달라도 같은 장소 집합이면 중복입니다.
 - variationSeed가 있으면 허용된 후보 중 기존과 다른 선택을 우선하세요.

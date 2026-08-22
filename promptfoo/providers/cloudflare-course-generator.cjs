@@ -49,21 +49,23 @@ function hasDuplicateCompositions(routes) {
   return false
 }
 
+const STRATEGY_LABELS = {
+  // biome-ignore lint/style/useNamingConvention: CourseStrategy 값과 동일하게 유지
+  distance_minimization: '최단거리 코스',
+  // biome-ignore lint/style/useNamingConvention: CourseStrategy 값과 동일하게 유지
+  preference_first: '선호도 최우선 코스',
+  balanced: '균형 잡힌 코스',
+}
+
 function buildServerFallback(input) {
   if (!Array.isArray(input?.strategyDefaults)) return undefined
 
   const placesById = new Map(
     (input.places ?? []).map((place) => [String(place.id), place]),
   )
-  const defaults =
-    input.generationMode === 'regenerate-one'
-      ? input.strategyDefaults.filter(
-          (defaultRoute) => defaultRoute.strategy === input.targetStrategy,
-        )
-      : input.strategyDefaults
-  const routes = defaults.map((defaultRoute, routeIndex) => ({
+  const routes = input.strategyDefaults.map((defaultRoute, routeIndex) => ({
     routeId: routeIndex + 1,
-    strategy: defaultRoute.strategy,
+    name: STRATEGY_LABELS[defaultRoute.strategy],
     places: defaultRoute.placeIds.map((placeId, placeIndex) => ({
       placeId: String(placeId),
       order: placeIndex + 1,

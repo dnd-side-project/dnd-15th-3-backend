@@ -4,7 +4,6 @@ const {
   buildRouteCandidates,
   buildSelectionPools,
   buildStrategyDefaults,
-  compactCandidates,
 } = require('../helpers/course-candidates.cjs')
 
 function parseInput(rawInput) {
@@ -31,15 +30,13 @@ function prepareInput(rawInput, generationOptions = {}) {
     { ...input, strategyConfig },
     allRouteCandidates,
   )
-  const routeCandidates = compactCandidates(selectionPools)
 
   return {
     ...input,
     ...generationOptions,
     strategyConfig,
-    maxUniqueRoutes: routeCandidates.length,
-    routeCandidates,
-    selectionPools,
+    maxUniqueRoutes: allRouteCandidates.length,
+    routeCandidates: allRouteCandidates,
     strategyDefaults: buildStrategyDefaults(selectionPools),
   }
 }
@@ -48,7 +45,6 @@ module.exports = function beforeEach(context) {
   const vars = context.test?.vars ?? {}
   const input = prepareInput(vars.inputJson, {
     generationMode: vars.generationMode ?? 'initial',
-    ...(vars.targetStrategy ? { targetStrategy: vars.targetStrategy } : {}),
     ...(vars.variationSeed ? { variationSeed: vars.variationSeed } : {}),
     ...(vars.feedbackConstraints
       ? { feedbackConstraints: vars.feedbackConstraints }
