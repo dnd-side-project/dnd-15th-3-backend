@@ -39,6 +39,14 @@ const envSchemaBase = z.object({
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   GOOGLE_PLACES_API_KEY: z.string().trim().default(''),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  OPENAI_API_KEY: z.string().trim().default(''),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  OPENAI_MODEL: z.string().trim().min(1).default('gpt-4o-mini'),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(1),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  LLM_MAX_TOKENS: z.coerce.number().int().min(1).default(2048),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   INVITATION_BASE_URL: z
     .string()
     .trim()

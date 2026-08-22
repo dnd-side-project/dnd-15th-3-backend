@@ -32,6 +32,10 @@ describe('validateEnv', () => {
       expect(env.MEDIA_PUBLIC_BASE_URL).toContain('/momo-media-test/o/')
       expect(env.KAKAO_REST_API_KEY).toBe('')
       expect(env.GOOGLE_PLACES_API_KEY).toBe('')
+      expect(env.OPENAI_API_KEY).toBe('')
+      expect(env.OPENAI_MODEL).toBe('gpt-4o-mini')
+      expect(env.LLM_TEMPERATURE).toBe(1)
+      expect(env.LLM_MAX_TOKENS).toBe(2048)
       expect(env.INVITATION_BASE_URL).toBe('https://momo.example/invite')
     })
 
