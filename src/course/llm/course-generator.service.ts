@@ -47,8 +47,6 @@ function buildFallbackOutput(
   input: CourseGeneratorInput,
   plan: CourseRoutePlan,
 ): CourseGeneratorOutput {
-  const placesById = new Map(input.places.map((place) => [place.id, place]))
-
   return {
     routes: plan.selectedRoutes.map((route, routeIndex) => ({
       routeId: routeIndex + 1,
@@ -56,8 +54,6 @@ function buildFallbackOutput(
       places: route.placeIds.map((placeId, placeIndex) => ({
         placeId,
         order: placeIndex + 1,
-        category:
-          placesById.get(placeId)?.category ?? input.visitOrder[placeIndex],
       })),
     })),
   }

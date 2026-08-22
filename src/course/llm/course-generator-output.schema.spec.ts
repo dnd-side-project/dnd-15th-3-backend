@@ -17,7 +17,7 @@ function buildInput() {
       { id: 'p3', name: '장소C', category: CategorySlug.Restaurant, score: 2 },
       // p5: start에서의 거리 데이터가 없음 (거리 연결성 실패 테스트용)
       { id: 'p5', name: '장소E', category: CategorySlug.Restaurant, score: 1 },
-      // p7: 방문 순서상 Restaurant 자리에 쓰이지만 실제 category는 Cafe (거짓 응답 테스트용)
+      // p7: 방문 순서상 Restaurant 자리에 쓰이지만 실제 category는 Cafe (잘못된 카테고리 배치 테스트용)
       { id: 'p7', name: '장소G', category: CategorySlug.Cafe, score: 1 },
       // p9: 세 번째 유효한 Restaurant 후보 (3개 코스 테스트용)
       { id: 'p9', name: '장소I', category: CategorySlug.Restaurant, score: 1 },
@@ -57,8 +57,8 @@ function buildRoute(overrides: Record<string, unknown> = {}) {
   return {
     routeId: 1,
     places: [
-      { placeId: 'p1', order: 1, category: CategorySlug.Restaurant },
-      { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+      { placeId: 'p1', order: 1 },
+      { placeId: 'p2', order: 2 },
     ],
     ...overrides,
   }
@@ -86,8 +86,8 @@ describe('createCourseGeneratorOutputSchema', () => {
         buildRoute({
           routeId: 2,
           places: [
-            { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
-            { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+            { placeId: 'p3', order: 1 },
+            { placeId: 'p2', order: 2 },
           ],
         }),
       ]),
@@ -105,15 +105,15 @@ describe('createCourseGeneratorOutputSchema', () => {
         buildRoute({
           routeId: 2,
           places: [
-            { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
-            { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+            { placeId: 'p3', order: 1 },
+            { placeId: 'p2', order: 2 },
           ],
         }),
         buildRoute({
           routeId: 3,
           places: [
-            { placeId: 'p9', order: 1, category: CategorySlug.Restaurant },
-            { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+            { placeId: 'p9', order: 1 },
+            { placeId: 'p2', order: 2 },
           ],
         }),
       ]
@@ -127,15 +127,15 @@ describe('createCourseGeneratorOutputSchema', () => {
         buildRoute({
           routeId: 2,
           places: [
-            { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
-            { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+            { placeId: 'p3', order: 1 },
+            { placeId: 'p2', order: 2 },
           ],
         }),
         buildRoute({
           routeId: 3,
           places: [
-            { placeId: 'p9', order: 1, category: CategorySlug.Restaurant },
-            { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+            { placeId: 'p9', order: 1 },
+            { placeId: 'p2', order: 2 },
           ],
         }),
         buildRoute({ routeId: 4 }),
@@ -153,8 +153,8 @@ describe('createCourseGeneratorOutputSchema', () => {
             buildRoute({
               routeId: 2,
               places: [
-                { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
-                { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+                { placeId: 'p3', order: 1 },
+                { placeId: 'p2', order: 2 },
               ],
             }),
           ],
@@ -169,9 +169,7 @@ describe('createCourseGeneratorOutputSchema', () => {
       expect(
         isValid([
           buildRoute({
-            places: [
-              { placeId: 'p1', order: 1, category: CategorySlug.Restaurant },
-            ],
+            places: [{ placeId: 'p1', order: 1 }],
           }),
         ]),
       ).toBe(false)
@@ -182,8 +180,8 @@ describe('createCourseGeneratorOutputSchema', () => {
         isValid([
           buildRoute({
             places: [
-              { placeId: 'p2', order: 1, category: CategorySlug.Cafe },
-              { placeId: 'p1', order: 2, category: CategorySlug.Restaurant },
+              { placeId: 'p2', order: 1 },
+              { placeId: 'p1', order: 2 },
             ],
           }),
         ]),
@@ -195,8 +193,8 @@ describe('createCourseGeneratorOutputSchema', () => {
         isValid([
           buildRoute({
             places: [
-              { placeId: 'p1', order: 2, category: CategorySlug.Restaurant },
-              { placeId: 'p2', order: 1, category: CategorySlug.Cafe },
+              { placeId: 'p1', order: 2 },
+              { placeId: 'p2', order: 1 },
             ],
           }),
         ]),
@@ -210,22 +208,24 @@ describe('createCourseGeneratorOutputSchema', () => {
         isValid([
           buildRoute({
             places: [
-              { placeId: 'ghost', order: 1, category: CategorySlug.Restaurant },
-              { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+              { placeId: 'ghost', order: 1 },
+              { placeId: 'p2', order: 2 },
             ],
           }),
         ]),
       ).toBe(false)
     })
 
-    it('실제 category와 출력 category가 다르면 거부한다', () => {
-      // p7의 실제 category는 Cafe인데, Restaurant 자리에 놓고 category를 Restaurant라고 거짓 응답
+    it('placeId의 실제 category가 visitOrder와 다르면 거부한다', () => {
+      // p7의 실제 category는 Cafe인데 Restaurant 자리(1번째)에 놓임.
+      // LLM은 이제 category를 직접 낼 수 없으므로, 서버가 placeId로 조회한
+      // 실제 category와 visitOrder를 비교해서 잡아낸다.
       expect(
         isValid([
           buildRoute({
             places: [
-              { placeId: 'p7', order: 1, category: CategorySlug.Restaurant },
-              { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+              { placeId: 'p7', order: 1 },
+              { placeId: 'p2', order: 2 },
             ],
           }),
         ]),
@@ -239,8 +239,8 @@ describe('createCourseGeneratorOutputSchema', () => {
         isValid([
           buildRoute({
             places: [
-              { placeId: 'p5', order: 1, category: CategorySlug.Restaurant },
-              { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+              { placeId: 'p5', order: 1 },
+              { placeId: 'p2', order: 2 },
             ],
           }),
         ]),
@@ -256,8 +256,8 @@ describe('createCourseGeneratorOutputSchema', () => {
           buildRoute({
             routeId: 2,
             places: [
-              { placeId: 'p1', order: 1, category: CategorySlug.Restaurant },
-              { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+              { placeId: 'p1', order: 1 },
+              { placeId: 'p2', order: 2 },
             ],
           }),
         ]),
@@ -273,8 +273,8 @@ describe('createCourseGeneratorOutputSchema', () => {
           buildRoute({
             routeId: 3,
             places: [
-              { placeId: 'p3', order: 1, category: CategorySlug.Restaurant },
-              { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+              { placeId: 'p3', order: 1 },
+              { placeId: 'p2', order: 2 },
             ],
           }),
         ]),
@@ -288,14 +288,14 @@ describe('createCourseGeneratorOutputSchema', () => {
     })
   })
 
-  describe('category 필드 자체 검증', () => {
-    it('CategorySlug에 없는 값이면 거부한다', () => {
+  describe('category 필드', () => {
+    it('category 필드를 보내면 거부한다 (더 이상 LLM이 판단하지 않고 서버가 placeId로 조회함)', () => {
       expect(
         isValid([
           buildRoute({
             places: [
-              { placeId: 'p1', order: 1, category: 'dessert' },
-              { placeId: 'p2', order: 2, category: CategorySlug.Cafe },
+              { placeId: 'p1', order: 1, category: 'restaurant' },
+              { placeId: 'p2', order: 2 },
             ],
           }),
         ]),
@@ -309,8 +309,8 @@ describe('createCourseGeneratorOutputSchema', () => {
         isValid([
           buildRoute({
             places: [
-              { placeId: 'p1', order: 1, category: CategorySlug.Restaurant },
-              { placeId: 'p1', order: 2, category: CategorySlug.Cafe },
+              { placeId: 'p1', order: 1 },
+              { placeId: 'p1', order: 2 },
             ],
           }),
         ]),

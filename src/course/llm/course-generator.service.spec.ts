@@ -50,10 +50,16 @@ describe('CourseGeneratorService', () => {
       const service = new CourseGeneratorService(client as unknown as LlmClient)
       const output = await service.generate(input)
 
-      expect(output.routes).toHaveLength(3)
-      expect(output.routes[0].places.map((place) => place.category)).toEqual(
-        input.visitOrder,
+      const categoryByPlaceId = new Map(
+        input.places.map((place) => [place.id, place.category]),
       )
+
+      expect(output.routes).toHaveLength(3)
+      expect(
+        output.routes[0].places.map((place) =>
+          categoryByPlaceId.get(place.placeId),
+        ),
+      ).toEqual(input.visitOrder)
       expect(mockChat).toHaveBeenCalledTimes(1)
     })
 

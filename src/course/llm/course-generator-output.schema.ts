@@ -1,4 +1,3 @@
-import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { z } from 'zod'
 import {
   buildCourseRoutePlan,
@@ -8,14 +7,9 @@ import {
 } from './course-generator.planner'
 import type { CourseGeneratorInput } from './course-generator-input.schema'
 
-const categorySlugSchema = z.enum(
-  Object.values(CategorySlug) as [CategorySlug, ...CategorySlug[]],
-)
-
 const coursePlaceSchema = z.strictObject({
   placeId: z.string().min(1),
   order: z.number().int().positive(),
-  category: categorySlugSchema,
 })
 
 const courseRouteSchema = z.strictObject({
@@ -35,7 +29,6 @@ export type CourseGeneratorOutput = {
     places: {
       placeId: string
       order: number
-      category: CategorySlug
     }[]
   }[]
 }
@@ -85,24 +78,19 @@ export function createCourseGeneratorOutputSchema(
         }
 
         for (const [placeIndex, place] of route.places.entries()) {
-          if (place.category !== visitOrder[placeIndex]) {
-            ctx.addIssue({
-              code: 'custom',
-              message: `${routeIndex + 1}번째 코스 ${placeIndex + 1}번째 장소의 카테고리가 ${place.category}(기대: ${visitOrder[placeIndex]})입니다.`,
-            })
-          }
           if (!candidateIds.has(place.placeId)) {
             ctx.addIssue({
               code: 'custom',
               message: `placeId ${place.placeId}는 후보 목록에 존재하지 않습니다.`,
             })
-          } else if (
-            candidatePlaces.get(place.placeId)?.category !== place.category
-          ) {
-            ctx.addIssue({
-              code: 'custom',
-              message: `placeId ${place.placeId}의 카테고리와 출력 category가 일치하지 않습니다.`,
-            })
+          } else {
+            const actualCategory = candidatePlaces.get(place.placeId)?.category
+            if (actualCategory !== visitOrder[placeIndex]) {
+              ctx.addIssue({
+                code: 'custom',
+                message: `${routeIndex + 1}번째 코스 ${placeIndex + 1}번째 장소(placeId ${place.placeId})의 카테고리가 ${actualCategory}(기대: ${visitOrder[placeIndex]})입니다.`,
+              })
+            }
           }
           if (place.order !== placeIndex + 1) {
             ctx.addIssue({

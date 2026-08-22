@@ -5,18 +5,15 @@
       "places": [
         {
           "placeId": "2",
-          "order": 1,
-          "category": "restaurant"
+          "order": 1
         },
         {
           "placeId": "3",
-          "order": 2,
-          "category": "cafe"
+          "order": 2
         },
         {
           "placeId": "5",
-          "order": 3,
-          "category": "bar"
+          "order": 3
         }
       ]
     },
@@ -25,18 +22,15 @@
       "places": [
         {
           "placeId": "1",
-          "order": 1,
-          "category": "restaurant"
+          "order": 1
         },
         {
           "placeId": "3",
-          "order": 2,
-          "category": "cafe"
+          "order": 2
         },
         {
           "placeId": "6",
-          "order": 3,
-          "category": "bar"
+          "order": 3
         }
       ]
     },
@@ -45,18 +39,15 @@
       "places": [
         {
           "placeId": "1",
-          "order": 1,
-          "category": "restaurant"
+          "order": 1
         },
         {
           "placeId": "4",
-          "order": 2,
-          "category": "cafe"
+          "order": 2
         },
         {
           "placeId": "5",
-          "order": 3,
-          "category": "bar"
+          "order": 3
         }
       ]
     }

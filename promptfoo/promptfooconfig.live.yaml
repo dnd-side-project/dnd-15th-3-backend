@@ -150,3 +150,56 @@ tests:
   - description: "긴 동선 · 주말 신호만 단독"
     vars:
       inputJson: file://fixtures/no-qna-weekend-no-tags.json
+
+  # --- 아래는 카테고리 반복(같은 카테고리가 visitOrder에 여러 번 등장)으로 인한
+  # 중복 장소 구성 후보를 서버가 미리 걸러내는지 검증하는 케이스 ---
+
+  # [테스트 케이스 15] 카테고리 3연속 중복(액티비티 3곳, 정확히 3곳뿐) - 순수 구조 테스트
+  - description: "카테고리 3연속 중복 · tight · 신호 없음"
+    vars:
+      inputJson: file://fixtures/dup-triple-tight.json
+
+  # [테스트 케이스 16] 위와 동일한 구조 + 식당·카페는 진짜 선택지(2곳씩) + qna
+  - description: "카테고리 3연속 중복 · tight · qna 있음"
+    vars:
+      inputJson: file://fixtures/dup-triple-tight-with-qna.json
+
+  # [테스트 케이스 17] 서로 다른 두 카테고리가 동시에 tight 중복(식당 2 + 카페 2)
+  - description: "두 카테고리 동시 tight 중복 · 신호 없음"
+    vars:
+      inputJson: file://fixtures/dup-double-segments-tight.json
+
+  # [테스트 케이스 18] 위 구조 + 바(단일 슬롯, 진짜 선택지) + 태그
+  - description: "두 카테고리 동시 tight 중복 · 태그 있음"
+    vars:
+      inputJson: file://fixtures/dup-double-segments-tight-with-tags.json
+
+  # [테스트 케이스 19] 비인접 위치의 카테고리 중복(카페가 1번째·4번째) + qna
+  - description: "비인접 위치 카테고리 중복 · qna 있음"
+    vars:
+      inputJson: file://fixtures/dup-nonadjacent.json
+
+  # [테스트 케이스 20] 시작 직후(맨 앞)에서 카테고리 중복 + 태그
+  - description: "시작 직후 카테고리 중복 · 태그 있음"
+    vars:
+      inputJson: file://fixtures/dup-at-start.json
+
+  # [테스트 케이스 21] 느슨한 대규모 중복 후보(액티비티 4곳 중 2곳 선택) - 조합 수 스케일 테스트
+  - description: "대규모 중복 후보(4곳 중 2곳) · 신호 없음"
+    vars:
+      inputJson: file://fixtures/dup-loose-many-candidates.json
+
+  # [테스트 케이스 22] 위와 동일한 대규모 후보 + qna·태그가 점수와 충돌
+  - description: "대규모 중복 후보(4곳 중 2곳) · qna·태그 vs 점수 충돌"
+    vars:
+      inputJson: file://fixtures/dup-loose-many-with-qna-conflict.json
+
+  # [테스트 케이스 23] MAX_COURSE_STEPS(6단계) 경계 + 두 카테고리 동시 tight 중복 + 최대 신호
+  - description: "6단계 경계 · 두 카테고리 동시 tight 중복 · 최대 신호"
+    vars:
+      inputJson: file://fixtures/dup-max-length-boundary.json
+
+  # [테스트 케이스 24] 6단계 경계 + 서로 다른 배수(카페 3중복 + 액티비티 2중복) 동시 발생
+  - description: "6단계 경계 · 서로 다른 배수의 중복 동시 발생"
+    vars:
+      inputJson: file://fixtures/dup-multi-multiplicity.json

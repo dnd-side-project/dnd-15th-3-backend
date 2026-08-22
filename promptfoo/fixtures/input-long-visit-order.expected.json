@@ -5,38 +5,31 @@
       "places": [
         {
           "placeId": "6",
-          "order": 1,
-          "category": "restaurant"
+          "order": 1
         },
         {
           "placeId": "10",
-          "order": 2,
-          "category": "cafe"
+          "order": 2
         },
         {
           "placeId": "7",
-          "order": 3,
-          "category": "activity"
+          "order": 3
         },
         {
           "placeId": "4",
-          "order": 4,
-          "category": "bar"
+          "order": 4
         },
         {
           "placeId": "5",
-          "order": 5,
-          "category": "cafe"
+          "order": 5
         },
         {
           "placeId": "1",
-          "order": 6,
-          "category": "restaurant"
+          "order": 6
         },
         {
           "placeId": "8",
-          "order": 7,
-          "category": "bar"
+          "order": 7
         }
       ]
     },
@@ -45,38 +38,31 @@
       "places": [
         {
           "placeId": "9",
-          "order": 1,
-          "category": "restaurant"
+          "order": 1
         },
         {
           "placeId": "2",
-          "order": 2,
-          "category": "cafe"
+          "order": 2
         },
         {
           "placeId": "3",
-          "order": 3,
-          "category": "activity"
+          "order": 3
         },
         {
           "placeId": "4",
-          "order": 4,
-          "category": "bar"
+          "order": 4
         },
         {
           "placeId": "5",
-          "order": 5,
-          "category": "cafe"
+          "order": 5
         },
         {
           "placeId": "1",
-          "order": 6,
-          "category": "restaurant"
+          "order": 6
         },
         {
           "placeId": "8",
-          "order": 7,
-          "category": "bar"
+          "order": 7
         }
       ]
     },
@@ -85,38 +71,31 @@
       "places": [
         {
           "placeId": "9",
-          "order": 1,
-          "category": "restaurant"
+          "order": 1
         },
         {
           "placeId": "2",
-          "order": 2,
-          "category": "cafe"
+          "order": 2
         },
         {
           "placeId": "3",
-          "order": 3,
-          "category": "activity"
+          "order": 3
         },
         {
           "placeId": "8",
-          "order": 4,
-          "category": "bar"
+          "order": 4
         },
         {
           "placeId": "10",
-          "order": 5,
-          "category": "cafe"
+          "order": 5
         },
         {
           "placeId": "6",
-          "order": 6,
-          "category": "restaurant"
+          "order": 6
         },
         {
           "placeId": "4",
-          "order": 7,
-          "category": "bar"
+          "order": 7
         }
       ]
     }

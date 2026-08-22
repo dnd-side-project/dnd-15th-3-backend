@@ -4,7 +4,7 @@ const { parseOutput } = require('../helpers/parse-output.cjs')
 // biome-ignore lint/style/noCommonJs: Promptfoo loads custom assertions via CommonJS.
 module.exports = function (outputString) {
   const routes = parseOutput(outputString)?.routes
-  const expectedKeys = ['placeId', 'order', 'category'].sort()
+  const expectedKeys = ['placeId', 'order'].sort()
   return (
     Array.isArray(routes) &&
     routes.every((r) =>

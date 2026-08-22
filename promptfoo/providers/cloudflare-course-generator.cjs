@@ -52,17 +52,11 @@ function hasDuplicateCompositions(routes) {
 function buildServerFallback(input) {
   if (!Array.isArray(input?.strategyDefaults)) return undefined
 
-  const placesById = new Map(
-    (input.places ?? []).map((place) => [String(place.id), place]),
-  )
   const routes = input.strategyDefaults.map((defaultRoute, routeIndex) => ({
     routeId: routeIndex + 1,
     places: defaultRoute.placeIds.map((placeId, placeIndex) => ({
       placeId: String(placeId),
       order: placeIndex + 1,
-      category:
-        placesById.get(String(placeId))?.category ??
-        input.visitOrder[placeIndex],
     })),
   }))
 

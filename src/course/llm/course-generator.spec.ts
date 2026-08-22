@@ -45,10 +45,16 @@ describe('parseCourseGeneratorOutput', () => {
       input,
     )
 
-    expect(output.routes).toHaveLength(3)
-    expect(output.routes[0].places.map((place) => place.category)).toEqual(
-      input.visitOrder,
+    const categoryByPlaceId = new Map(
+      input.places.map((place) => [place.id, place.category]),
     )
+
+    expect(output.routes).toHaveLength(3)
+    expect(
+      output.routes[0].places.map((place) =>
+        categoryByPlaceId.get(place.placeId),
+      ),
+    ).toEqual(input.visitOrder)
   })
 
   it('카테고리 촉박 케이스(후보 5개)의 유효 출력을 통과시킨다', () => {
