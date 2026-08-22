@@ -33,6 +33,10 @@ export const COURSE_CONFIRMABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.CourseGenerated,
 ]
 
+export const COURSE_GENERATABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.RecommendationCollecting,
+]
+
 export const COURSE_PLACE_ADDABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.CourseGenerated,
 ]

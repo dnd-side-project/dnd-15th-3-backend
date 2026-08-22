@@ -32,6 +32,10 @@ describe('validateEnv', () => {
       expect(env.MEDIA_PUBLIC_BASE_URL).toContain('/momo-media-test/o/')
       expect(env.KAKAO_REST_API_KEY).toBe('')
       expect(env.GOOGLE_PLACES_API_KEY).toBe('')
+      expect(env.OPENAI_API_KEY).toBe('')
+      expect(env.OPENAI_MODEL).toBe('')
+      expect(env.OPENAI_BASE_URL).toBe('https://api.openai.com/v1')
+      expect(env.OPENAI_TIMEOUT_MS).toBe(15000)
       expect(env.INVITATION_BASE_URL).toBe('https://momo.example/invite')
     })
 
@@ -115,6 +119,16 @@ describe('validateEnv', () => {
 
     it('does not require OCI_S3_ENDPOINT', () => {
       expect(() => validateEnv(baseConfig)).not.toThrow()
+    })
+
+    it('OpenAI API key와 model 중 하나만 설정하면 거부한다', () => {
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          OPENAI_API_KEY: 'test-key',
+        }),
+      ).toThrow('OPENAI_MODEL')
     })
 
     it('requires a media bucket name', () => {

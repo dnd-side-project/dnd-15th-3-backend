@@ -99,7 +99,7 @@ run = [
 [tasks.ci]
 description = "로컬에서 CI와 동일한 검증 실행"
 run = [
-  "biome check .",
+  "pnpm exec biome check .",
   "pnpm run typecheck",
   "pnpm run test",
 ]

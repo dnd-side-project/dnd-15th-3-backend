@@ -46,6 +46,10 @@ describe('PlaceSelectionFact entity', () => {
         `"like_count" >= 0`,
         `"dislike_count" >= 0`,
         `"like_count" + "dislike_count" <= "participant_count"`,
+        `("course_generation_run_id" IS NULL AND "course_generation_customization_type" IS NULL AND "course_generation_input_hash" IS NULL) OR ("course_generation_run_id" IS NOT NULL AND "course_generation_customization_type" IS NOT NULL AND "course_generation_input_hash" IS NOT NULL)`,
+        `"course_generation_run_id" IS NULL OR "course_generation_run_id" > 0`,
+        `"course_generation_customization_type" IS NULL OR "course_generation_customization_type" IN ('SKIP', 'QUESTIONNAIRE')`,
+        `"course_generation_input_hash" IS NULL OR length("course_generation_input_hash") = 64`,
       ].sort(),
     )
   })

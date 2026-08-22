@@ -1,7 +1,10 @@
 import { BaseEntity } from 'src/common/entities/base.entity'
 import type { ErrorCode } from 'src/common/exception/error-code.type'
 import { Check, Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm'
-import { COURSE_CONFIRMABLE_STATUSES } from '../constants/meeting-status.constants'
+import {
+  COURSE_CONFIRMABLE_STATUSES,
+  COURSE_GENERATABLE_STATUSES,
+} from '../constants/meeting-status.constants'
 import { MeetingStatus } from '../enums/meeting-status.enum'
 import { MeetingException } from '../exception/meeting.exception'
 import { MeetingErrorCode } from '../exception/meeting-error-code'
@@ -59,6 +62,30 @@ export class Meeting extends BaseEntity {
       MeetingErrorCode.courseNotConfirmable,
     )
     this.status = MeetingStatus.CourseConfirmed
+  }
+
+  startCourseGeneration(): void {
+    this.assertStatus(
+      [...COURSE_GENERATABLE_STATUSES, MeetingStatus.CourseGenerationFailed],
+      MeetingErrorCode.courseNotGeneratable,
+    )
+    this.status = MeetingStatus.CourseGenerating
+  }
+
+  completeCourseGeneration(): void {
+    this.assertStatus(
+      [MeetingStatus.CourseGenerating],
+      MeetingErrorCode.courseNotGeneratable,
+    )
+    this.status = MeetingStatus.CourseGenerated
+  }
+
+  failCourseGeneration(): void {
+    this.assertStatus(
+      [MeetingStatus.CourseGenerating],
+      MeetingErrorCode.courseNotGeneratable,
+    )
+    this.status = MeetingStatus.CourseGenerationFailed
   }
 
   bumpCourseVersion(): void {

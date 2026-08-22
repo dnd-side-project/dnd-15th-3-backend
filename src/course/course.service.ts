@@ -240,6 +240,7 @@ export class CourseService {
       const candidateRepository = manager.getRepository(CourseCandidate)
       const candidate = await candidateRepository.findOne({
         where: { id: courseCandidateId, meeting: { id: meetingId } },
+        relations: { generationRun: true },
       })
       if (!candidate) {
         throw new CourseException(CourseErrorCode.candidateNotFound)
@@ -253,7 +254,7 @@ export class CourseService {
         manager,
         meeting,
         meetingId,
-        courseCandidateId,
+        candidate,
       )
 
       return {
@@ -267,9 +268,9 @@ export class CourseService {
     manager: EntityManager,
     meeting: Meeting,
     meetingId: string,
-    courseCandidateId: string,
+    courseCandidate: CourseCandidate,
   ): Promise<void> {
-    const steps = await this.loadCourseStepsOrThrow(manager, courseCandidateId)
+    const steps = await this.loadCourseStepsOrThrow(manager, courseCandidate.id)
     const recommendationIds = steps.map(
       (step) => step.meetingPlaceRecommendation.id,
     )
@@ -292,6 +293,49 @@ export class CourseService {
         courseVersion: meeting.courseVersion,
         payloadVersion: COURSE_CONFIRMED_PAYLOAD_VERSION,
         participantCount,
+        courseGeneration: courseCandidate.generationRun
+          ? {
+              runId: courseCandidate.generationRun.id,
+              inputHash: courseCandidate.generationRun.inputHash,
+              customizationType:
+                courseCandidate.generationRun.customizationType,
+              questionnaire: courseCandidate.generationRun.inputSnapshot
+                .questionnaire
+                ? {
+                    questionnaireId:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire
+                        .questionnaireId,
+                    questionnaireVersion:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire
+                        .questionnaireVersion,
+                    schemaVersion:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire
+                        .schemaVersion,
+                    promptVersion:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire
+                        .promptVersion,
+                    source:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire
+                        .source,
+                    provider:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire
+                        .provider,
+                    model:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire
+                        .model,
+                    answers:
+                      courseCandidate.generationRun.inputSnapshot.questionnaire.answers.map(
+                        (answer) => ({
+                          questionCode: answer.questionCode,
+                          questionText: answer.questionText,
+                          optionCode: answer.optionCode,
+                          optionLabel: answer.optionLabel,
+                        }),
+                      ),
+                  }
+                : null,
+            }
+          : null,
         places: steps.map((step) => {
           const place = step.meetingPlaceRecommendation.place
           const counts = voteCounts.get(step.meetingPlaceRecommendation.id)
@@ -305,7 +349,7 @@ export class CourseService {
       })
     } catch (error) {
       this.logger.error(
-        `코스 확정 outbox 이벤트 payload 검증에 실패했습니다. meetingId=${meetingId} courseCandidateId=${courseCandidateId}`,
+        `코스 확정 outbox 이벤트 payload 검증에 실패했습니다. meetingId=${meetingId} courseCandidateId=${courseCandidate.id}`,
         error instanceof Error ? error.stack : error,
       )
       throw new CourseException(CourseErrorCode.courseConfirmedEventInvalid)

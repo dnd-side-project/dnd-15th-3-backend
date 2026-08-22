@@ -47,4 +47,14 @@ export const CourseErrorCode = {
     message:
       '코스 확정 이벤트 payload 검증에 실패해 코스 확정이 취소된 데이터 정합성 오류입니다.',
   },
+  generationInputIncomplete: {
+    code: 'COURSE_GENERATION_INPUT_INCOMPLETE',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: '코스 순서에 필요한 카테고리의 추천 장소가 부족합니다.',
+  },
+  generationRunMissing: {
+    code: 'COURSE_GENERATION_RUN_MISSING',
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    message: '코스 생성 상태와 생성 작업 데이터가 일치하지 않습니다.',
+  },
 } as const satisfies Record<string, ErrorCode>

@@ -15,6 +15,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "start:place-sync": "node dist/place/place-sync-worker.js",
+    "start:place-sync:dev": "node -r ts-node/register -r tsconfig-paths/register src/place/place-sync-worker.ts",
     "start:statistics-worker": "node dist/statistics/statistics-worker.js",
     "start:statistics-worker:dev": "node -r ts-node/register -r tsconfig-paths/register src/statistics/statistics-worker.ts",
     "dev": "mise run dev",

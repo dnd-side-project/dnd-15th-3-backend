@@ -20,8 +20,10 @@ source .env.development
 set +a
 
 bash scripts/dev-db-local.sh
+statistics_db_ready=true
 if ! bash scripts/dev-stats-db-local.sh; then
   echo "Warning: local statistics PostgreSQL failed to start; continuing without it." >&2
+  statistics_db_ready=false
 fi
 
 export DB_HOST=127.0.0.1
@@ -42,9 +44,22 @@ export STATS_DB_SYNCHRONIZE=false
 
 pnpm migration:run
 
-pnpm start:statistics-worker:dev &
-statistics_worker_pid=$!
-trap 'kill "$statistics_worker_pid" 2>/dev/null' EXIT
+statistics_worker_pid=
+if [ "$statistics_db_ready" = true ]; then
+  pnpm migration:run:stats
+  pnpm start:statistics-worker:dev &
+  statistics_worker_pid=$!
+fi
+pnpm start:place-sync:dev &
+core_worker_pid=$!
+
+cleanup() {
+  if [ -n "$statistics_worker_pid" ]; then
+    kill "$statistics_worker_pid" 2>/dev/null || true
+  fi
+  kill "$core_worker_pid" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 echo "Starting API at http://localhost:3000 (Swagger UI: /api/v1/docs)"
 pnpm start:dev

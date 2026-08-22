@@ -134,6 +134,11 @@ export const MeetingErrorCode = {
     status: HttpStatus.CONFLICT,
     message: '모임이 코스 생성 완료 상태가 아니어서 코스를 확정할 수 없습니다.',
   },
+  courseNotGeneratable: {
+    code: 'MEETING_COURSE_NOT_GENERATABLE',
+    status: HttpStatus.CONFLICT,
+    message: '현재 모임 상태에서는 코스를 생성할 수 없습니다.',
+  },
   mapPinsNotVisible: {
     code: 'MEETING_MAP_PINS_NOT_VISIBLE',
     status: HttpStatus.CONFLICT,

@@ -22,7 +22,6 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
@@ -32,10 +31,12 @@ import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { ApiErrorResponse } from 'src/common/decorators/api-error-response.decorator'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import { createValidationException } from 'src/common/exception/validation-exception.factory'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { MeetingErrorCode } from 'src/meeting/exception/meeting-error-code'
 import { CourseService } from './course.service'
+import { CourseGenerationService } from './course-generation.service'
 import { AddCoursePlaceRequestDto } from './dto/add-course-place-request.dto'
 import { CourseCandidateListResponseDto } from './dto/course-candidate-list-response.dto'
 import { CourseCommentDto } from './dto/course-comment.dto'
@@ -43,13 +44,18 @@ import { CourseDetailResponseDto } from './dto/course-detail-response.dto'
 import { CreateCourseCommentRequestDto } from './dto/create-course-comment-request.dto'
 import { CreateCourseCommentResponseDto } from './dto/create-course-comment-response.dto'
 import { ExcludedPlaceListResponseDto } from './dto/excluded-place-list-response.dto'
+import { GenerateCourseRequestDto } from './dto/generate-course-request.dto'
 import { UpdateCoursePlacesRequestDto } from './dto/update-course-places-request.dto'
 import { CourseErrorCode } from './exception/course-error-code'
+import { generateCourseRequestSchema } from './schema/generate-course-request.schema'
 
 @ApiTags('코스')
 @Controller('meetings')
 export class CourseController {
-  constructor(private readonly courseService: CourseService) {}
+  constructor(
+    private readonly courseService: CourseService,
+    private readonly courseGenerationService: CourseGenerationService,
+  ) {}
 
   @Post(':meetingId/courses')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -93,15 +99,21 @@ export class CourseController {
     description:
       '모임이 코스 생성 중이거나 이미 코스가 생성 완료·확정된 상태여서 다시 생성할 수 없습니다.',
   })
-  @ApiErrorResponse(
-    CommonErrorCode.notImplemented,
-    '실제 데이터 연동 전까지 제공되지 않는 API',
-  )
+  @ApiBody({ type: GenerateCourseRequestDto })
   generateCourse(
     @Param('meetingId', BigIntStringPipe) meetingId: string,
-    @Query('accessToken') _accessToken: string,
-  ): never {
-    throw new CommonException(CommonErrorCode.notImplemented)
+    @Query('accessToken') accessToken: string,
+    @Body() dto: GenerateCourseRequestDto,
+  ): Promise<MeetingStatusResponseDto> {
+    const parsed = generateCourseRequestSchema.safeParse(dto)
+    if (!parsed.success) {
+      throw createValidationException(parsed.error.issues)
+    }
+    return this.courseGenerationService.generateCourse(
+      meetingId,
+      accessToken,
+      parsed.data,
+    )
   }
 
   @Get(':meetingId/courses')
