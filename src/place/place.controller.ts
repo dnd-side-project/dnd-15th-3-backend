@@ -13,7 +13,7 @@ import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { createValidationException } from 'src/common/exception/validation-exception.factory'
 import { BigIntStringPipe } from 'src/common/pipes/bigint-string.pipe'
 import { KakaoLocalService } from 'src/kakao/kakao-local.service'
-import { kakaoLocalAddressSearchRequestSchema } from 'src/kakao/schema/local-address-search-request.schema'
+import { kakaoLocalKeywordSearchRequestSchema } from 'src/kakao/schema/local-keyword-search-request.schema'
 import { PlaceSearchResponseDto } from './dto/place-search-response.dto'
 import { PlaceSearchResultDto } from './dto/place-search-result.dto'
 import { PlaceErrorCode } from './exception/place-error-code'
@@ -32,12 +32,12 @@ export class PlaceController {
   @ApiOperation({
     summary: '첫 만남 위치 검색',
     description:
-      '입력값이 변경될 때마다 카카오 Local 주소 검색 API를 호출합니다. 이 API는 주변 장소 DB를 조회하지 않습니다.',
+      '카카오 Local 키워드 검색 API로 역 출구·건물·상호 등 첫 만남 위치 후보를 조회합니다. 선택한 결과의 name, address, latitude, longitude, externalAddressId를 모임 생성·위치 변경 요청에 사용합니다. 이 API는 주변 장소 DB를 조회하거나 추천 장소를 추가하지 않습니다.',
   })
   @ApiQuery({
     name: 'q',
-    description: '주소 검색어',
-    example: '강남',
+    description: '장소 검색어',
+    example: '강남역 2번출구',
     required: true,
   })
   @ApiOkResponse({
@@ -48,11 +48,11 @@ export class PlaceController {
   @ApiErrorResponse(CommonErrorCode.validationError, '검색어가 비어 있음')
   @ApiErrorResponse(
     CommonErrorCode.serviceUnavailable,
-    '주소 검색 서비스를 사용할 수 없음',
+    '장소 검색 서비스를 사용할 수 없음',
   )
   @ApiErrorResponse(
     CommonErrorCode.externalServiceError,
-    '카카오 주소 검색 API 호출 또는 응답 검증 실패',
+    '카카오 키워드 검색 API 호출 또는 응답 검증 실패',
   )
   async searchFirstMeetingPlaces(@Query('q') q?: string) {
     const parsedQuery = firstMeetingSearchRequestSchema.safeParse({ q })
@@ -60,11 +60,11 @@ export class PlaceController {
       throw createValidationException(parsedQuery.error.issues)
     }
 
-    const kakaoRequest = kakaoLocalAddressSearchRequestSchema.parse({
+    const kakaoRequest = kakaoLocalKeywordSearchRequestSchema.parse({
       query: parsedQuery.data.q,
     })
 
-    return await this.kakaoLocal.searchAddressPlaces(kakaoRequest)
+    return await this.kakaoLocal.searchKeywordPlaces(kakaoRequest)
   }
 
   @Get('search')
@@ -141,18 +141,12 @@ export class PlaceController {
   @ApiOperation({
     summary: '장소 상세 조회',
     description:
-      '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다. 모임 상태와 무관하게 조회 가능합니다.',
+      '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다. accessToken이 속한 모임의 기준 위치를 사용하며 모임 상태와 무관하게 조회 가능합니다.',
   })
   @ApiParam({
     name: 'placeId',
     description: '조회할 장소의 ID',
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
-  })
-  @ApiQuery({
-    name: 'meetingId',
-    description: '장소를 조회할 모임 ID',
-    example: '123',
-    required: true,
   })
   @ApiQuery({
     name: 'accessToken',
@@ -169,16 +163,14 @@ export class PlaceController {
     CommonErrorCode.authenticationFailed,
     '참여자 토큰이 유효하지 않음',
   )
-  @ApiErrorResponse(PlaceErrorCode.notFound, '장소를 찾을 수 없음')
+  @ApiErrorResponse(
+    [PlaceErrorCode.notFound, PlaceErrorCode.meetingLocationNotFound],
+    '장소 또는 모임 기준 위치를 찾을 수 없음',
+  )
   async getPlaceDetail(
     @Param('placeId', BigIntStringPipe) placeId: string,
-    @Query('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') accessToken: string,
   ): Promise<PlaceSearchResultDto> {
-    return await this.placeService.getPlaceDetail(
-      placeId,
-      meetingId,
-      accessToken,
-    )
+    return await this.placeService.getPlaceDetail(placeId, accessToken)
   }
 }

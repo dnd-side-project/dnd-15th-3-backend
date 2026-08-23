@@ -10,20 +10,16 @@ describe('PlaceController', () => {
     const placeService = {
       getPlaceDetail: jest.fn().mockResolvedValue({ placeId: '1' }),
     }
-    const kakaoLocal = { searchAddressPlaces: jest.fn() }
+    const kakaoLocal = { searchKeywordPlaces: jest.fn() }
     const controller = new PlaceController(
       placeService as unknown as PlaceService,
       kakaoLocal as unknown as KakaoLocalService,
     )
 
     await expect(
-      controller.getPlaceDetail('1', '123', 'token'),
+      controller.getPlaceDetail('1', 'token'),
     ).resolves.toMatchObject({ placeId: '1' })
-    expect(placeService.getPlaceDetail).toHaveBeenCalledWith(
-      '1',
-      '123',
-      'token',
-    )
+    expect(placeService.getPlaceDetail).toHaveBeenCalledWith('1', 'token')
   })
 
   it('Swagger 문서에 모든 응답 코드와 응답 스키마가 포함된다', async () => {
@@ -36,7 +32,7 @@ describe('PlaceController', () => {
         },
         {
           provide: KakaoLocalService,
-          useValue: { searchAddressPlaces: jest.fn() },
+          useValue: { searchKeywordPlaces: jest.fn() },
         },
       ],
     }).compile()
@@ -47,12 +43,21 @@ describe('PlaceController', () => {
     )
 
     const placeDetailPath = document.paths?.['/places/{placeId}'] as
-      | { get?: { responses?: Record<string, unknown> } }
+      | {
+          get?: {
+            parameters?: Array<{ name?: string }>
+            responses?: Record<string, unknown>
+          }
+        }
       | undefined
     expect(placeDetailPath?.get?.responses).toHaveProperty('200')
     expect(placeDetailPath?.get?.responses).toHaveProperty('400')
     expect(placeDetailPath?.get?.responses).toHaveProperty('401')
     expect(placeDetailPath?.get?.responses).toHaveProperty('404')
+    expect(placeDetailPath?.get?.parameters?.map(({ name }) => name)).toEqual([
+      'placeId',
+      'accessToken',
+    ])
 
     type SchemaWithProperties = {
       properties?: Record<string, { type?: string; nullable?: boolean }>
@@ -73,7 +78,7 @@ describe('PlaceController', () => {
     const placeService = {
       searchPlaces: jest.fn().mockResolvedValue({ items: [] }),
     }
-    const kakaoLocal = { searchAddressPlaces: jest.fn() }
+    const kakaoLocal = { searchKeywordPlaces: jest.fn() }
     const controller = new PlaceController(
       placeService as unknown as PlaceService,
       kakaoLocal as unknown as KakaoLocalService,
@@ -93,7 +98,7 @@ describe('PlaceController', () => {
     const placeService = { searchPlaces: jest.fn() }
     const controller = new PlaceController(
       placeService as unknown as PlaceService,
-      { searchAddressPlaces: jest.fn() } as unknown as KakaoLocalService,
+      { searchKeywordPlaces: jest.fn() } as unknown as KakaoLocalService,
     )
 
     expect(() => controller.search({ meetingId: '123' })).toThrow(
@@ -102,19 +107,17 @@ describe('PlaceController', () => {
     expect(placeService.searchPlaces).not.toHaveBeenCalled()
   })
 
-  it('첫 만남 위치 검색은 Kakao 주소 서비스에 위임한다', async () => {
-    const kakaoLocal = { searchAddressPlaces: jest.fn().mockResolvedValue([]) }
+  it('첫 만남 위치 검색은 Kakao 키워드 서비스에 위임한다', async () => {
+    const kakaoLocal = { searchKeywordPlaces: jest.fn().mockResolvedValue([]) }
     const controller = new PlaceController(
       { searchPlaces: jest.fn() } as unknown as PlaceService,
       kakaoLocal as unknown as KakaoLocalService,
     )
 
-    await controller.searchFirstMeetingPlaces('강남')
+    await controller.searchFirstMeetingPlaces('강남역 2번출구')
 
-    expect(kakaoLocal.searchAddressPlaces).toHaveBeenCalledWith({
-      query: '강남',
-      // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
-      analyze_type: 'similar',
+    expect(kakaoLocal.searchKeywordPlaces).toHaveBeenCalledWith({
+      query: '강남역 2번출구',
       page: 1,
       size: 10,
     })

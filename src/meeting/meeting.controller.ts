@@ -160,7 +160,8 @@ export class MeetingController {
   @Post(':meetingId/recommendations')
   @ApiOperation({
     summary: '장소를 모임 추천 목록에 추가',
-    description: '로컬 장소 검색 결과를 현재 모임의 추천 장소로 추가합니다.',
+    description:
+      'GET /places/search 응답의 items[].id를 placeId로 전달해 현재 모임의 추천 장소로 추가합니다. GET /places/first-meeting의 id는 사용할 수 없습니다.',
   })
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({

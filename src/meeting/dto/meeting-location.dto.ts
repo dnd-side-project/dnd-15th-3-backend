@@ -14,8 +14,8 @@ export class MeetingLocationDto {
   longitude!: number
 
   @ApiPropertyOptional({
-    description: '주소 Provider의 외부 주소 ID',
-    example: 'kakao-address-127.0276-37.4979',
+    description: '첫 만남 위치 검색 결과의 externalAddressId',
+    example: 'kakao-place-22906009',
     nullable: true,
   })
   externalAddressId?: string | null

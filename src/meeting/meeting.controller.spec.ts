@@ -42,6 +42,21 @@ function createController() {
 }
 
 describe('MeetingController', () => {
+  it('검색 결과의 장소 ID를 추천 장소 추가 서비스에 전달한다', async () => {
+    const { controller, meetingService } = createController()
+    const expected = { id: 'recommendation-1' }
+    ;(meetingService.addRecommendation as jest.Mock).mockResolvedValue(expected)
+
+    await expect(
+      controller.addRecommendation('1', 'token', { placeId: '101' }),
+    ).resolves.toEqual(expected)
+    expect(meetingService.addRecommendation).toHaveBeenCalledWith(
+      '1',
+      'token',
+      { placeId: '101' },
+    )
+  })
+
   it('모임 상태 조회는 MeetingService에 위임한다', async () => {
     const { controller, meetingService } = createController()
     const expected = {
@@ -201,6 +216,23 @@ describe('MeetingController', () => {
     ] as PathOperations | undefined
     expect(responseCodes(similarPlacesPath?.get?.responses)).toEqual(
       ['200', '400', '401', '404', '409'].sort(),
+    )
+
+    const recommendationPath = document.paths?.[
+      '/meetings/{meetingId}/recommendations'
+    ] as
+      | {
+          post?: {
+            description?: string
+            responses?: Record<string, unknown>
+          }
+        }
+      | undefined
+    expect(responseCodes(recommendationPath?.post?.responses)).toEqual(
+      ['201', '400', '401', '404', '409'].sort(),
+    )
+    expect(recommendationPath?.post?.description).toContain(
+      'GET /places/search',
     )
 
     expect(document.components?.schemas?.PreferenceType).toMatchObject({
