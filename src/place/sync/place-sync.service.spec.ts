@@ -21,6 +21,7 @@ function createService() {
   }
   const provider = {
     source: PlaceSource.Google,
+    supportsCategory: jest.fn().mockReturnValue(true),
     searchNearby: jest.fn(),
   }
 
@@ -99,6 +100,31 @@ describe('PlaceSyncService', () => {
       'previewUrl',
     )
     expect(coverageRepository.save).toHaveBeenCalled()
+    expect(jobRepository.update).toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({ status: PlaceSyncJobStatus.Completed }),
+    )
+  })
+
+  it('Provider가 지원하지 않는 카테고리는 tile 조회 없이 완료한다', async () => {
+    const { service, jobRepository, coverageRepository, provider } =
+      createService()
+    provider.supportsCategory.mockReturnValue(false)
+    jobRepository.findOne.mockResolvedValue({
+      id: 'job-1',
+      source: PlaceSource.Google,
+      locationVersion: 1,
+      radiusMeters: 1,
+      attemptCount: 1,
+      resultCount: 0,
+      center: { type: 'Point', coordinates: [127, 37.5] },
+      category: { id: '1', slug: 'other' },
+    })
+
+    await service.processJob('job-1')
+
+    expect(provider.searchNearby).not.toHaveBeenCalled()
+    expect(coverageRepository.findOne).not.toHaveBeenCalled()
     expect(jobRepository.update).toHaveBeenCalledWith(
       'job-1',
       expect.objectContaining({ status: PlaceSyncJobStatus.Completed }),

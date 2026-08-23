@@ -1,4 +1,6 @@
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { z } from 'zod'
+import { PlaceSource } from '../enums/place-source.enum'
 
 const placeSearchCategorySchema = z.object({
   id: z.string(),
@@ -23,6 +25,11 @@ export const placeSearchItemSchema = z.object({
   longitude: z.number(),
   distanceMeters: z.number().nonnegative(),
   previewUrl: z.string().nullable(),
+  source: z.enum(PlaceSource),
+  providerPlaceId: z.string().nullable(),
+  roadAddress: z.string().nullable(),
+  phone: z.string().nullable(),
+  placeUrl: z.string().nullable(),
 })
 
 export const placeSearchResponseSchema = z.object({
@@ -33,6 +40,9 @@ export const placeSearchResponseSchema = z.object({
   hasNext: z.boolean(),
   collectionStatus: collectionStatusSchema,
   lastSyncedAt: z.date().nullable(),
+  source: z.literal(PlaceSource.Kakao),
+  isLive: z.literal(true),
+  unsupportedCategorySlugs: z.array(z.enum(CategorySlug)),
 })
 
 export type PlaceSearchItem = z.infer<typeof placeSearchItemSchema>

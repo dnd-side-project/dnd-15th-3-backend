@@ -9,12 +9,18 @@ import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { MeetingException } from 'src/meeting/exception/meeting.exception'
 import { OutboxAggregateType } from 'src/outbox/constants/outbox-aggregate-type.constant'
 import { OutboxEventType } from 'src/outbox/constants/outbox-event-type.constant'
+import { QuestionnaireSource } from 'src/questionnaire/enums/questionnaire-source.enum'
+import {
+  QuestionnaireDimensionCode,
+  QuestionnaireOptionCode,
+} from 'src/questionnaire/questionnaire.constants'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseService } from './course.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { CourseCategoryStep } from './entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from './entities/meeting-place-recommendation.entity'
+import { CourseGenerationCustomizationType } from './enums/course-generation-customization-type.enum'
 import { PreferenceType } from './enums/preference-type.enum'
 import { CourseException } from './exception/course.exception'
 
@@ -60,6 +66,13 @@ function createService() {
   const placeImageService = {
     getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
   }
+  const placeLiveDataService = {
+    resolvePlaces: jest
+      .fn()
+      .mockImplementation((places) =>
+        Promise.resolve(new Map(places.map((place) => [place.id, place]))),
+      ),
+  }
   const kakaoWalkingCourseService = { getWalkingCourse: jest.fn() }
   const courseRepository = {
     lockMeeting: jest.fn(),
@@ -79,6 +92,7 @@ function createService() {
     commentRepository as never,
     courseCandidatePlaceRepository as never,
     placeImageService as never,
+    placeLiveDataService as never,
     kakaoWalkingCourseService as never,
     courseRepository as never,
     outboxEventRepository as never,
@@ -1103,6 +1117,7 @@ describe('CourseService', () => {
       await expect(promise).rejects.toThrow('코스 후보를 찾을 수 없습니다.')
       expect(candidateRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
+        relations: { generationRun: true },
       })
     })
 
@@ -1153,7 +1168,46 @@ describe('CourseService', () => {
       meeting.courseVersion = 2
       meeting.meetingType = { id: '5' } as never
       courseRepository.lockMeeting.mockResolvedValue(meeting)
-      const candidate = createCandidate({ id: '2', isSelected: false })
+      const candidate = createCandidate({
+        id: '2',
+        isSelected: false,
+        generationRun: {
+          id: '70',
+          inputHash: 'a'.repeat(64),
+          customizationType: CourseGenerationCustomizationType.Questionnaire,
+          inputSnapshot: {
+            questionnaire: {
+              questionnaireId: '60',
+              questionnaireVersion: 1,
+              schemaVersion: 1,
+              promptVersion: 1,
+              source: QuestionnaireSource.Llm,
+              provider: 'openai',
+              model: 'test-model',
+              answers: [
+                {
+                  questionCode: QuestionnaireDimensionCode.primaryPurpose,
+                  questionText: '목적은?',
+                  optionCode: QuestionnaireOptionCode.conversation,
+                  optionLabel: '대화',
+                },
+                {
+                  questionCode: QuestionnaireDimensionCode.coursePace,
+                  questionText: '속도는?',
+                  optionCode: QuestionnaireOptionCode.relaxed,
+                  optionLabel: '여유',
+                },
+                {
+                  questionCode: QuestionnaireDimensionCode.atmosphere,
+                  questionText: '분위기는?',
+                  optionCode: QuestionnaireOptionCode.cozy,
+                  optionLabel: '아늑함',
+                },
+              ],
+            },
+          },
+        } as never,
+      })
       candidateRepository.findOne.mockResolvedValue(candidate)
       placeRepository.find.mockResolvedValue(createConfirmedSteps())
       courseRepository.countParticipants.mockResolvedValue(3)
@@ -1174,6 +1228,7 @@ describe('CourseService', () => {
       expect(courseRepository.lockMeeting).toHaveBeenCalledWith(manager, '1')
       expect(candidateRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
+        relations: { generationRun: true },
       })
       expect(candidate.isSelected).toBe(true)
       expect(candidateRepository.save).toHaveBeenCalledWith(candidate)
@@ -1193,8 +1248,42 @@ describe('CourseService', () => {
           meetingDate: '2026-08-22',
           meetingTime: '18:00:00',
           courseVersion: 2,
-          payloadVersion: 1,
+          payloadVersion: 2,
           participantCount: 3,
+          courseGeneration: {
+            runId: '70',
+            inputHash: 'a'.repeat(64),
+            customizationType: CourseGenerationCustomizationType.Questionnaire,
+            questionnaire: {
+              questionnaireId: '60',
+              questionnaireVersion: 1,
+              schemaVersion: 1,
+              promptVersion: 1,
+              source: QuestionnaireSource.Llm,
+              provider: 'openai',
+              model: 'test-model',
+              answers: [
+                {
+                  questionCode: QuestionnaireDimensionCode.primaryPurpose,
+                  questionText: '목적은?',
+                  optionCode: QuestionnaireOptionCode.conversation,
+                  optionLabel: '대화',
+                },
+                {
+                  questionCode: QuestionnaireDimensionCode.coursePace,
+                  questionText: '속도는?',
+                  optionCode: QuestionnaireOptionCode.relaxed,
+                  optionLabel: '여유',
+                },
+                {
+                  questionCode: QuestionnaireDimensionCode.atmosphere,
+                  questionText: '분위기는?',
+                  optionCode: QuestionnaireOptionCode.cozy,
+                  optionLabel: '아늑함',
+                },
+              ],
+            },
+          },
           places: [
             {
               placeId: '101',

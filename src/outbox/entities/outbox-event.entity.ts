@@ -17,10 +17,10 @@ import { OutboxEventStatus } from '../enums/outbox-event-status.enum'
 @Check(`"next_retry_at" >= "created_at"`)
 @Check(`"status" <> 'PROCESSING' OR "started_at" IS NOT NULL`)
 export class OutboxEvent extends BaseEntity {
-  @Column({ name: 'event_type' })
+  @Column({ name: 'event_type', type: 'varchar' })
   eventType: OutboxEventType
 
-  @Column({ name: 'aggregate_type' })
+  @Column({ name: 'aggregate_type', type: 'varchar' })
   aggregateType: OutboxAggregateType
 
   @Column({ name: 'aggregate_id', type: 'bigint' })

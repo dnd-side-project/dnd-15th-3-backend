@@ -38,10 +38,21 @@ const envSchemaBase = z.object({
   KAKAO_REST_API_KEY: z.string().trim().default(''),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   GOOGLE_PLACES_API_KEY: z.string().trim().default(''),
+  // Optional OpenAI questionnaire generation. Both key and model must be set
+  // to enable it; otherwise the curated fallback generator is used.
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   OPENAI_API_KEY: z.string().trim().default(''),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  OPENAI_MODEL: z.string().trim().min(1).default('gpt-4o-mini'),
+  OPENAI_MODEL: z.string().trim().default(''),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  OPENAI_BASE_URL: z.string().trim().url().default('https://api.openai.com/v1'),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  OPENAI_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(30000)
+    .default(15000),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(1),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
@@ -87,6 +98,16 @@ const envSchemaBase = z.object({
 })
 
 const envSchema = envSchemaBase.superRefine((config, context) => {
+  const hasOpenAiKey = config.OPENAI_API_KEY.length > 0
+  const hasOpenAiModel = config.OPENAI_MODEL.length > 0
+  if (hasOpenAiKey !== hasOpenAiModel) {
+    context.addIssue({
+      code: 'custom',
+      path: [hasOpenAiKey ? 'OPENAI_MODEL' : 'OPENAI_API_KEY'],
+      message: 'OPENAI_API_KEY와 OPENAI_MODEL은 함께 설정해야 합니다',
+    })
+  }
+
   let publicUrl: URL
   try {
     publicUrl = new URL(config.MEDIA_PUBLIC_BASE_URL)

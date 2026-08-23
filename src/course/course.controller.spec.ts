@@ -6,6 +6,9 @@ import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { CourseController } from './course.controller'
 import { CourseService } from './course.service'
+import { CourseGenerationService } from './course-generation.service'
+import type { GenerateCourseRequestDto } from './dto/generate-course-request.dto'
+import { CourseGenerationCustomizationType } from './enums/course-generation-customization-type.enum'
 
 function createController() {
   const courseService = {
@@ -19,8 +22,13 @@ function createController() {
     updateCoursePlaces: jest.fn().mockResolvedValue({}),
   } as unknown as CourseService
 
+  const courseGenerationService = {
+    generateCourse: jest.fn().mockResolvedValue({}),
+  } as unknown as CourseGenerationService
+
   return {
-    controller: new CourseController(courseService),
+    controller: new CourseController(courseService, courseGenerationService),
+    courseGenerationService,
     courseService,
   }
 }
@@ -202,12 +210,56 @@ describe('CourseController', () => {
     )
   })
 
-  it('실제 데이터 연동 전까지 나머지 엔드포인트가 501을 반환한다', () => {
+  it('코스 생성 요청은 CourseGenerationService에 위임한다', async () => {
+    const { controller, courseGenerationService } = createController()
+    const expected = {
+      status: 'COURSE_GENERATED',
+      confirmedCourseCandidateId: null,
+    }
+    ;(courseGenerationService.generateCourse as jest.Mock).mockResolvedValue(
+      expected,
+    )
+    const dto: GenerateCourseRequestDto = {
+      customization: { type: CourseGenerationCustomizationType.Skip },
+    }
+
+    await expect(controller.generateCourse('1', 'token', dto)).resolves.toEqual(
+      expected,
+    )
+    expect(courseGenerationService.generateCourse).toHaveBeenCalledWith(
+      '1',
+      'token',
+      dto,
+    )
+  })
+
+  it('코스 생성 요청 본문이 올바르지 않으면 검증 예외를 반환한다', () => {
     const { controller } = createController()
 
-    expect(() => controller.generateCourse('1', 'token')).toThrow(
-      CommonException,
-    )
+    expect(() =>
+      controller.generateCourse('1', 'token', {
+        customization: { type: 'QUESTIONNAIRE' },
+      } as never),
+    ).toThrow(CommonException)
+  })
+
+  it('질문·선택지 ID가 숫자가 아니어도 검증 예외로 반환한다', () => {
+    const { controller } = createController()
+
+    expect(() =>
+      controller.generateCourse('1', 'token', {
+        customization: {
+          type: CourseGenerationCustomizationType.Questionnaire,
+          questionnaireId: 'not-a-number',
+          questionnaireVersion: 1,
+          answers: [
+            { questionId: '1', optionId: '1' },
+            { questionId: '2', optionId: '2' },
+            { questionId: '3', optionId: '3' },
+          ],
+        },
+      }),
+    ).toThrow(CommonException)
   })
 
   it('Swagger 문서에 모든 경로와 응답 코드가 포함된다', async () => {
@@ -226,6 +278,10 @@ describe('CourseController', () => {
             addCoursePlace: jest.fn(),
             updateCoursePlaces: jest.fn(),
           },
+        },
+        {
+          provide: CourseGenerationService,
+          useValue: { generateCourse: jest.fn() },
         },
       ],
     }).compile()
@@ -249,7 +305,7 @@ describe('CourseController', () => {
       | PathOperations
       | undefined
     expect(responseCodes(coursesPath?.post?.responses)).toEqual(
-      ['202', '400', '401', '403', '404', '409', '422', '501'].sort(),
+      ['200', '400', '401', '403', '404', '409', '422'].sort(),
     )
     expect(responseCodes(coursesPath?.get?.responses)).toEqual(
       ['200', '400', '401', '404', '409', '500'].sort(),
@@ -342,6 +398,9 @@ describe('CourseController', () => {
       'longitude',
       'latitude',
       'walkDurationToNextMin',
+      'source',
+      'providerPlaceId',
+      'placeUrl',
     ])
     expect(routeStepSchema?.properties?.primaryImageUrl?.nullable).toBe(true)
     expect(routeStepSchema?.properties?.walkDurationToNextMin?.nullable).toBe(

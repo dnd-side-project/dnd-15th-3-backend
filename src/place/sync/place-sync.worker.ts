@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { DataSource } from 'typeorm'
+import { normalizeQueryRows } from './normalize-query-rows'
 import { PLACE_SYNC_STALE_AFTER_MS } from './place-sync.constants'
 import { PlaceSyncService } from './place-sync.service'
 
 const POLL_INTERVAL_MS = 5_000
+
+type ClaimedPlaceSyncJob = {
+  id: string
+}
 
 @Injectable()
 export class PlaceSyncWorker {
@@ -33,7 +38,7 @@ export class PlaceSyncWorker {
       [PLACE_SYNC_STALE_AFTER_MS],
     )
 
-    const rows = await this.dataSource.query(`
+    const result = await this.dataSource.query(`
       UPDATE "place_sync_job"
       SET
         "status" = 'RUNNING',
@@ -51,8 +56,8 @@ export class PlaceSyncWorker {
       )
       RETURNING "id"
     `)
-
-    const jobId = rows[0]?.id as string | undefined
+    const rows = normalizeQueryRows<ClaimedPlaceSyncJob>(result)
+    const jobId = rows[0]?.id
     if (!jobId) return false
 
     await this.placeSyncService.processJob(jobId)

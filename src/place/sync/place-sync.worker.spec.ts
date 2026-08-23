@@ -7,7 +7,7 @@ describe('PlaceSyncWorker', () => {
       query: jest
         .fn()
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ id: 'job-1' }]),
+        .mockResolvedValueOnce([[{ id: 'job-1' }], 1]),
     }
     const placeSyncService = {
       processJob: jest.fn().mockResolvedValue(undefined),
@@ -28,7 +28,7 @@ describe('PlaceSyncWorker', () => {
 
   it('처리할 작업이 없으면 false를 반환한다', async () => {
     const dataSource = {
-      query: jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+      query: jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([[], 0]),
     }
     const placeSyncService = { processJob: jest.fn() }
     const worker = new PlaceSyncWorker(

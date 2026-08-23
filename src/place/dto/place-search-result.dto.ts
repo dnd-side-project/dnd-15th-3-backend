@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { PlaceSource } from '../enums/place-source.enum'
 
 export class PlaceSearchResultDto {
   @ApiProperty({ description: '장소 ID', example: '1', pattern: '^\\d+$' })
@@ -31,7 +32,33 @@ export class PlaceSearchResultDto {
 
   @ApiProperty({
     description: '미리보기 사이트 링크',
-    example: 'https://...',
+    example: null,
+    nullable: true,
   })
-  previewUrl!: string
+  previewUrl!: string | null
+
+  @ApiProperty({ enum: PlaceSource, example: PlaceSource.Kakao })
+  source!: PlaceSource
+
+  @ApiProperty({
+    description: '외부 장소 ID',
+    nullable: true,
+    example: '12345',
+  })
+  providerPlaceId!: string | null
+
+  @ApiProperty({ description: '도로명 주소', nullable: true })
+  roadAddress!: string | null
+
+  @ApiProperty({ description: '전화번호', nullable: true })
+  phone!: string | null
+
+  @ApiProperty({ description: 'Kakao 장소 상세 URL', nullable: true })
+  placeUrl!: string | null
+
+  @ApiProperty({ description: '위도', example: 37.5446 })
+  latitude!: number
+
+  @ApiProperty({ description: '경도', example: 127.0557 })
+  longitude!: number
 }

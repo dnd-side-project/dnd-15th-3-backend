@@ -9,7 +9,7 @@ import { CourseCategoryStep } from 'src/course/entities/course-category-step.ent
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import type { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
-import type { PlaceSyncService } from 'src/place/sync/place-sync.service'
+import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { User } from 'src/user/entities/user.entity'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { In, type Repository } from 'typeorm'
@@ -107,11 +107,42 @@ function createMeetingService() {
   const placeImageService = {
     getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
   }
+  const placeLiveDataService = {
+    resolvePlace: jest.fn().mockImplementation((place) =>
+      Promise.resolve({
+        ...place,
+        source: place.source ?? PlaceSource.Google,
+        providerPlaceId: place.providerPlaceId ?? null,
+        roadAddress: place.roadAddress ?? null,
+        phone: place.phone ?? null,
+        placeUrl: place.placeUrl ?? null,
+        previewUrl: place.previewUrl ?? null,
+      }),
+    ),
+    resolvePlaces: jest.fn().mockImplementation((places) =>
+      Promise.resolve(
+        new Map(
+          places.map((place) => [
+            place.id,
+            {
+              ...place,
+              source: place.source ?? PlaceSource.Google,
+              providerPlaceId: place.providerPlaceId ?? null,
+              roadAddress: place.roadAddress ?? null,
+              phone: place.phone ?? null,
+              placeUrl: place.placeUrl ?? null,
+              previewUrl: place.previewUrl ?? null,
+            },
+          ]),
+        ),
+      ),
+    ),
+    searchKakao: jest.fn(),
+  }
 
   const service = new MeetingService(
     config as unknown as ConfigService<Env, true>,
     dataSource as never,
-    placeSyncService as unknown as PlaceSyncService,
     mediaService as never,
     participantRepository as never,
     placeRepository as never,
@@ -122,6 +153,7 @@ function createMeetingService() {
     meetingAccessService as unknown as MeetingAccessService,
     placeSearchRepository as never,
     placeImageService as never,
+    placeLiveDataService as never,
   )
 
   return {
@@ -139,6 +171,7 @@ function createMeetingService() {
     meetingAccessService,
     placeSearchRepository,
     placeImageService,
+    placeLiveDataService,
   }
 }
 
@@ -401,7 +434,7 @@ describe('MeetingService', () => {
     ).rejects.toMatchObject({ errorCode: MeetingErrorCode.hostOnly })
   })
 
-  it('모임·기준 위치·코스·호스트 참여자·수집 작업을 하나의 transaction에서 만든다', async () => {
+  it('모임·기준 위치·코스·호스트 참여자를 하나의 transaction에서 만들고 수집 작업은 만들지 않는다', async () => {
     const { service, dataSource, placeSyncService } = createMeetingService()
     const meetingType = {
       id: 'type-1',
@@ -500,15 +533,10 @@ describe('MeetingService', () => {
       categorySteps: [{ id: 'step-1', slug: CategorySlug.Cafe }],
     })
     expect(dataSource.transaction).toHaveBeenCalledTimes(1)
-    expect(placeSyncService.createJobs).toHaveBeenCalledWith(
-      manager,
-      meeting,
-      location,
-      [category],
-    )
+    expect(placeSyncService.createJobs).not.toHaveBeenCalled()
   })
 
-  it('기준 위치 변경 시 이전 작업을 무효화하고 새 버전 작업을 등록한다', async () => {
+  it('기준 위치 변경 시 이전 작업을 무효화하고 새 수집 작업은 등록하지 않는다', async () => {
     const { service, dataSource, placeSyncService } = createMeetingService()
     const meeting = { id: 'meeting-1' }
     const location = {
@@ -583,12 +611,7 @@ describe('MeetingService', () => {
     expect(locationQueryBuilder.setLock).toHaveBeenCalledWith(
       'pessimistic_write',
     )
-    expect(placeSyncService.createJobs).toHaveBeenCalledWith(
-      manager,
-      meeting,
-      updatedLocation,
-      [category],
-    )
+    expect(placeSyncService.createJobs).not.toHaveBeenCalled()
   })
 
   it('선택한 코스의 반경 내 장소만 중복 없이 추천한다', async () => {
@@ -1190,7 +1213,6 @@ describe('MeetingService', () => {
       expect(placeRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2' },
         relations: { category: true },
-        select: { latitude: true, longitude: true, category: { id: true } },
       })
       expect(placeSearchRepository.findSimilar).toHaveBeenCalledWith(
         '1',

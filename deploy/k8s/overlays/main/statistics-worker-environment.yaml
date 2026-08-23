@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: momo-statistics-worker
+spec:
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: NODE_ENV
+              value: production

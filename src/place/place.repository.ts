@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { DataSource } from 'typeorm'
+import { PlaceSource } from './enums/place-source.enum'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
 import type { PlaceSearchItem } from './schema/place-search-response.schema'
 import { PLACE_SYNC_RADIUS_METERS } from './sync/place-sync.constants'
@@ -17,6 +18,11 @@ type RawPlaceSearchRow = {
   categoryName: string
   categorySlug: string
   distanceMeters: number | string
+  source: PlaceSource
+  providerPlaceId: string | null
+  roadAddress: string | null
+  phone: string | null
+  placeUrl: string | null
 }
 
 type RawCountRow = {
@@ -97,6 +103,11 @@ export class PlaceRepository {
         "place"."latitude" AS "latitude",
         "place"."longitude" AS "longitude",
         "place"."preview_url" AS "previewUrl",
+        "place"."source" AS "source",
+        "place"."provider_place_id" AS "providerPlaceId",
+        "place"."road_address" AS "roadAddress",
+        "place"."phone" AS "phone",
+        "place"."place_url" AS "placeUrl",
         "category"."id" AS "categoryId",
         "category"."name" AS "categoryName",
         "category"."slug" AS "categorySlug",
@@ -134,6 +145,11 @@ export class PlaceRepository {
         longitude: Number(row.longitude),
         distanceMeters: Number(row.distanceMeters),
         previewUrl: row.previewUrl,
+        source: row.source,
+        providerPlaceId: row.providerPlaceId,
+        roadAddress: row.roadAddress,
+        phone: row.phone,
+        placeUrl: row.placeUrl,
       })),
       total: Number(countRows[0]?.total ?? 0),
     }

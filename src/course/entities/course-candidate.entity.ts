@@ -9,6 +9,7 @@ import {
   ManyToOne,
   Unique,
 } from 'typeorm'
+import { CourseGenerationRun } from './course-generation-run.entity'
 
 @Entity()
 @Unique(['meeting', 'order'])
@@ -18,6 +19,13 @@ export class CourseCandidate extends BaseEntity {
   @ManyToOne(() => Meeting, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'meeting_id' })
   meeting: Meeting
+
+  @ManyToOne(() => CourseGenerationRun, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'generation_run_id' })
+  generationRun: CourseGenerationRun | null
 
   @Column()
   order: number

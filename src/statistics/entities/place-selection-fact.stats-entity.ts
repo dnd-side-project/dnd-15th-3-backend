@@ -1,3 +1,4 @@
+import type { CourseGenerationCustomizationType } from 'src/course/enums/course-generation-customization-type.enum'
 import {
   Check,
   Column,
@@ -14,6 +15,19 @@ import {
 // 나중에 실시간을 위한 캐시 테이블이 필요할 경우 해당 사실 테이블 정보를 바탕으로 캐시 테이블을 생성 가능
 @Entity()
 @Index(['meetingId', 'courseVersion'])
+@Index('IDX_place_selection_fact_place', ['placeId'])
+@Index('IDX_place_selection_fact_meeting_type_place', [
+  'meetingTypeId',
+  'placeId',
+])
+@Index('IDX_place_selection_fact_meeting_date_place', [
+  'meetingDate',
+  'placeId',
+])
+@Index('IDX_place_selection_fact_category_place', [
+  'placeCategoryId',
+  'placeId',
+])
 @Check(`"outbox_event_id" > 0`)
 @Check(`"place_id" > 0`)
 @Check(`"place_category_id" > 0`)
@@ -24,6 +38,16 @@ import {
 @Check(`"like_count" >= 0`)
 @Check(`"dislike_count" >= 0`)
 @Check(`"like_count" + "dislike_count" <= "participant_count"`)
+@Check(
+  `("course_generation_run_id" IS NULL AND "course_generation_customization_type" IS NULL AND "course_generation_input_hash" IS NULL) OR ("course_generation_run_id" IS NOT NULL AND "course_generation_customization_type" IS NOT NULL AND "course_generation_input_hash" IS NOT NULL)`,
+)
+@Check(`"course_generation_run_id" IS NULL OR "course_generation_run_id" > 0`)
+@Check(
+  `"course_generation_customization_type" IS NULL OR "course_generation_customization_type" IN ('SKIP', 'QUESTIONNAIRE')`,
+)
+@Check(
+  `"course_generation_input_hash" IS NULL OR length("course_generation_input_hash") = 64`,
+)
 export class PlaceSelectionFact {
   @PrimaryColumn({ name: 'outbox_event_id', type: 'bigint' })
   outboxEventId: string
@@ -60,6 +84,25 @@ export class PlaceSelectionFact {
 
   @Column({ name: 'dislike_count' })
   dislikeCount: number
+
+  @Column({ name: 'course_generation_run_id', type: 'bigint', nullable: true })
+  courseGenerationRunId: string | null
+
+  @Column({
+    name: 'course_generation_customization_type',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  courseGenerationCustomizationType: CourseGenerationCustomizationType | null
+
+  @Column({
+    name: 'course_generation_input_hash',
+    type: 'char',
+    length: 64,
+    nullable: true,
+  })
+  courseGenerationInputHash: string | null
 
   @CreateDateColumn()
   createdAt: Date

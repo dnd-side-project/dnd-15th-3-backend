@@ -1,10 +1,13 @@
 import { MODULE_METADATA } from '@nestjs/common/constants'
 import { AppModule } from 'src/app.module'
 import {
+  CORE_ENTITIES_GLOB,
+  CORE_MIGRATIONS_GLOB,
   STATISTICS_ENTITIES_GLOB,
   STATISTICS_MIGRATIONS_GLOB,
 } from 'src/database/database.options'
 import {
+  createCoreTypeOrmOptions,
   createStatsTypeOrmOptions,
   StatisticsWorkerModule,
 } from './statistics-worker.module'
@@ -74,6 +77,34 @@ describe('StatisticsWorkerModule', () => {
     )
     expect(options.migrations?.[0]).toEqual(
       expect.stringContaining(STATISTICS_MIGRATIONS_GLOB),
+    )
+  })
+
+  it('connects to the Core DB as a non-synchronizing Outbox source', () => {
+    const values = new Map<string, unknown>([
+      ['DB_HOST', 'core-db.example.com'],
+      ['DB_PORT', 5432],
+      ['DB_USERNAME', 'reader'],
+      ['DB_PASSWORD', 'password'],
+      ['DB_DATABASE', 'momo'],
+      ['DB_SSL', false],
+    ])
+    const options = createCoreTypeOrmOptions({
+      get: (key: string) => values.get(key),
+    } as never) as {
+      name?: string
+      synchronize?: boolean
+      entities?: string[]
+      migrations?: string[]
+    }
+
+    expect(options.name).toBe('core')
+    expect(options.synchronize).toBe(false)
+    expect(options.entities?.[0]).toEqual(
+      expect.stringContaining(CORE_ENTITIES_GLOB),
+    )
+    expect(options.migrations?.[0]).toEqual(
+      expect.stringContaining(CORE_MIGRATIONS_GLOB),
     )
   })
 
