@@ -1,11 +1,24 @@
+import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from 'src/app.module'
+import { createApplicationLogger } from 'src/common/observability/application-logger'
+import type { Env } from 'src/config/env'
 import { MediaCleanupWorker } from 'src/media/media-cleanup.worker'
 import { QuestionnaireGenerationWorker } from 'src/questionnaire/questionnaire-generation.worker'
 import { PlaceSyncWorker } from './sync/place-sync.worker'
 
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule)
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    bufferLogs: true,
+  })
+  const config = app.get(ConfigService) as ConfigService<Env, true>
+  app.useLogger(
+    createApplicationLogger({
+      serviceName: config.get('SERVICE_NAME', { infer: true }),
+      format: config.get('LOG_FORMAT', { infer: true }),
+      level: config.get('LOG_LEVEL', { infer: true }),
+    }),
+  )
   const placeSyncWorker = app.get(PlaceSyncWorker)
   const mediaCleanupWorker = app.get(MediaCleanupWorker)
   const questionnaireGenerationWorker = app.get(QuestionnaireGenerationWorker)

@@ -70,6 +70,13 @@ describe('PlaceController', () => {
     )
     expect(schema?.properties?.imageUrls?.type).toBe('array')
     expect(schema?.properties?.imageUrls?.nullable).not.toBe(true)
+    expect(schema?.properties).not.toHaveProperty('images')
+    expect(schema?.properties).not.toHaveProperty('previewImage')
+
+    const searchItemSchema = document.components?.schemas
+      ?.PlaceSearchItemResponseDto as SchemaWithProperties | undefined
+    expect(searchItemSchema?.properties?.previewUrl?.nullable).toBe(true)
+    expect(searchItemSchema?.properties).not.toHaveProperty('previewImage')
 
     await app.close()
   })

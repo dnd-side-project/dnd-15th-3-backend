@@ -12,7 +12,11 @@ import {
   StatisticsWorkerModule,
 } from './statistics-worker.module'
 
-const SHARED_INFRASTRUCTURE_MODULES = new Set(['ConfigModule', 'TypeOrmModule'])
+const SHARED_INFRASTRUCTURE_MODULES = new Set([
+  'ConfigModule',
+  'ObservabilityModule',
+  'TypeOrmModule',
+])
 
 function getModuleName(value: unknown) {
   if (typeof value === 'function') return value.name

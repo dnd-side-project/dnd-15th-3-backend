@@ -33,6 +33,18 @@ const envSchemaBase = z.object({
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  SERVICE_NAME: z.string().trim().min(1).default('momo-api'),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  LOG_FORMAT: z.enum(['json', 'pretty']).default('pretty'),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  LOG_LEVEL: z
+    .enum(['error', 'warn', 'log', 'debug', 'verbose'])
+    .default('log'),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  METRICS_ENABLED: coerceBoolean,
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   CORS_ORIGINS: z.string().trim().min(1),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   KAKAO_REST_API_KEY: z.string().trim().default(''),

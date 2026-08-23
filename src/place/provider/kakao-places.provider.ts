@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import type { Env } from 'src/config/env'
 import {
   type KakaoPlaceDocument,
@@ -38,13 +39,26 @@ type KakaoSearchResult = {
 export class KakaoPlacesProvider implements PlaceProvider {
   readonly source = PlaceSource.Kakao
 
-  constructor(private readonly config: ConfigService<Env, true>) {}
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
   supportsCategory(categorySlug: CategorySlug): boolean {
     return KAKAO_PLACE_SEARCH_SPECS_BY_CATEGORY[categorySlug].length > 0
   }
 
-  async searchNearby(
+  searchNearby(
+    request: PlaceProviderSearchRequest,
+  ): Promise<PlaceProviderSearchResult> {
+    if (!this.metrics) return this.requestNearby(request)
+
+    return this.metrics.observeExternal('kakao_places', 'nearby_search', () =>
+      this.requestNearby(request),
+    )
+  }
+
+  private async requestNearby(
     request: PlaceProviderSearchRequest,
   ): Promise<PlaceProviderSearchResult> {
     const specs = KAKAO_PLACE_SEARCH_SPECS_BY_CATEGORY[request.categorySlug]
@@ -99,10 +113,15 @@ export class KakaoPlacesProvider implements PlaceProvider {
     apiKey: string,
     page: number,
   ): Promise<KakaoPlaceSearchResponse> {
+    const userQuery = request.query?.trim()
+    const keywordQuery =
+      spec.type === 'keyword'
+        ? userQuery
+          ? this.combineQueries(userQuery, spec.query)
+          : spec.query
+        : userQuery
     const url = new URL(
-      spec.type === 'category'
-        ? KAKAO_CATEGORY_SEARCH_URL
-        : KAKAO_KEYWORD_SEARCH_URL,
+      keywordQuery ? KAKAO_KEYWORD_SEARCH_URL : KAKAO_CATEGORY_SEARCH_URL,
     )
     const searchParams = new URLSearchParams({
       x: String(request.longitude),
@@ -112,10 +131,11 @@ export class KakaoPlacesProvider implements PlaceProvider {
       page: String(page),
       size: String(KAKAO_PAGE_SIZE),
     })
+    if (keywordQuery) {
+      searchParams.set('query', keywordQuery)
+    }
     if (spec.type === 'category') {
       searchParams.set('category_group_code', spec.categoryGroupCode)
-    } else {
-      searchParams.set('query', spec.query)
     }
     url.search = searchParams.toString()
 
@@ -148,6 +168,11 @@ export class KakaoPlacesProvider implements PlaceProvider {
       throw new PlaceException(PlaceErrorCode.invalidProviderResponse)
     }
     return parsedResponse.data
+  }
+
+  private combineQueries(userQuery: string, categoryQuery: string): string {
+    if (userQuery.includes(categoryQuery)) return userQuery
+    return `${userQuery} ${categoryQuery}`
   }
 
   private toProviderPlace(document: KakaoPlaceDocument): PlaceProviderPlace {

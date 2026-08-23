@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
 import { InjectDataSource } from '@nestjs/typeorm'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import { OutboxEventType } from 'src/outbox/constants/outbox-event-type.constant'
 import { DataSource, type QueryRunner } from 'typeorm'
 import {
@@ -33,6 +34,7 @@ export class StatisticsOutboxWorker {
     @InjectDataSource(CORE_DATABASE_CONNECTION)
     private readonly coreDataSource: DataSource,
     private readonly processor: StatisticsOutboxProcessor,
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   async runOnce(): Promise<boolean> {
@@ -48,9 +50,21 @@ export class StatisticsOutboxWorker {
       const event = await this.claimNextEvent(queryRunner)
       if (!event) return false
 
-      try {
+      const processEvent = async () => {
         await this.processor.process(event)
         await this.markProcessed(queryRunner, event.id)
+      }
+
+      try {
+        if (this.metrics) {
+          await this.metrics.observeWorkerJob(
+            'statistics_outbox',
+            'process_event',
+            processEvent,
+          )
+        } else {
+          await processEvent()
+        }
       } catch (error) {
         await this.markFailed(queryRunner, event, error)
       }
@@ -67,6 +81,7 @@ export class StatisticsOutboxWorker {
   }
 
   async run(): Promise<void> {
+    this.metrics?.setWorkerRunning('statistics_outbox', true)
     this.logger.log('Statistics outbox worker started')
     while (this.isRunning) {
       try {
@@ -84,6 +99,7 @@ export class StatisticsOutboxWorker {
 
   stop(): void {
     this.isRunning = false
+    this.metrics?.setWorkerRunning('statistics_outbox', false)
   }
 
   private async tryAcquireSharedPipelineLock(

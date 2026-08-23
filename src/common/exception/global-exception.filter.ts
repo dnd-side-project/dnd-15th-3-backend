@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common'
-import type { Response } from 'express'
+import type { Request, Response } from 'express'
 import { BaseException } from './base.exception'
 import { CommonException } from './common.exception'
 import { CommonErrorCode } from './common-error-code'
@@ -29,7 +29,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name)
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const response = host.switchToHttp().getResponse<Response>()
+    const http = host.switchToHttp()
+    const request = http.getRequest<Request>()
+    const response = http.getResponse<Response>()
     const { errorCode, fieldErrors } = this.resolveException(exception)
     const body: ErrorResponseDto = {
       code: errorCode.code,
@@ -37,7 +39,36 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       ...(fieldErrors ? { fieldErrors } : {}),
     }
 
+    if (errorCode.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logServerError(exception, errorCode, request)
+    }
+
     response.status(errorCode.status).json(body)
+  }
+
+  private logServerError(
+    exception: unknown,
+    errorCode: ErrorCode,
+    request: Request,
+  ): void {
+    const routePath = request.route?.path
+    const route =
+      typeof routePath === 'string'
+        ? `${request.baseUrl}${routePath}` || '/'
+        : 'unmatched'
+
+    this.logger.error({
+      event: 'http_exception',
+      method: request.method,
+      route,
+      // biome-ignore lint/style/useNamingConvention: Structured log schema uses snake_case.
+      status_code: errorCode.status,
+      // biome-ignore lint/style/useNamingConvention: Structured log schema uses snake_case.
+      error_code: errorCode.code,
+      // biome-ignore lint/style/useNamingConvention: Structured log schema uses snake_case.
+      error_type:
+        exception instanceof Error ? exception.name : typeof exception,
+    })
   }
 
   private resolveException(exception: unknown): {
@@ -71,7 +102,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
     }
 
-    this.logger.error('Unhandled exception', exception)
     return { errorCode: CommonErrorCode.internalServerError }
   }
 

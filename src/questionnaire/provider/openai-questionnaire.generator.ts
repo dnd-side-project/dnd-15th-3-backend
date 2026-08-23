@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import type { Env } from 'src/config/env'
 import { z } from 'zod'
 import { QuestionnaireSource } from '../enums/questionnaire-source.enum'
@@ -108,7 +109,10 @@ const QUESTIONNAIRE_JSON_SCHEMA = {
 
 @Injectable()
 export class OpenAiQuestionnaireGenerator implements QuestionnaireGenerator {
-  constructor(private readonly config: ConfigService<Env, true>) {}
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
   isConfigured(): boolean {
     return Boolean(
@@ -117,7 +121,19 @@ export class OpenAiQuestionnaireGenerator implements QuestionnaireGenerator {
     )
   }
 
-  async generate(
+  generate(
+    context: QuestionnaireGenerationContext,
+  ): Promise<QuestionnaireGenerationResult> {
+    if (!this.metrics) return this.generateWithOpenAi(context)
+
+    return this.metrics.observeExternal(
+      'openai',
+      'questionnaire_generation',
+      () => this.generateWithOpenAi(context),
+    )
+  }
+
+  private async generateWithOpenAi(
     context: QuestionnaireGenerationContext,
   ): Promise<QuestionnaireGenerationResult> {
     const apiKey = this.config.get('OPENAI_API_KEY', { infer: true })

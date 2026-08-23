@@ -24,14 +24,16 @@ export class PlaceSearchResultDto {
   address!: string
 
   @ApiProperty({
-    description: '장소 사진 URL 목록. 표시 순서대로 정렬됩니다.',
+    description:
+      '프론트에서 직접 렌더링할 장소 이미지 URL 목록. 이미지가 없으면 빈 배열입니다.',
     type: [String],
     example: ['https://...', 'https://...'],
   })
   imageUrls!: string[]
 
   @ApiProperty({
-    description: '미리보기 사이트 링크',
+    description:
+      '대표 이미지 미리보기 URL. 프론트에서 직접 렌더링하며 이미지가 없으면 null입니다.',
     example: null,
     nullable: true,
   })

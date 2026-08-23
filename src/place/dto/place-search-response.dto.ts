@@ -45,7 +45,8 @@ export class PlaceSearchItemResponseDto {
   distanceMeters!: number
 
   @ApiProperty({
-    description: '대표 이미지 URL. 이미지 수집 전에는 null입니다.',
+    description:
+      '대표 이미지 미리보기 URL. 프론트에서 직접 렌더링하며 이미지가 없으면 null입니다.',
     example: null,
     nullable: true,
   })

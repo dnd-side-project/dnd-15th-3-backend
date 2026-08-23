@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm'
+import { ObservabilityModule } from 'src/common/observability/observability.module'
 import {
   CORE_ENTITIES_GLOB,
   CORE_MIGRATIONS_GLOB,
@@ -76,6 +77,7 @@ export function createStatsTypeOrmOptions(
       isGlobal: true,
       validate: validateStatisticsWorkerEnv,
     }),
+    ObservabilityModule,
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: createStatsTypeOrmOptions,

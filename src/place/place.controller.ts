@@ -71,7 +71,7 @@ export class PlaceController {
   @ApiOperation({
     summary: '주변 장소 검색',
     description:
-      'Kakao Local API에서 모임 기준 위치 반경 2km 이내의 장소를 실시간 조회합니다. Kakao 장소 ID와 URL만 저장합니다.',
+      'Kakao Local API에서 모임 기준 위치 반경 2km 이내의 장소를 실시간 조회합니다. 현재 페이지의 previewUrl은 프론트에서 직접 렌더링할 외부 이미지 URL이며, 이미지 파일을 프록시하거나 저장하지 않습니다. 이미지가 없으면 null입니다.',
   })
   @ApiQuery({
     name: 'meetingId',
@@ -97,7 +97,8 @@ export class PlaceController {
   })
   @ApiQuery({
     name: 'q',
-    description: '현재 Kakao 반경 검색 결과 안에서 적용할 장소명·주소 검색어',
+    description:
+      'Kakao 키워드 검색에 전달할 장소명·주소 검색어. 기준 위치 반경과 선택 카테고리를 함께 적용합니다.',
     required: false,
   })
   @ApiQuery({
@@ -141,7 +142,7 @@ export class PlaceController {
   @ApiOperation({
     summary: '장소 상세 조회',
     description:
-      '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다. accessToken이 속한 모임의 기준 위치를 사용하며 모임 상태와 무관하게 조회 가능합니다.',
+      '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다. accessToken이 속한 모임의 기준 위치를 사용하며 모임 상태와 무관하게 조회 가능합니다. imageUrls는 프론트에서 직접 렌더링할 URL 목록이며 이미지가 없으면 빈 배열입니다.',
   })
   @ApiParam({
     name: 'placeId',

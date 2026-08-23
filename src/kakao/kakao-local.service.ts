@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { createValidationException } from 'src/common/exception/validation-exception.factory'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import type { Env } from 'src/config/env'
 import type { PlaceSearchResult } from 'src/place/place.types'
 import {
@@ -27,9 +28,22 @@ const KAKAO_REQUEST_TIMEOUT_MS = 5_000
 
 @Injectable()
 export class KakaoLocalService {
-  constructor(private readonly config: ConfigService<Env, true>) {}
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
-  async searchAddress(
+  searchAddress(
+    request: KakaoLocalAddressSearchRequest,
+  ): Promise<KakaoLocalAddressSearchResponse> {
+    if (!this.metrics) return this.requestAddress(request)
+
+    return this.metrics.observeExternal('kakao', 'address_search', () =>
+      this.requestAddress(request),
+    )
+  }
+
+  private async requestAddress(
     request: KakaoLocalAddressSearchRequest,
   ): Promise<KakaoLocalAddressSearchResponse> {
     const parsedRequest =

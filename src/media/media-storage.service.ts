@@ -7,8 +7,9 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import type { MimeType } from '../common/enums/mime-type.enum'
 import type { Env } from '../config/env'
 
@@ -32,6 +33,7 @@ export class MediaStorageService {
   constructor(
     @Inject('S3_CLIENT') private readonly s3Client: S3Client,
     config: ConfigService<Env, true>,
+    @Optional() private readonly metrics?: MetricsService,
   ) {
     this.bucketName = config.get('MEDIA_BUCKET_NAME', { infer: true })
     this.publicBaseUrl = config
@@ -51,7 +53,23 @@ export class MediaStorageService {
     return `${this.publicBaseUrl}/${encodedKey}`
   }
 
-  async uploadImage(
+  uploadImage(
+    objectKey: string,
+    body: Uint8Array,
+    mimeType: MimeType,
+  ): Promise<void> {
+    if (!this.metrics) {
+      return this.uploadImageToStorage(objectKey, body, mimeType)
+    }
+
+    return this.metrics.observeExternal(
+      'oci_object_storage',
+      'upload_image',
+      () => this.uploadImageToStorage(objectKey, body, mimeType),
+    )
+  }
+
+  private async uploadImageToStorage(
     objectKey: string,
     body: Uint8Array,
     mimeType: MimeType,
@@ -72,7 +90,17 @@ export class MediaStorageService {
     )
   }
 
-  async deleteObject(objectKey: string): Promise<void> {
+  deleteObject(objectKey: string): Promise<void> {
+    if (!this.metrics) return this.deleteObjectFromStorage(objectKey)
+
+    return this.metrics.observeExternal(
+      'oci_object_storage',
+      'delete_object',
+      () => this.deleteObjectFromStorage(objectKey),
+    )
+  }
+
+  private async deleteObjectFromStorage(objectKey: string): Promise<void> {
     await this.s3Client.send(
       new DeleteObjectCommand({
         // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
@@ -83,7 +111,22 @@ export class MediaStorageService {
     )
   }
 
-  async listObjects(
+  listObjects(
+    prefix: string,
+    continuationToken?: string,
+  ): Promise<StoredMediaObjectPage> {
+    if (!this.metrics) {
+      return this.listObjectsFromStorage(prefix, continuationToken)
+    }
+
+    return this.metrics.observeExternal(
+      'oci_object_storage',
+      'list_objects',
+      () => this.listObjectsFromStorage(prefix, continuationToken),
+    )
+  }
+
+  private async listObjectsFromStorage(
     prefix: string,
     continuationToken?: string,
   ): Promise<StoredMediaObjectPage> {
@@ -115,7 +158,19 @@ export class MediaStorageService {
     }
   }
 
-  async downloadObject(objectKey: string): Promise<Readable> {
+  downloadObject(objectKey: string): Promise<Readable> {
+    if (!this.metrics) return this.downloadObjectFromStorage(objectKey)
+
+    return this.metrics.observeExternal(
+      'oci_object_storage',
+      'download_object',
+      () => this.downloadObjectFromStorage(objectKey),
+    )
+  }
+
+  private async downloadObjectFromStorage(
+    objectKey: string,
+  ): Promise<Readable> {
     const response = await this.s3Client.send(
       new GetObjectCommand({
         // biome-ignore lint/style/useNamingConvention: AWS SDK S3 API property name
