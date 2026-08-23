@@ -45,6 +45,7 @@ describe('PlaceRepository', () => {
           longitude: 127.0557,
           distanceMeters: 352.4,
           previewUrl: null,
+          previewImage: null,
         },
       ],
       total: 21,

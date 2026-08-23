@@ -70,6 +70,8 @@ describe('PlaceController', () => {
     )
     expect(schema?.properties?.imageUrls?.type).toBe('array')
     expect(schema?.properties?.imageUrls?.nullable).not.toBe(true)
+    expect(schema?.properties?.images?.type).toBe('array')
+    expect(schema?.properties?.previewImage?.nullable).toBe(true)
 
     await app.close()
   })

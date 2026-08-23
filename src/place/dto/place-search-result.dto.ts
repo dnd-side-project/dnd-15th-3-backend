@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { PlaceSource } from '../enums/place-source.enum'
+import { PlaceImageResponseDto } from './place-image-response.dto'
 
 export class PlaceSearchResultDto {
   @ApiProperty({ description: '장소 ID', example: '1', pattern: '^\\d+$' })
@@ -31,11 +32,27 @@ export class PlaceSearchResultDto {
   imageUrls!: string[]
 
   @ApiProperty({
-    description: '미리보기 사이트 링크',
+    description:
+      '프론트 직접 렌더링, thumbnail fallback, 출처 표시에 필요한 장소 이미지 목록',
+    type: PlaceImageResponseDto,
+    isArray: true,
+  })
+  images!: PlaceImageResponseDto[]
+
+  @ApiProperty({
+    description:
+      '대표 이미지 미리보기 URL. 프론트에서 직접 렌더링하며 이미지가 없으면 null입니다.',
     example: null,
     nullable: true,
   })
   previewUrl!: string | null
+
+  @ApiProperty({
+    description: '대표 이미지 메타데이터. 이미지가 없으면 null입니다.',
+    type: PlaceImageResponseDto,
+    nullable: true,
+  })
+  previewImage!: PlaceImageResponseDto | null
 
   @ApiProperty({ enum: PlaceSource, example: PlaceSource.Kakao })
   source!: PlaceSource
