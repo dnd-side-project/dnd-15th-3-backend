@@ -1,3 +1,4 @@
+import type { KakaoWalkingDistanceService } from 'src/kakao/kakao-walking-distance.service'
 import { CourseGenerationRouteService } from './course-generation-route.service'
 
 const recommendations = [
@@ -5,41 +6,47 @@ const recommendations = [
   { latitude: 37.501, longitude: 127.001 },
 ] as never
 
-describe('CourseGenerationRouteService', () => {
-  it('카카오 도보 경로가 있으면 실제 시간과 거리를 저장한다', async () => {
-    const kakaoWalkingCourseService = {
-      getWalkingCourse: jest.fn().mockResolvedValue({
-        status: 'OK',
-        route: {
-          properties: { totalTime: 240, totalDistance: 300 },
-        },
-      }),
-    }
-    const service = new CourseGenerationRouteService(
-      kakaoWalkingCourseService as never,
-    )
+function createService(getWalkingDistance: jest.Mock) {
+  return new CourseGenerationRouteService({
+    getWalkingDistance,
+  } as unknown as KakaoWalkingDistanceService)
+}
 
-    await expect(service.getLegs(recommendations)).resolves.toEqual([
+describe('CourseGenerationRouteService', () => {
+  it('연속된 장소 쌍마다 거리를 조회하고 마지막 구간은 null로 채운다', async () => {
+    const getWalkingDistance = jest.fn().mockResolvedValue({
+      distanceMeters: 300,
+      travelTimeSeconds: 240,
+      isEstimated: false,
+    })
+    const service = createService(getWalkingDistance)
+
+    const legs = await service.getLegs(recommendations)
+
+    expect(getWalkingDistance).toHaveBeenCalledTimes(1)
+    expect(getWalkingDistance).toHaveBeenCalledWith(
+      recommendations[0],
+      recommendations[1],
+    )
+    expect(legs).toEqual([
       { travelTimeToNext: 240, distanceToNextMeters: 300 },
       { travelTimeToNext: null, distanceToNextMeters: null },
     ])
   })
 
-  it('카카오 도보 경로를 사용할 수 없어도 직선거리 기반 추정치로 생성을 계속한다', async () => {
-    const kakaoWalkingCourseService = {
-      getWalkingCourse: jest.fn().mockRejectedValue(new Error('unavailable')),
-    }
-    const service = new CourseGenerationRouteService(
-      kakaoWalkingCourseService as never,
-    )
+  it('추정치(isEstimated)여도 그대로 거리·시간에 반영한다', async () => {
+    const getWalkingDistance = jest.fn().mockResolvedValue({
+      distanceMeters: 132,
+      travelTimeSeconds: 110,
+      isEstimated: true,
+    })
+    const service = createService(getWalkingDistance)
 
-    const result = await service.getLegs(recommendations)
+    const legs = await service.getLegs(recommendations)
 
-    expect(result[0].distanceToNextMeters).toBeGreaterThan(0)
-    expect(result[0].travelTimeToNext).toBeGreaterThan(0)
-    expect(result[1]).toEqual({
-      travelTimeToNext: null,
-      distanceToNextMeters: null,
+    expect(legs[0]).toEqual({
+      travelTimeToNext: 110,
+      distanceToNextMeters: 132,
     })
   })
 })

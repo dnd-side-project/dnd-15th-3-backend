@@ -1,7 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import type { CategorySlug } from 'src/category/enums/category-slug.enum'
-import { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
-import type { KakaoWalkingCourseResponse } from 'src/kakao/schema/walking-course-response.schema'
+import { KakaoWalkingDistanceService } from 'src/kakao/kakao-walking-distance.service'
 import type { CourseGenerationRuntimeInput } from '../../schema/course-generation-input.schema'
 import {
   type CourseGeneratorInput,
@@ -23,10 +22,8 @@ const SUNDAY = 0
 
 @Injectable()
 export class CourseGeneratorInputBuilder {
-  private readonly logger = new Logger(CourseGeneratorInputBuilder.name)
-
   constructor(
-    private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
+    private readonly walkingDistanceService: KakaoWalkingDistanceService,
   ) {}
 
   async build(
@@ -120,37 +117,21 @@ export class CourseGeneratorInputBuilder {
     )
   }
 
+  /**
+   * 카카오 도보 경로를 못 구해도(API 오류·경로 미발견) 던지지 않고
+   * CourseGenerationRouteService와 동일하게 직선거리 기반 추정치로 대체한다.
+   * 카카오 장애 하나 때문에 AI 코스 생성 전체가 수동 생성으로 폴백되지
+   * 않게 하기 위함이다.
+   */
   private async getWalkingDistanceMeters(
     origin: Coordinate | undefined,
     destination: Coordinate | undefined,
   ): Promise<number | null> {
     if (!origin || !destination) return null
 
-    let walkingCourse: KakaoWalkingCourseResponse
-    try {
-      walkingCourse = await this.kakaoWalkingCourseService.getWalkingCourse({
-        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
-        start_x: String(origin.longitude),
-        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
-        start_y: String(origin.latitude),
-        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
-        end_x: String(destination.longitude),
-        // biome-ignore lint/style/useNamingConvention: 카카오 API 쿼리 파라미터 이름과 동일하게 유지
-        end_y: String(destination.latitude),
-      })
-    } catch (error) {
-      // API 키 미설정, 네트워크 오류 등 서비스 자체의 문제. 이 쌍만 없는 걸로
-      // 조용히 넘기면 원인 파악이 안 되므로 로그를 남기고 그대로 전파한다.
-      this.logger.error(
-        `카카오 도보 경로 API 호출에 실패했습니다. origin=(${origin.longitude}, ${origin.latitude}) destination=(${destination.longitude}, ${destination.latitude})`,
-        error instanceof Error ? error.stack : error,
-      )
-      throw error
-    }
-
-    // 경로 자체를 찾을 수 없는 건 정상적인 응답이다 (두 지점 사이에 도보 경로가 없을 수 있음).
-    if (walkingCourse.status !== 'OK' || !walkingCourse.route) return null
-    return walkingCourse.route.properties.totalDistance
+    const { distanceMeters } =
+      await this.walkingDistanceService.getWalkingDistance(origin, destination)
+    return distanceMeters
   }
 
   private calculatePreferenceScore(

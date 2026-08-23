@@ -1,5 +1,5 @@
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
-import type { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
+import type { KakaoWalkingDistanceService } from 'src/kakao/kakao-walking-distance.service'
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { QuestionnaireSource } from 'src/questionnaire/enums/questionnaire-source.enum'
 import { QuestionnaireDimensionCode } from 'src/questionnaire/questionnaire.constants'
@@ -57,36 +57,40 @@ function createRuntimeInput(
 }
 
 function createBuilder() {
-  const kakaoWalkingCourseService = {
-    getWalkingCourse: jest.fn().mockResolvedValue({
-      status: 'OK',
-      route: { properties: { totalDistance: 100, totalTime: 100 }, legs: [] },
+  const walkingDistanceService = {
+    getWalkingDistance: jest.fn().mockResolvedValue({
+      distanceMeters: 100,
+      travelTimeSeconds: 100,
+      isEstimated: false,
     }),
   }
   const builder = new CourseGeneratorInputBuilder(
-    kakaoWalkingCourseService as unknown as KakaoWalkingCourseService,
+    walkingDistanceService as unknown as KakaoWalkingDistanceService,
   )
 
-  return { builder, kakaoWalkingCourseService }
+  return { builder, walkingDistanceService }
 }
 
 describe('CourseGeneratorInputBuilder', () => {
-  it('카카오 API 호출이 실패(설정 오류·네트워크 오류 등)하면 그대로 전파한다', async () => {
-    const { builder, kakaoWalkingCourseService } = createBuilder()
-    kakaoWalkingCourseService.getWalkingCourse.mockRejectedValue(
-      new Error('카카오 API 키가 설정되지 않았습니다'),
-    )
+  it('카카오 도보 경로 조회가 실패해도(추정치로 대체되므로) AI 생성이 계속된다', async () => {
+    const { builder, walkingDistanceService } = createBuilder()
+    walkingDistanceService.getWalkingDistance.mockResolvedValue({
+      distanceMeters: 400,
+      travelTimeSeconds: 300,
+      isEstimated: true,
+    })
 
-    await expect(builder.build(createRuntimeInput())).rejects.toThrow(
-      '카카오 API 키가 설정되지 않았습니다',
-    )
+    const input = await builder.build(createRuntimeInput())
+
+    expect(input.distanceMatrix.values.start['rec-1']).toBe(400)
   })
 
   it('추천 장소·투표·거리 데이터를 조합해 유효한 입력을 만든다', async () => {
-    const { builder, kakaoWalkingCourseService } = createBuilder()
-    kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue({
-      status: 'OK',
-      route: { properties: { totalDistance: 250, totalTime: 200 }, legs: [] },
+    const { builder, walkingDistanceService } = createBuilder()
+    walkingDistanceService.getWalkingDistance.mockResolvedValue({
+      distanceMeters: 250,
+      travelTimeSeconds: 200,
+      isEstimated: false,
     })
 
     const input = await builder.build(
@@ -280,14 +284,24 @@ describe('CourseGeneratorInputBuilder', () => {
     })
   })
 
-  it('카카오 API가 경로를 찾지 못한 쌍은 distanceMatrix에서 빠진다', async () => {
-    const { builder, kakaoWalkingCourseService } = createBuilder()
-    kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue({
-      status: 'ROUTE_RESULT_NOT_FOUND',
-    })
+  it('해당 카테고리 단계에 후보가 없으면 그 자리는 distanceMatrix 조회 대상에서 빠진다', async () => {
+    const { builder, walkingDistanceService } = createBuilder()
 
-    const input = await builder.build(createRuntimeInput())
+    const input = await builder.build(
+      createRuntimeInput({
+        categorySteps: [
+          {
+            order: 1,
+            categoryId: 'category-1',
+            categorySlug: CategorySlug.Restaurant,
+          },
+        ],
+        // 방문 단계는 restaurant인데 후보는 cafe뿐 -> 해당 단계 pool이 비게 됨
+        recommendations: [createRecommendation('rec-1', CategorySlug.Cafe)],
+      }),
+    )
 
+    expect(walkingDistanceService.getWalkingDistance).not.toHaveBeenCalled()
     expect(input.distanceMatrix.values).toEqual({})
   })
 })
