@@ -29,10 +29,6 @@ export type KakaoImagePreviewTarget = KakaoImageSearchTarget & {
 export type KakaoPlaceImage = {
   url: string
   thumbnailUrl: string
-  sourceName: string | null
-  sourceUrl: string | null
-  width: number
-  height: number
 }
 
 type CacheEntry = {
@@ -86,10 +82,10 @@ export class KakaoImageSearchService {
     }
   }
 
-  async findPreviewImages(
+  async findPreviewUrls(
     targets: KakaoImagePreviewTarget[],
-  ): Promise<Map<string, KakaoPlaceImage>> {
-    const previews = new Map<string, KakaoPlaceImage>()
+  ): Promise<Map<string, string>> {
+    const previews = new Map<string, string>()
     if (targets.length === 0) return previews
 
     let nextIndex = 0
@@ -98,7 +94,7 @@ export class KakaoImageSearchService {
         const target = targets[nextIndex]
         nextIndex += 1
         const image = (await this.findImages(target))[0]
-        if (image) previews.set(target.id, image)
+        if (image) previews.set(target.id, image.thumbnailUrl)
       }
     }
     const workerCount = Math.min(KAKAO_IMAGE_SEARCH_CONCURRENCY, targets.length)
@@ -157,26 +153,21 @@ export class KakaoImageSearchService {
   private toPlaceImage(
     document: KakaoImageSearchDocument,
   ): KakaoPlaceImage | null {
-    const originalUrl = this.toUrl(document.image_url, true)
-    const thumbnailUrl = this.toUrl(document.thumbnail_url, true)
+    const originalUrl = this.toHttpsUrl(document.image_url)
+    const thumbnailUrl = this.toHttpsUrl(document.thumbnail_url)
     const renderUrl = originalUrl ?? thumbnailUrl
     if (!renderUrl) return null
 
     return {
       url: renderUrl,
       thumbnailUrl: thumbnailUrl ?? renderUrl,
-      sourceName: document.display_sitename.trim() || null,
-      sourceUrl: this.toUrl(document.doc_url, false),
-      width: document.width,
-      height: document.height,
     }
   }
 
-  private toUrl(value: string, httpsOnly: boolean): string | null {
+  private toHttpsUrl(value: string): string | null {
     try {
       const url = new URL(value)
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-      if (httpsOnly && url.protocol !== 'https:') return null
+      if (url.protocol !== 'https:') return null
       return url.toString()
     } catch {
       return null

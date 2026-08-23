@@ -5,15 +5,11 @@ import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
-import {
-  KakaoImageSearchService,
-  type KakaoPlaceImage,
-} from 'src/kakao/kakao-image-search.service'
+import { KakaoImageSearchService } from 'src/kakao/kakao-image-search.service'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { Repository } from 'typeorm'
-import type { PlaceImageResponseDto } from './dto/place-image-response.dto'
 import type { PlaceSearchResultDto } from './dto/place-search-result.dto'
 import { Place } from './entities/place.entity'
 import { PlaceSource } from './enums/place-source.enum'
@@ -29,6 +25,11 @@ import {
   type PlaceSearchResponse,
   placeSearchResponseSchema,
 } from './schema/place-search-response.schema'
+
+type ResolvedImageUrls = {
+  imageUrls: string[]
+  previewUrl: string | null
+}
 
 @Injectable()
 export class PlaceService {
@@ -81,7 +82,7 @@ export class PlaceService {
     )
     const offset = (request.page - 1) * request.size
     const pageItems = result.places.slice(offset, offset + request.size)
-    const previewImages = await this.kakaoImageSearchService.findPreviewImages(
+    const previewUrls = await this.kakaoImageSearchService.findPreviewUrls(
       pageItems.map((place) => ({
         id: place.id,
         name: place.name,
@@ -91,29 +92,25 @@ export class PlaceService {
     )
 
     const response = {
-      items: pageItems.map((place) => {
-        const previewImage = previewImages.get(place.id) ?? null
-        return {
-          id: place.id,
-          name: place.name,
-          address: place.address,
-          category: {
-            id: place.category.id,
-            name: place.category.name,
-            slug: place.category.slug,
-          },
-          latitude: place.latitude,
-          longitude: place.longitude,
-          distanceMeters: place.distanceMeters,
-          previewUrl: previewImage?.thumbnailUrl ?? place.previewUrl,
-          previewImage,
-          source: place.source,
-          providerPlaceId: place.providerPlaceId,
-          roadAddress: place.roadAddress,
-          phone: place.phone,
-          placeUrl: place.placeUrl,
-        }
-      }),
+      items: pageItems.map((place) => ({
+        id: place.id,
+        name: place.name,
+        address: place.address,
+        category: {
+          id: place.category.id,
+          name: place.category.name,
+          slug: place.category.slug,
+        },
+        latitude: place.latitude,
+        longitude: place.longitude,
+        distanceMeters: place.distanceMeters,
+        previewUrl: previewUrls.get(place.id) ?? place.previewUrl,
+        source: place.source,
+        providerPlaceId: place.providerPlaceId,
+        roadAddress: place.roadAddress,
+        phone: place.phone,
+        placeUrl: place.placeUrl,
+      })),
       page: request.page,
       size: request.size,
       total: result.places.length,
@@ -165,9 +162,10 @@ export class PlaceService {
       longitude: meetingLocation.longitude,
     })
 
-    const images = await this.resolveImages(place, resolved)
-    const imageUrls = images.map((image) => image.url)
-    const previewImage = images[0] ?? null
+    const { imageUrls, previewUrl } = await this.resolveImageUrls(
+      place,
+      resolved,
+    )
 
     return {
       placeId: place.id,
@@ -176,12 +174,7 @@ export class PlaceService {
       name: resolved.name,
       address: resolved.address,
       imageUrls,
-      images,
-      previewUrl:
-        place.source === PlaceSource.Kakao
-          ? (previewImage?.thumbnailUrl ?? resolved.previewUrl)
-          : (resolved.previewUrl ?? previewImage?.thumbnailUrl ?? null),
-      previewImage,
+      previewUrl,
       source: resolved.source,
       providerPlaceId: resolved.providerPlaceId,
       roadAddress: resolved.roadAddress,
@@ -192,29 +185,26 @@ export class PlaceService {
     }
   }
 
-  private async resolveImages(
+  private async resolveImageUrls(
     place: Place,
     resolved: ResolvedPlace,
-  ): Promise<PlaceImageResponseDto[]> {
+  ): Promise<ResolvedImageUrls> {
     if (place.source === PlaceSource.Kakao) {
-      const images: KakaoPlaceImage[] =
-        await this.kakaoImageSearchService.findImages({
-          name: resolved.name,
-          address: resolved.address,
-          roadAddress: resolved.roadAddress,
-        })
-      return images
+      const images = await this.kakaoImageSearchService.findImages({
+        name: resolved.name,
+        address: resolved.address,
+        roadAddress: resolved.roadAddress,
+      })
+      return {
+        imageUrls: images.map((image) => image.url),
+        previewUrl: images[0]?.thumbnailUrl ?? resolved.previewUrl,
+      }
     }
 
-    const imageUrls = await this.placeImageService.getImageUrls(place.id)
-    return imageUrls.map((url) => ({
-      url,
-      thumbnailUrl: url,
-      sourceName: null,
-      sourceUrl: null,
-      width: null,
-      height: null,
-    }))
+    return {
+      imageUrls: await this.placeImageService.getImageUrls(place.id),
+      previewUrl: resolved.previewUrl,
+    }
   }
 
   private async findSearchCategories(

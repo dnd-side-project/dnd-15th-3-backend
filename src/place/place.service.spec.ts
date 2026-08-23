@@ -52,7 +52,7 @@ function createService() {
     getImageUrls: jest.fn().mockResolvedValue([]),
   }
   const kakaoImageSearchService = {
-    findPreviewImages: jest.fn().mockResolvedValue(new Map()),
+    findPreviewUrls: jest.fn().mockResolvedValue(new Map()),
     findImages: jest.fn().mockResolvedValue([]),
   }
 
@@ -215,7 +215,7 @@ describe('PlaceService', () => {
       )
     })
 
-    it('현재 페이지 장소의 대표 이미지 URL과 fallback 메타데이터를 응답한다', async () => {
+    it('현재 페이지 장소의 대표 이미지 URL을 기존 previewUrl로 응답한다', async () => {
       const {
         service,
         participantRepository,
@@ -244,35 +244,27 @@ describe('PlaceService', () => {
         isComplete: true,
         unsupportedCategorySlugs: [],
       })
-      const previewImage = {
-        url: 'https://images.example.com/place.jpg',
-        thumbnailUrl: 'https://search.example.com/place-thumbnail.jpg',
-        sourceName: '장소 블로그',
-        sourceUrl: 'https://blog.example.com/place',
-        width: 1280,
-        height: 960,
-      }
-      kakaoImageSearchService.findPreviewImages.mockResolvedValue(
-        new Map([['10', previewImage]]),
+      const previewUrl = 'https://search.example.com/place-thumbnail.jpg'
+      kakaoImageSearchService.findPreviewUrls.mockResolvedValue(
+        new Map([['10', previewUrl]]),
       )
 
-      await expect(
-        service.searchPlaces({
-          meetingId: '123',
-          accessToken: 'token',
-          page: 1,
-          size: 20,
-        }),
-      ).resolves.toMatchObject({
+      const result = await service.searchPlaces({
+        meetingId: '123',
+        accessToken: 'token',
+        page: 1,
+        size: 20,
+      })
+      expect(result).toMatchObject({
         items: [
           {
             id: '10',
-            previewUrl: previewImage.thumbnailUrl,
-            previewImage,
+            previewUrl,
           },
         ],
       })
-      expect(kakaoImageSearchService.findPreviewImages).toHaveBeenCalledWith([
+      expect(result.items[0]).not.toHaveProperty('previewImage')
+      expect(kakaoImageSearchService.findPreviewUrls).toHaveBeenCalledWith([
         {
           id: '10',
           name: '성수 카페',
@@ -382,24 +374,6 @@ describe('PlaceService', () => {
             'https://signed.example.com/first.jpg',
             'https://signed.example.com/second.jpg',
           ],
-          images: [
-            {
-              url: 'https://signed.example.com/first.jpg',
-              thumbnailUrl: 'https://signed.example.com/first.jpg',
-              sourceName: null,
-              sourceUrl: null,
-              width: null,
-              height: null,
-            },
-            {
-              url: 'https://signed.example.com/second.jpg',
-              thumbnailUrl: 'https://signed.example.com/second.jpg',
-              sourceName: null,
-              sourceUrl: null,
-              width: null,
-              height: null,
-            },
-          ],
           previewUrl: 'https://preview.example.com/1',
         },
       )
@@ -426,9 +400,11 @@ describe('PlaceService', () => {
       })
       placeImageService.getImageUrls.mockResolvedValue([])
 
-      await expect(service.getPlaceDetail('1', 'token')).resolves.toMatchObject(
-        { imageUrls: [], images: [], previewImage: null },
-      )
+      const result = await service.getPlaceDetail('1', 'token')
+
+      expect(result).toMatchObject({ imageUrls: [] })
+      expect(result).not.toHaveProperty('images')
+      expect(result).not.toHaveProperty('previewImage')
     })
 
     it('Kakao 장소는 이미지 파일을 저장하지 않고 검색된 외부 URL을 응답한다', async () => {
@@ -470,26 +446,66 @@ describe('PlaceService', () => {
       const image = {
         url: 'https://images.example.com/place.jpg',
         thumbnailUrl: 'https://search.example.com/place-thumbnail.jpg',
-        sourceName: '장소 블로그',
-        sourceUrl: 'https://blog.example.com/place',
-        width: 1280,
-        height: 960,
       }
       kakaoImageSearchService.findImages.mockResolvedValue([image])
 
-      await expect(service.getPlaceDetail('1', 'token')).resolves.toMatchObject(
-        {
-          imageUrls: [image.url],
-          images: [image],
-          previewUrl: image.thumbnailUrl,
-          previewImage: image,
-        },
-      )
+      const result = await service.getPlaceDetail('1', 'token')
+
+      expect(result).toMatchObject({
+        imageUrls: [image.url],
+        previewUrl: image.thumbnailUrl,
+      })
+      expect(result).not.toHaveProperty('images')
+      expect(result).not.toHaveProperty('previewImage')
       expect(kakaoImageSearchService.findImages).toHaveBeenCalledWith({
         name: '성수 카페',
         address: '서울 성동구 성수동1가 1',
         roadAddress: '서울 성동구 성수이로 1',
       })
+      expect(placeImageService.getImageUrls).not.toHaveBeenCalled()
+    })
+
+    it('Kakao 이미지가 없으면 기존 필드에 빈 값만 응답한다', async () => {
+      const {
+        service,
+        participantRepository,
+        placeRepository,
+        placeLiveDataService,
+        placeImageService,
+      } = createService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { id: '123' },
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '1',
+        source: PlaceSource.Kakao,
+        name: '12345',
+        address: 'KAKAO_PLACE_REFERENCE',
+        previewUrl: null,
+        category: { name: '카페', slug: 'cafe' },
+      })
+      placeLiveDataService.resolvePlace.mockResolvedValue({
+        id: '1',
+        source: PlaceSource.Kakao,
+        providerPlaceId: '12345',
+        category: { name: '카페', slug: 'cafe' },
+        name: '성수 카페',
+        address: '서울 성동구 성수동1가 1',
+        roadAddress: '서울 성동구 성수이로 1',
+        latitude: 37.5,
+        longitude: 127,
+        phone: null,
+        placeUrl: 'https://place.map.kakao.com/12345',
+        previewUrl: null,
+        distanceMeters: 100,
+      })
+
+      const result = await service.getPlaceDetail('1', 'token')
+
+      expect(result).toMatchObject({ imageUrls: [], previewUrl: null })
+      expect(result).not.toHaveProperty('images')
+      expect(result).not.toHaveProperty('previewImage')
       expect(placeImageService.getImageUrls).not.toHaveBeenCalled()
     })
   })
