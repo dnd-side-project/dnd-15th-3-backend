@@ -3,6 +3,7 @@ import type { KakaoWalkingDistanceService } from 'src/kakao/kakao-walking-distan
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { QuestionnaireSource } from 'src/questionnaire/enums/questionnaire-source.enum'
 import { QuestionnaireDimensionCode } from 'src/questionnaire/questionnaire.constants'
+import { calculatePreferenceScore } from '../../course-preference-score'
 import type { CourseGenerationRuntimeInput } from '../../schema/course-generation-input.schema'
 import { CourseGeneratorInputBuilder } from './course-generator-input.builder'
 
@@ -205,56 +206,21 @@ describe('CourseGeneratorInputBuilder', () => {
     expect(input.qna).toEqual([])
   })
 
-  describe('선호도 점수 계산', () => {
-    it.each([
-      [0, 0, 0],
-      [5, 0, 5],
-      [0, 5, -7.5],
-      [10, 1, 8.5],
-      [3, 2, 0],
-      [1, 1, -0.5],
-    ])(
-      '좋아요 %i개, 싫어요 %i개면 점수는 %f이다',
-      async (likeCount, dislikeCount, expectedScore) => {
-        const { builder } = createBuilder()
+  it('추천의 좋아요·싫어요를 선호도 점수로 변환해 places에 담는다 (공식 자체는 calculatePreferenceScore에서 검증)', async () => {
+    const { builder } = createBuilder()
 
-        const input = await builder.build(
-          createRuntimeInput({
-            recommendations: [
-              createRecommendation('rec-1', CategorySlug.Restaurant, {
-                likeCount,
-                dislikeCount,
-              }),
-            ],
+    const input = await builder.build(
+      createRuntimeInput({
+        recommendations: [
+          createRecommendation('rec-1', CategorySlug.Restaurant, {
+            likeCount: 10,
+            dislikeCount: 1,
           }),
-        )
-
-        expect(input.places[0].score).toBe(expectedScore)
-      },
+        ],
+      }),
     )
 
-    it('싫어요 1개는 좋아요 1개보다 더 크게 깎는다 (비대칭 가중치)', async () => {
-      const { builder } = createBuilder()
-
-      async function scoreFor(likeCount: number, dislikeCount: number) {
-        const input = await builder.build(
-          createRuntimeInput({
-            recommendations: [
-              createRecommendation('rec-1', CategorySlug.Restaurant, {
-                likeCount,
-                dislikeCount,
-              }),
-            ],
-          }),
-        )
-        return input.places[0].score
-      }
-
-      const onlyLike = await scoreFor(1, 0)
-      const onlyDislike = await scoreFor(0, 1)
-
-      expect(Math.abs(onlyDislike)).toBeGreaterThan(Math.abs(onlyLike))
-    })
+    expect(input.places[0].score).toBe(calculatePreferenceScore(10, 1))
   })
 
   describe('주말 판정', () => {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { haversineDistanceMeters } from 'src/common/geo/haversine-distance'
 import { QuestionnaireOptionCode } from 'src/questionnaire/questionnaire.constants'
+import { calculatePreferenceScore } from '../course-preference-score'
 import type { CourseGenerationRuntimeInput } from '../schema/course-generation-input.schema'
 import {
   type CourseGenerationOutputSnapshot,
@@ -120,7 +121,10 @@ export class DeterministicCourseCandidateGenerator
   }
 
   private preferenceScore(recommendation: Recommendation): number {
-    return recommendation.likeCount * 3 - recommendation.dislikeCount * 2
+    return calculatePreferenceScore(
+      recommendation.likeCount,
+      recommendation.dislikeCount,
+    )
   }
 
   private discoveryScore(recommendation: Recommendation): number {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { KakaoWalkingDistanceService } from 'src/kakao/kakao-walking-distance.service'
+import { calculatePreferenceScore } from '../../course-preference-score'
 import type { CourseGenerationRuntimeInput } from '../../schema/course-generation-input.schema'
 import {
   type CourseGeneratorInput,
@@ -16,7 +17,6 @@ type Coordinate = { longitude: number; latitude: number }
 type CourseGeneratorPlace = CourseGeneratorInput['places'][number]
 type Recommendation = CourseGenerationRuntimeInput['recommendations'][number]
 
-const DISLIKE_WEIGHT = 1.5
 const SATURDAY = 6
 const SUNDAY = 0
 
@@ -76,7 +76,7 @@ export class CourseGeneratorInputBuilder {
       id: recommendation.recommendationId,
       name: recommendation.name,
       category: recommendation.categorySlug,
-      score: this.calculatePreferenceScore(
+      score: calculatePreferenceScore(
         recommendation.likeCount,
         recommendation.dislikeCount,
       ),
@@ -132,13 +132,6 @@ export class CourseGeneratorInputBuilder {
     const { distanceMeters } =
       await this.walkingDistanceService.getWalkingDistance(origin, destination)
     return distanceMeters
-  }
-
-  private calculatePreferenceScore(
-    likeCount: number,
-    dislikeCount: number,
-  ): number {
-    return likeCount - dislikeCount * DISLIKE_WEIGHT
   }
 
   /**
