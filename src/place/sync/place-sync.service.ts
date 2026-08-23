@@ -3,7 +3,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
-import { normalizeQueryRows } from 'src/common/database/normalize-query-rows'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import {
@@ -17,6 +16,7 @@ import { PlaceSyncCoverage } from '../entities/place-sync-coverage.entity'
 import { PlaceSyncJob } from '../entities/place-sync-job.entity'
 import { PlaceSyncJobStatus } from '../enums/place-sync-job-status.enum'
 import type { PlaceProvider } from '../provider/place-provider'
+import { normalizeQueryRows } from './normalize-query-rows'
 import {
   buildCoverageTiles,
   haversineDistanceMeters,

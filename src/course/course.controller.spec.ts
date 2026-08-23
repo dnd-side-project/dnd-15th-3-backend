@@ -213,7 +213,7 @@ describe('CourseController', () => {
   it('코스 생성 요청은 CourseGenerationService에 위임한다', async () => {
     const { controller, courseGenerationService } = createController()
     const expected = {
-      status: 'COURSE_GENERATING',
+      status: 'COURSE_GENERATED',
       confirmedCourseCandidateId: null,
     }
     ;(courseGenerationService.generateCourse as jest.Mock).mockResolvedValue(
@@ -305,7 +305,7 @@ describe('CourseController', () => {
       | PathOperations
       | undefined
     expect(responseCodes(coursesPath?.post?.responses)).toEqual(
-      ['202', '400', '401', '403', '404', '409', '422'].sort(),
+      ['200', '400', '401', '403', '404', '409', '422'].sort(),
     )
     expect(responseCodes(coursesPath?.get?.responses)).toEqual(
       ['200', '400', '401', '404', '409', '500'].sort(),

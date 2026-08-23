@@ -11,7 +11,6 @@ import { CourseService } from './course.service'
 import { CourseGenerationProcessor } from './course-generation.processor'
 import { CourseGenerationService } from './course-generation.service'
 import { COURSE_CANDIDATE_GENERATOR } from './course-generation.tokens'
-import { CourseGenerationWorker } from './course-generation.worker'
 import { CourseGenerationRouteService } from './course-generation-route.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
@@ -50,9 +49,8 @@ import { DeterministicCourseCandidateGenerator } from './provider/deterministic-
     CourseGenerationRouteService,
     CourseGenerationProcessor,
     CourseGenerationService,
-    CourseGenerationWorker,
     CourseService,
   ],
-  exports: [MeetingPlaceRecommendationVoteRepository, CourseGenerationWorker],
+  exports: [MeetingPlaceRecommendationVoteRepository],
 })
 export class CourseModule {}

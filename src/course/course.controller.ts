@@ -11,7 +11,6 @@ import {
   Query,
 } from '@nestjs/common'
 import {
-  ApiAcceptedResponse,
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
@@ -58,7 +57,7 @@ export class CourseController {
   ) {}
 
   @Post(':meetingId/courses')
-  @HttpCode(HttpStatus.ACCEPTED)
+  @HttpCode(HttpStatus.OK)
   @ApiParam({
     name: 'meetingId',
     description: '모임 ID',
@@ -73,16 +72,16 @@ export class CourseController {
   @ApiOperation({
     summary: 'AI 코스 생성',
     description:
-      'AI를 이용해 모임에 추가된 장소 추천을 기반으로 코스 생성을 요청합니다. ' +
+      'AI를 이용해 모임에 추가된 장소 추천을 기반으로 코스를 생성합니다. ' +
       '코스 순서 기준으로 각 카테고리를 채울 장소가 확보되어 있는지 먼저 확인합니다. ' +
-      '요청이 접수되면 모임 상태가 코스 생성 중으로 즉시 전환되고, ' +
-      '이후 모임 상태 조회 API로 완료 또는 실패 여부를 확인할 수 있습니다. ' +
+      '장소 해석, 코스 후보 선정, 구간별 경로 생성을 요청 안에서 완료한 뒤 결과 상태를 반환합니다. ' +
       'AI 코스 생성에 실패하면 내부 로직으로 경로를 직접 생성하는 방식으로 재시도하며, ' +
       '이 경우에도 생성에 실패할 수 있습니다. ' +
       '방장만 호출할 수 있고, 모임이 장소 추천 수집 중이거나 코스 생성 실패 상태일 때만 호출할 수 있습니다.',
   })
-  @ApiAcceptedResponse({
-    description: '코스 생성 요청이 접수되어 처리 중입니다.',
+  @ApiOkResponse({
+    description:
+      '동기 코스 생성 처리가 완료·실패했거나 동일 모임의 생성 요청이 이미 처리 중입니다.',
     type: MeetingStatusResponseDto,
   })
   @ApiBadRequestResponse({ description: 'meetingId 형식이 올바르지 않습니다.' })

@@ -156,7 +156,9 @@ describe('CourseGenerationProcessor', () => {
   it('생성된 후보와 경로를 하나의 트랜잭션에 저장하고 상태를 완료로 바꾴다', async () => {
     const context = createContext()
 
-    await context.processor.processRun('70')
+    await expect(context.processor.processRun('70')).resolves.toBe(
+      MeetingStatus.CourseGenerated,
+    )
 
     expect(context.generator.generate).toHaveBeenCalledWith(input)
     expect(context.routeService.getLegs).toHaveBeenCalledWith([
@@ -226,7 +228,9 @@ describe('CourseGenerationProcessor', () => {
       ]),
     )
 
-    await context.processor.processRun('70')
+    await expect(context.processor.processRun('70')).resolves.toBe(
+      MeetingStatus.CourseGenerated,
+    )
 
     expect(context.generator.generate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -249,7 +253,9 @@ describe('CourseGenerationProcessor', () => {
       candidates: [{ name: '잘못된 코스', recommendationIds: ['999'] }],
     })
 
-    await context.processor.processRun('70')
+    await expect(context.processor.processRun('70')).resolves.toBe(
+      MeetingStatus.CourseGenerationFailed,
+    )
 
     expect(context.candidateRepository.save).not.toHaveBeenCalled()
     expect(context.run.status).toBe(CourseGenerationRunStatus.Failed)

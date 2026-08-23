@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { normalizeQueryRows } from 'src/common/database/normalize-query-rows'
 import { DataSource } from 'typeorm'
+import { normalizeQueryRows } from './normalize-query-rows'
 import { PLACE_SYNC_STALE_AFTER_MS } from './place-sync.constants'
 import { PlaceSyncService } from './place-sync.service'
 

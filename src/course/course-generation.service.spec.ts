@@ -62,11 +62,15 @@ function createService() {
     getVoteCountsByRecommendation: jest.fn(),
   }
   const questionnaireService = { resolveAnswers: jest.fn() }
+  const processor = {
+    processRun: jest.fn().mockResolvedValue(MeetingStatus.CourseGenerated),
+  }
   const service = new CourseGenerationService(
     dataSource as never,
     courseRepository as never,
     voteRepository as never,
     questionnaireService as never,
+    processor as never,
   )
 
   return {
@@ -81,6 +85,7 @@ function createService() {
     courseRepository,
     voteRepository,
     questionnaireService,
+    processor,
   }
 }
 
@@ -131,7 +136,7 @@ function arrangeGeneratableMeeting(context: ReturnType<typeof createService>) {
 }
 
 describe('CourseGenerationService', () => {
-  it('질문을 건너뛰면 생성 입력을 스냅샷으로 보존하고 코스 생성 상태로 전환한다', async () => {
+  it('질문을 건너뛰면 입력을 보존하고 같은 요청에서 코스 생성을 완료한다', async () => {
     const context = createService()
     const { meeting } = arrangeGeneratableMeeting(context)
 
@@ -140,14 +145,16 @@ describe('CourseGenerationService', () => {
         customization: { type: CourseGenerationCustomizationType.Skip },
       }),
     ).resolves.toEqual({
-      status: MeetingStatus.CourseGenerating,
+      status: MeetingStatus.CourseGenerated,
       confirmedCourseCandidateId: null,
     })
 
     expect(context.runRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         runVersion: 1,
-        status: CourseGenerationRunStatus.Pending,
+        status: CourseGenerationRunStatus.Processing,
+        attemptCount: 1,
+        startedAt: expect.any(Date),
         customizationType: CourseGenerationCustomizationType.Skip,
         inputSnapshot: expect.objectContaining({
           schemaVersion: 1,
@@ -168,6 +175,7 @@ describe('CourseGenerationService', () => {
     expect(context.answerRepository.save).not.toHaveBeenCalled()
     expect(meeting.status).toBe(MeetingStatus.CourseGenerating)
     expect(context.meetingRepository.save).toHaveBeenCalledWith(meeting)
+    expect(context.processor.processRun).toHaveBeenCalledWith('70')
   })
 
   it('Kakao 장소는 생성 스냅샷에 ID와 URL만 보존한다', async () => {
@@ -310,8 +318,13 @@ describe('CourseGenerationService', () => {
     const meeting = Object.assign(new Meeting(), {
       status: MeetingStatus.CourseGenerating,
     })
+    const run = Object.assign(new CourseGenerationRun(), {
+      status: CourseGenerationRunStatus.Processing,
+      startedAt: new Date(),
+    })
     context.participantRepository.findOne.mockResolvedValue(participant)
     context.courseRepository.lockMeeting.mockResolvedValue(meeting)
+    context.runRepository.findOne.mockResolvedValue(run)
 
     await expect(
       context.service.generateCourse('10', 'host-token', {
@@ -325,5 +338,103 @@ describe('CourseGenerationService', () => {
     expect(context.runRepository.save).not.toHaveBeenCalled()
     expect(context.questionnaireService.resolveAnswers).not.toHaveBeenCalled()
     expect(context.meetingRepository.save).not.toHaveBeenCalled()
+    expect(context.processor.processRun).not.toHaveBeenCalled()
+  })
+
+  it('중단된 동기 생성 run은 재요청에서 즉시 재개한다', async () => {
+    const context = createService()
+    const participant = Object.assign(new MeetingParticipant(), {
+      role: ParticipantRole.Host,
+    })
+    const meeting = Object.assign(new Meeting(), {
+      id: '10',
+      status: MeetingStatus.CourseGenerating,
+    })
+    const run = Object.assign(new CourseGenerationRun(), {
+      id: '70',
+      status: CourseGenerationRunStatus.Processing,
+      attemptCount: 2,
+      startedAt: new Date(Date.now() - 6 * 60 * 1000),
+    })
+    context.participantRepository.findOne.mockResolvedValue(participant)
+    context.courseRepository.lockMeeting.mockResolvedValue(meeting)
+    context.runRepository.findOne.mockResolvedValue(run)
+
+    await expect(
+      context.service.generateCourse('10', 'host-token', {
+        customization: { type: CourseGenerationCustomizationType.Skip },
+      }),
+    ).resolves.toEqual({
+      status: MeetingStatus.CourseGenerated,
+      confirmedCourseCandidateId: null,
+    })
+
+    expect(run.status).toBe(CourseGenerationRunStatus.Processing)
+    expect(run.attemptCount).toBe(3)
+    expect(context.runRepository.save).toHaveBeenCalledWith(run)
+    expect(context.processor.processRun).toHaveBeenCalledWith('70')
+  })
+
+  it('동기 코스 생성 실패 상태를 같은 응답으로 반환한다', async () => {
+    const context = createService()
+    arrangeGeneratableMeeting(context)
+    context.processor.processRun.mockResolvedValue(
+      MeetingStatus.CourseGenerationFailed,
+    )
+
+    await expect(
+      context.service.generateCourse('10', 'host-token', {
+        customization: { type: CourseGenerationCustomizationType.Skip },
+      }),
+    ).resolves.toEqual({
+      status: MeetingStatus.CourseGenerationFailed,
+      confirmedCourseCandidateId: null,
+    })
+  })
+
+  it('실패한 run을 PROCESSING으로 전환해 같은 요청에서 재시도한다', async () => {
+    const context = createService()
+    const participant = Object.assign(new MeetingParticipant(), {
+      id: '11',
+      role: ParticipantRole.Host,
+    })
+    const meeting = Object.assign(new Meeting(), {
+      id: '10',
+      status: MeetingStatus.CourseGenerationFailed,
+    })
+    const run = Object.assign(new CourseGenerationRun(), {
+      id: '70',
+      status: CourseGenerationRunStatus.Failed,
+      attemptCount: 2,
+      errorMessage: 'route failed',
+      outputSnapshot: null,
+      startedAt: new Date('2026-08-22T00:00:00Z'),
+      completedAt: new Date('2026-08-22T00:01:00Z'),
+    })
+    context.participantRepository.findOne.mockResolvedValue(participant)
+    context.courseRepository.lockMeeting.mockResolvedValue(meeting)
+    context.runRepository.findOne.mockResolvedValue(run)
+
+    await expect(
+      context.service.generateCourse('10', 'host-token', {
+        customization: { type: CourseGenerationCustomizationType.Skip },
+      }),
+    ).resolves.toEqual({
+      status: MeetingStatus.CourseGenerated,
+      confirmedCourseCandidateId: null,
+    })
+
+    expect(run).toEqual(
+      expect.objectContaining({
+        requestedBy: participant,
+        status: CourseGenerationRunStatus.Processing,
+        attemptCount: 3,
+        errorMessage: null,
+        completedAt: null,
+        startedAt: expect.any(Date),
+      }),
+    )
+    expect(context.runRepository.save).toHaveBeenCalledWith(run)
+    expect(context.processor.processRun).toHaveBeenCalledWith('70')
   })
 })

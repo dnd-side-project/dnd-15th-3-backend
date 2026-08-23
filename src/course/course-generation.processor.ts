@@ -31,6 +31,10 @@ type PreparedCandidate = {
   legs: CourseGenerationLeg[]
 }
 
+export type CourseGenerationResultStatus =
+  | MeetingStatus.CourseGenerated
+  | MeetingStatus.CourseGenerationFailed
+
 @Injectable()
 export class CourseGenerationProcessor {
   private readonly logger = new Logger(CourseGenerationProcessor.name)
@@ -43,14 +47,16 @@ export class CourseGenerationProcessor {
     private readonly placeLiveDataService: PlaceLiveDataService,
   ) {}
 
-  async processRun(runId: string): Promise<void> {
+  async processRun(runId: string): Promise<CourseGenerationResultStatus> {
     try {
       const run = await this.dataSource
         .getRepository(CourseGenerationRun)
         .findOne({
           where: { id: runId },
         })
-      if (!run || run.status !== CourseGenerationRunStatus.Processing) return
+      if (!run || run.status !== CourseGenerationRunStatus.Processing) {
+        throw new Error('Course generation run is not processing')
+      }
 
       const input = courseGenerationInputSchema.parse(run.inputSnapshot)
       const runtimeInput = await this.hydrateInput(input)
@@ -67,12 +73,14 @@ export class CourseGenerationProcessor {
         output,
         preparedCandidates,
       )
+      return MeetingStatus.CourseGenerated
     } catch (error) {
       this.logger.error(
         `코스 생성 작업에 실패했습니다. runId=${runId}`,
         error instanceof Error ? error.stack : String(error),
       )
       await this.failRun(runId, error)
+      return MeetingStatus.CourseGenerationFailed
     }
   }
 
