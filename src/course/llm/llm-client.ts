@@ -1,20 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { APIError, OpenAI } from 'openai'
 
-export type LlmProvider = 'nvidia' | 'openai' | 'cloudflare'
+export type LlmProvider = 'nvidia' | 'openai'
 
 export interface LlmClientOptions {
   provider: LlmProvider
   apiKey: string
   baseUrl: string
-  model: string
-  temperature: number
-  maxTokens?: number
-}
-
-export interface CloudflareLlmClientOptions {
-  accountId: string
-  apiToken: string
   model: string
   temperature: number
   maxTokens?: number
@@ -172,127 +164,6 @@ export class LlmClient implements LlmClientPort {
       user: 'Return a JSON object containing a single key "ok" with value true.',
       withJsonFormat: true,
     })
-  }
-}
-
-const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4'
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function getCloudflareResponse(payload: unknown): string | undefined {
-  if (!isRecord(payload) || payload.success !== true) return undefined
-  if (!isRecord(payload.result)) return undefined
-  return typeof payload.result.response === 'string'
-    ? payload.result.response
-    : undefined
-}
-
-function getCloudflareErrorMessage(payload: unknown): string {
-  if (!isRecord(payload) || !Array.isArray(payload.errors)) {
-    return 'Cloudflare API 응답이 올바르지 않습니다.'
-  }
-
-  const messages = payload.errors
-    .filter(isRecord)
-    .map((error) => (typeof error.message === 'string' ? error.message : ''))
-    .filter((message) => message.length > 0)
-
-  return messages.length > 0
-    ? messages.join('; ')
-    : 'Cloudflare API 호출에 실패했습니다.'
-}
-
-@Injectable()
-export class CloudflareLlmClient implements LlmClientPort {
-  private readonly fetcher: typeof fetch
-  readonly metadata: LlmClientMetadata
-
-  constructor(
-    readonly options: CloudflareLlmClientOptions,
-    fetcher: typeof fetch = globalThis.fetch,
-  ) {
-    this.fetcher = fetcher
-    this.metadata = {
-      provider: 'cloudflare',
-      model: options.model,
-      endpoint: this.getEndpoint(),
-      isConfigured: options.accountId.length > 0 && options.apiToken.length > 0,
-    }
-  }
-
-  async chat(system: string, user: string): Promise<LlmChatResult> {
-    if (!this.metadata.isConfigured) {
-      throw new LlmProviderError(
-        'Cloudflare LLM 설정이 비어 있습니다.',
-        'cloudflare_not_configured',
-      )
-    }
-
-    const response = await this.fetcher(this.getEndpoint(), {
-      headers: {
-        // biome-ignore lint/style/useNamingConvention: HTTP 헤더 이름과 동일하게 유지
-        Authorization: `Bearer ${this.options.apiToken}`,
-        'Content-Type': 'application/json',
-      },
-      method: 'POST',
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: this.options.temperature,
-        // biome-ignore lint/style/useNamingConvention: Cloudflare API field name.
-        max_tokens: this.options.maxTokens ?? DEFAULT_MAX_TOKENS,
-      }),
-    })
-
-    let payload: unknown
-    try {
-      payload = await response.json()
-    } catch {
-      throw new LlmProviderError(
-        'Cloudflare API 응답을 JSON으로 읽을 수 없습니다.',
-        'cloudflare_invalid_response',
-        response.status,
-      )
-    }
-
-    if (!response.ok || !isRecord(payload) || payload.success !== true) {
-      throw new LlmProviderError(
-        `Cloudflare LLM 호출 실패: ${getCloudflareErrorMessage(payload)}`,
-        'cloudflare_api_error',
-        response.status,
-      )
-    }
-
-    const content = getCloudflareResponse(payload)
-    if (!content) {
-      throw new LlmProviderError(
-        'Cloudflare API 응답에 생성된 텍스트가 없습니다.',
-        'cloudflare_invalid_response',
-        response.status,
-      )
-    }
-
-    return { content: stripCodeFence(content), model: this.options.model }
-  }
-
-  // Cloudflare validates the model through the run endpoint itself.
-  validateModel(): Promise<void> {
-    return Promise.resolve()
-  }
-
-  async probeJson(): Promise<void> {
-    await this.chat(
-      'You are a JSON generator.',
-      'Return a JSON object containing a single key "ok" with value true.',
-    )
-  }
-
-  private getEndpoint(): string {
-    return `${CLOUDFLARE_API_BASE_URL}/accounts/${encodeURIComponent(this.options.accountId)}/ai/run/${this.options.model}`
   }
 }
 

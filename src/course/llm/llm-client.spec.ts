@@ -1,10 +1,5 @@
 import { APIError, OpenAI } from 'openai'
-import {
-  CloudflareLlmClient,
-  LlmClient,
-  LlmProviderError,
-  stripCodeFence,
-} from './llm-client'
+import { LlmClient, LlmProviderError, stripCodeFence } from './llm-client'
 
 jest.mock('openai', () => {
   const createMock = jest.fn()
@@ -186,95 +181,6 @@ describe('LlmClient', () => {
           response_format: { type: 'json_object' },
         }),
       )
-    })
-  })
-})
-
-describe('CloudflareLlmClient', () => {
-  const baseOptions = {
-    accountId: 'account-id',
-    apiToken: 'cf-token',
-    model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-    temperature: 0.2,
-  }
-
-  it('sends the Cloudflare AI run request and parses the response', async () => {
-    const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>
-    mockFetch.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          result: { response: '```json\n{"ok":true}\n```' },
-        }),
-        { status: 200 },
-      ),
-    )
-    const client = new CloudflareLlmClient(baseOptions, mockFetch)
-
-    const result = await client.chat('system prompt', 'user prompt')
-
-    expect(result).toEqual({
-      content: '{"ok":true}',
-      model: baseOptions.model,
-    })
-    expect(mockFetch).toHaveBeenCalledTimes(1)
-    expect(mockFetch).toHaveBeenCalledWith(
-      `https://api.cloudflare.com/client/v4/accounts/${baseOptions.accountId}/ai/run/${baseOptions.model}`,
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          // biome-ignore lint/style/useNamingConvention: HTTP 헤더 이름과 동일하게 유지
-          Authorization: `Bearer ${baseOptions.apiToken}`,
-          'Content-Type': 'application/json',
-        },
-      }),
-    )
-
-    const request = mockFetch.mock.calls[0][1]
-    expect(JSON.parse(String(request?.body))).toEqual({
-      messages: [
-        { role: 'system', content: 'system prompt' },
-        { role: 'user', content: 'user prompt' },
-      ],
-      temperature: 0.2,
-      // biome-ignore lint/style/useNamingConvention: Cloudflare API field name.
-      max_tokens: 2048,
-    })
-  })
-
-  it('throws LlmProviderError for a Cloudflare API error', async () => {
-    const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>
-    mockFetch.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: false,
-          errors: [{ code: 1001, message: 'invalid token' }],
-        }),
-        { status: 401 },
-      ),
-    )
-    const client = new CloudflareLlmClient(baseOptions, mockFetch)
-
-    await expect(client.chat('system', 'user')).rejects.toMatchObject({
-      name: 'LlmProviderError',
-      code: 'cloudflare_api_error',
-      status: 401,
-      message: 'Cloudflare LLM 호출 실패: invalid token',
-    })
-  })
-
-  it('throws when a successful response does not contain generated text', async () => {
-    const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ success: true, result: {} }), {
-        status: 200,
-      }),
-    )
-    const client = new CloudflareLlmClient(baseOptions, mockFetch)
-
-    await expect(client.chat('system', 'user')).rejects.toMatchObject({
-      code: 'cloudflare_invalid_response',
-      status: 200,
     })
   })
 })
