@@ -13,6 +13,7 @@ import { CourseService } from './course.service'
 import { CourseGenerationProcessor } from './course-generation.processor'
 import { CourseGenerationService } from './course-generation.service'
 import { COURSE_CANDIDATE_GENERATOR } from './course-generation.tokens'
+import { CourseGenerationInputSnapshotBuilder } from './course-generation-input-snapshot.builder'
 import { CourseGenerationRouteService } from './course-generation-route.service'
 import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
@@ -58,6 +59,7 @@ import { ResilientCourseCandidateGenerator } from './provider/resilient-course-c
       useExisting: ResilientCourseCandidateGenerator,
     },
     CourseGenerationRouteService,
+    CourseGenerationInputSnapshotBuilder,
     CourseGenerationProcessor,
     CourseGenerationService,
     CourseService,

@@ -11,6 +11,7 @@ import {
   QuestionnaireOptionCode,
 } from 'src/questionnaire/questionnaire.constants'
 import { CourseGenerationService } from './course-generation.service'
+import { CourseGenerationInputSnapshotBuilder } from './course-generation-input-snapshot.builder'
 import { CourseCategoryStep } from './entities/course-category-step.entity'
 import { CourseGenerationQuestionnaireAnswer } from './entities/course-generation-questionnaire-answer.entity'
 import { CourseGenerationRun } from './entities/course-generation-run.entity'
@@ -65,11 +66,15 @@ function createService() {
   const processor = {
     processRun: jest.fn().mockResolvedValue(MeetingStatus.CourseGenerated),
   }
-  const service = new CourseGenerationService(
-    dataSource as never,
+  const snapshotBuilder = new CourseGenerationInputSnapshotBuilder(
     courseRepository as never,
     voteRepository as never,
     questionnaireService as never,
+  )
+  const service = new CourseGenerationService(
+    dataSource as never,
+    courseRepository as never,
+    snapshotBuilder,
     processor as never,
   )
 
