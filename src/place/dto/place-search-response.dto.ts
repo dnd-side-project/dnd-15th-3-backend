@@ -14,7 +14,10 @@ export class PlaceSearchCategoryResponseDto {
 }
 
 export class PlaceSearchItemResponseDto {
-  @ApiProperty({ description: '장소 ID', example: '101' })
+  @ApiProperty({
+    description: '내부 장소 ID. 추천 장소 추가 요청의 placeId로 사용합니다.',
+    example: '101',
+  })
   id!: string
 
   @ApiProperty({ description: '장소명', example: '성수 카페 모모' })

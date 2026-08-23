@@ -123,15 +123,12 @@ export class PlaceService {
 
   async getPlaceDetail(
     placeId: string,
-    meetingId: string,
     accessToken: string,
   ): Promise<PlaceSearchResultDto> {
     assertAccessToken(accessToken)
     const participant = await this.participantRepository.findOne({
-      where: {
-        meeting: { id: meetingId },
-        accessToken: accessToken.trim(),
-      },
+      where: { accessToken: accessToken.trim() },
+      relations: { meeting: true },
     })
     if (!participant) {
       throw new CommonException(CommonErrorCode.authenticationFailed)
@@ -146,7 +143,7 @@ export class PlaceService {
     }
 
     const meetingLocation = await this.meetingLocationRepository.findOne({
-      where: { meeting: { id: meetingId } },
+      where: { meeting: { id: participant.meeting.id } },
     })
     if (!meetingLocation) {
       throw new PlaceException(PlaceErrorCode.meetingLocationNotFound)
