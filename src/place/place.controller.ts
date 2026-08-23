@@ -97,7 +97,8 @@ export class PlaceController {
   })
   @ApiQuery({
     name: 'q',
-    description: '현재 Kakao 반경 검색 결과 안에서 적용할 장소명·주소 검색어',
+    description:
+      'Kakao 키워드 검색에 전달할 장소명·주소 검색어. 기준 위치 반경과 선택 카테고리를 함께 적용합니다.',
     required: false,
   })
   @ApiQuery({

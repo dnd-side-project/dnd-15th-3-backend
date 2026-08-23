@@ -57,7 +57,9 @@ export class PlaceLiveDataService {
   async searchKakao(
     center: PlaceSearchCenter,
     categories: Category[],
+    query?: string,
   ): Promise<LivePlaceSearchResult> {
+    const lookupQuery = query?.trim() || undefined
     const supported = categories.filter((category) =>
       this.kakaoPlacesProvider.supportsCategory(category.slug as CategorySlug),
     )
@@ -77,6 +79,7 @@ export class PlaceLiveDataService {
           ...center,
           radiusMeters: PLACE_SYNC_RADIUS_METERS,
           categorySlug: category.slug as CategorySlug,
+          ...(lookupQuery ? { query: lookupQuery } : {}),
         }),
       })),
     )
@@ -85,6 +88,7 @@ export class PlaceLiveDataService {
       results.flatMap(({ category, result }) =>
         result.places.map((place) => ({ category, place })),
       ),
+      lookupQuery,
     )
     const placesById = new Map<string, ResolvedPlace>()
 
@@ -127,7 +131,10 @@ export class PlaceLiveDataService {
     center: PlaceSearchCenter,
   ): Promise<Map<string, ResolvedPlace>> {
     const resolved = new Map<string, ResolvedPlace>()
-    const kakaoByCategory = new Map<CategorySlug, Place[]>()
+    const kakaoByCategoryAndQuery = new Map<
+      CategorySlug,
+      Map<string, Place[]>
+    >()
 
     for (const place of places) {
       if (place.source !== PlaceSource.Kakao) {
@@ -135,36 +142,54 @@ export class PlaceLiveDataService {
         continue
       }
       const categorySlug = place.category.slug as CategorySlug
-      const categoryPlaces = kakaoByCategory.get(categorySlug) ?? []
-      categoryPlaces.push(place)
-      kakaoByCategory.set(categorySlug, categoryPlaces)
+      const byQuery = kakaoByCategoryAndQuery.get(categorySlug) ?? new Map()
+      const lookupQuery = place.lookupQuery?.trim() ?? ''
+      const queryPlaces = byQuery.get(lookupQuery) ?? []
+      queryPlaces.push(place)
+      byQuery.set(lookupQuery, queryPlaces)
+      kakaoByCategoryAndQuery.set(categorySlug, byQuery)
     }
 
     await Promise.all(
-      [...kakaoByCategory].map(async ([categorySlug, references]) => {
-        if (!this.kakaoPlacesProvider.supportsCategory(categorySlug)) {
-          throw new PlaceException(PlaceErrorCode.providerPlaceUnavailable)
-        }
+      [...kakaoByCategoryAndQuery].flatMap(([categorySlug, byQuery]) =>
+        [...byQuery].map(async ([lookupQuery, references]) => {
+          if (!this.kakaoPlacesProvider.supportsCategory(categorySlug)) {
+            throw new PlaceException(PlaceErrorCode.providerPlaceUnavailable)
+          }
+          const result = await this.kakaoPlacesProvider.searchNearby({
+            ...center,
+            radiusMeters: PLACE_SYNC_RADIUS_METERS,
+            categorySlug,
+            ...(lookupQuery ? { query: lookupQuery } : {}),
+          })
+          this.addResolvedPlaces(resolved, references, result.places, center)
+        }),
+      ),
+    )
+
+    const fallbackByCategory = new Map<CategorySlug, Place[]>()
+    for (const place of places) {
+      if (
+        place.source !== PlaceSource.Kakao ||
+        resolved.has(place.id) ||
+        !place.lookupQuery?.trim()
+      ) {
+        continue
+      }
+      const categorySlug = place.category.slug as CategorySlug
+      const categoryPlaces = fallbackByCategory.get(categorySlug) ?? []
+      categoryPlaces.push(place)
+      fallbackByCategory.set(categorySlug, categoryPlaces)
+    }
+
+    await Promise.all(
+      [...fallbackByCategory].map(async ([categorySlug, references]) => {
         const result = await this.kakaoPlacesProvider.searchNearby({
           ...center,
           radiusMeters: PLACE_SYNC_RADIUS_METERS,
           categorySlug,
         })
-        const liveByProviderId = new Map(
-          result.places.map((place) => [place.providerPlaceId, place]),
-        )
-        for (const reference of references) {
-          const providerPlaceId = reference.providerPlaceId
-          const livePlace = providerPlaceId
-            ? liveByProviderId.get(providerPlaceId)
-            : undefined
-          if (livePlace) {
-            resolved.set(
-              reference.id,
-              this.toResolved(reference, livePlace, center),
-            )
-          }
-        }
+        this.addResolvedPlaces(resolved, references, result.places, center)
       }),
     )
 
@@ -176,6 +201,7 @@ export class PlaceLiveDataService {
 
   private async persistReferences(
     candidates: Array<{ category: Category; place: PlaceProviderPlace }>,
+    lookupQuery?: string,
   ): Promise<Map<string, Place>> {
     const unique = new Map<
       string,
@@ -189,24 +215,28 @@ export class PlaceLiveDataService {
     if (unique.size === 0) return new Map()
 
     const referencesToPersist = [...unique.values()].map(
-      ({ category, place }) => ({
-        category,
-        // Kakao 정책상 장소 ID와 place_url만 보관한다. 아래 값은 스키마의
-        // NOT NULL 제약을 만족하기 위한 비표시용 reference 값이다.
-        name: place.providerPlaceId,
-        address: KAKAO_REFERENCE_ADDRESS,
-        latitude: 0,
-        longitude: 0,
-        location: KAKAO_REFERENCE_LOCATION,
-        source: PlaceSource.Kakao,
-        providerPlaceId: place.providerPlaceId,
-        placeUrl: place.placeUrl,
-        phone: null,
-        roadAddress: null,
-        providerCategoryCode: null,
-        lastSyncedAt: null,
-        previewUrl: null,
-      }),
+      ({ category, place }) => {
+        const reference = {
+          category,
+          // Kakao 정책상 장소 ID와 place_url만 보관한다. 아래 값은 스키마의
+          // NOT NULL 제약을 만족하기 위한 비표시용 reference 값이다.
+          // lookupQuery는 Kakao 응답이 아니라 사용자가 입력한 검색어다.
+          name: place.providerPlaceId,
+          address: KAKAO_REFERENCE_ADDRESS,
+          latitude: 0,
+          longitude: 0,
+          location: KAKAO_REFERENCE_LOCATION,
+          source: PlaceSource.Kakao,
+          providerPlaceId: place.providerPlaceId,
+          placeUrl: place.placeUrl,
+          phone: null,
+          roadAddress: null,
+          providerCategoryCode: null,
+          lastSyncedAt: null,
+          previewUrl: null,
+        }
+        return lookupQuery ? { ...reference, lookupQuery } : reference
+      },
     )
     await this.placeRepository.upsert(referencesToPersist, {
       conflictPaths: ['source', 'providerPlaceId'],
@@ -225,6 +255,29 @@ export class PlaceLiveDataService {
         .filter((reference) => reference.providerPlaceId !== null)
         .map((reference) => [reference.providerPlaceId as string, reference]),
     )
+  }
+
+  private addResolvedPlaces(
+    resolved: Map<string, ResolvedPlace>,
+    references: Place[],
+    livePlaces: PlaceProviderPlace[],
+    center: PlaceSearchCenter,
+  ): void {
+    const liveByProviderId = new Map(
+      livePlaces.map((place) => [place.providerPlaceId, place]),
+    )
+    for (const reference of references) {
+      const providerPlaceId = reference.providerPlaceId
+      const livePlace = providerPlaceId
+        ? liveByProviderId.get(providerPlaceId)
+        : undefined
+      if (livePlace) {
+        resolved.set(
+          reference.id,
+          this.toResolved(reference, livePlace, center),
+        )
+      }
+    }
   }
 
   private toResolved(

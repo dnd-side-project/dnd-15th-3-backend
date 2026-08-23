@@ -6,6 +6,7 @@ export type PlaceProviderSearchRequest = {
   longitude: number
   radiusMeters: number
   categorySlug: CategorySlug
+  query?: string
 }
 
 export type PlaceProviderPlace = {
