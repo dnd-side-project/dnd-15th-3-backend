@@ -3,13 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
 import type { Category } from 'src/category/entities/category.entity'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
-import { CommonException } from 'src/common/exception/common.exception'
-import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { ErrorCode } from 'src/common/exception/error-code.type'
 import { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
 import type { KakaoWalkingCourseResponse } from 'src/kakao/schema/walking-course-response.schema'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
-import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import {
   COURSE_CANDIDATES_VISIBLE_STATUSES,
   COURSE_COMMENT_CREATABLE_STATUSES,
@@ -218,22 +215,13 @@ export class CourseService {
     courseCandidateId: string,
     accessToken: string,
   ): Promise<MeetingStatusResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
+    await this.assertHostParticipant(
+      meetingId,
+      accessToken,
+      MeetingErrorCode.courseConfirmHostOnly,
+    )
 
     return await this.dataSource.transaction(async (manager) => {
-      const participantRepository = manager.getRepository(MeetingParticipant)
-      const participant = await participantRepository.findOne({
-        where: {
-          meeting: { id: meetingId },
-          accessToken: normalizedAccessToken,
-        },
-      })
-      if (!participant) {
-        throw new CommonException(CommonErrorCode.authenticationFailed)
-      }
-      participant.assertHost(MeetingErrorCode.courseConfirmHostOnly)
-
       const meeting = await this.courseRepository.lockMeeting(
         manager,
         meetingId,
@@ -442,16 +430,14 @@ export class CourseService {
     accessToken: string,
     request: AddCoursePlaceRequestDto,
   ): Promise<CourseDetailResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
+    await this.assertHostParticipant(
+      meetingId,
+      accessToken,
+      MeetingErrorCode.courseEditHostOnly,
+    )
 
     const { candidate, steps } = await this.dataSource.transaction(
       async (manager) => {
-        await this.assertHostParticipant(
-          manager,
-          meetingId,
-          normalizedAccessToken,
-        )
         const meeting = await this.lockMeetingOrThrow(
           manager,
           meetingId,
@@ -495,16 +481,14 @@ export class CourseService {
     accessToken: string,
     request: UpdateCoursePlacesRequestDto,
   ): Promise<CourseDetailResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
+    await this.assertHostParticipant(
+      meetingId,
+      accessToken,
+      MeetingErrorCode.courseEditHostOnly,
+    )
 
     const { candidate, steps } = await this.dataSource.transaction(
       async (manager) => {
-        await this.assertHostParticipant(
-          manager,
-          meetingId,
-          normalizedAccessToken,
-        )
         const meeting = await this.lockMeetingOrThrow(
           manager,
           meetingId,
@@ -537,19 +521,16 @@ export class CourseService {
   }
 
   private async assertHostParticipant(
-    manager: EntityManager,
     meetingId: string,
     accessToken: string,
-  ): Promise<void> {
-    const participant = await manager
-      .getRepository(MeetingParticipant)
-      .findOne({
-        where: { meeting: { id: meetingId }, accessToken },
-      })
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
-    participant.assertHost(MeetingErrorCode.courseEditHostOnly)
+    errorCode: ErrorCode,
+  ): Promise<MeetingParticipant> {
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    participant.assertHost(errorCode)
+    return participant
   }
 
   private async lockMeetingOrThrow(

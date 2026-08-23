@@ -115,7 +115,6 @@ function createService() {
 }
 
 function createConfirmTransactionMocks() {
-  const participantRepository = { findOne: jest.fn() }
   const meetingRepository = {
     save: jest.fn().mockImplementation((value) => value),
   }
@@ -125,7 +124,6 @@ function createConfirmTransactionMocks() {
   }
   const placeRepository = { find: jest.fn() }
   const repositories = new Map<unknown, unknown>([
-    [MeetingParticipant, participantRepository],
     [Meeting, meetingRepository],
     [CourseCandidate, candidateRepository],
     [CourseCandidatePlace, placeRepository],
@@ -136,7 +134,6 @@ function createConfirmTransactionMocks() {
 
   return {
     manager,
-    participantRepository,
     meetingRepository,
     candidateRepository,
     placeRepository,
@@ -144,7 +141,6 @@ function createConfirmTransactionMocks() {
 }
 
 function createAddPlaceTransactionMocks() {
-  const participantRepository = { findOne: jest.fn() }
   const meetingRepository = {
     save: jest.fn().mockImplementation((value) => value),
   }
@@ -161,7 +157,6 @@ function createAddPlaceTransactionMocks() {
     create: jest.fn().mockImplementation((value) => value),
   }
   const repositories = new Map<unknown, unknown>([
-    [MeetingParticipant, participantRepository],
     [Meeting, meetingRepository],
     [CourseCandidate, candidateRepository],
     [MeetingPlaceRecommendation, recommendationRepository],
@@ -174,7 +169,6 @@ function createAddPlaceTransactionMocks() {
 
   return {
     manager,
-    participantRepository,
     meetingRepository,
     candidateRepository,
     recommendationRepository,
@@ -184,7 +178,6 @@ function createAddPlaceTransactionMocks() {
 }
 
 function createUpdatePlacesTransactionMocks() {
-  const participantRepository = { findOne: jest.fn() }
   const meetingRepository = {
     save: jest.fn().mockImplementation((value) => value),
   }
@@ -199,7 +192,6 @@ function createUpdatePlacesTransactionMocks() {
     create: jest.fn().mockImplementation((value) => value),
   }
   const repositories = new Map<unknown, unknown>([
-    [MeetingParticipant, participantRepository],
     [Meeting, meetingRepository],
     [CourseCandidate, candidateRepository],
     [MeetingPlaceRecommendation, recommendationRepository],
@@ -212,7 +204,6 @@ function createUpdatePlacesTransactionMocks() {
 
   return {
     manager,
-    participantRepository,
     meetingRepository,
     candidateRepository,
     recommendationRepository,
@@ -1006,38 +997,25 @@ describe('CourseService', () => {
   })
 
   describe('confirmCourse', () => {
-    it('accessToken이 빈 문자열이면 트랜잭션 없이 401을 던진다', async () => {
-      const { service, dataSource } = createService()
+    it('참여자를 찾지 못하면 401을 던지고 트랜잭션을 시작하지 않는다', async () => {
+      const { service, meetingAccessService, dataSource } = createService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new CommonException(CommonErrorCode.authenticationFailed),
+      )
 
-      const promise = service.confirmCourse('1', '2', '')
+      const promise = service.confirmCourse('1', '2', 'token')
 
       await expect(promise).rejects.toBeInstanceOf(CommonException)
       expect(dataSource.transaction).not.toHaveBeenCalled()
     })
 
-    it('참여자를 찾지 못하면 401을 던지고 아무것도 변경하지 않는다', async () => {
-      const { service, dataSource } = createService()
-      const { manager, participantRepository, candidateRepository } =
-        createConfirmTransactionMocks()
-      dataSource.transaction.mockImplementation((callback: never) =>
-        (callback as (manager: unknown) => unknown)(manager),
-      )
-      participantRepository.findOne.mockResolvedValue(null)
-
-      const promise = service.confirmCourse('1', '2', 'token')
-
-      await expect(promise).rejects.toBeInstanceOf(CommonException)
-      expect(candidateRepository.save).not.toHaveBeenCalled()
-    })
-
     it('참여자가 방장이 아니면 403을 던지고 아무것도 변경하지 않는다', async () => {
-      const { service, dataSource } = createService()
-      const { manager, participantRepository, candidateRepository } =
-        createConfirmTransactionMocks()
+      const { service, meetingAccessService, dataSource } = createService()
+      const { manager, candidateRepository } = createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Member }),
       )
 
@@ -1049,13 +1027,13 @@ describe('CourseService', () => {
     })
 
     it('모임을 찾지 못하면 404를 던지고 후보를 조회하지 않는다', async () => {
-      const { service, dataSource, courseRepository } = createService()
-      const { manager, participantRepository, candidateRepository } =
-        createConfirmTransactionMocks()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
+      const { manager, candidateRepository } = createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(null)
@@ -1076,13 +1054,13 @@ describe('CourseService', () => {
     ])(
       '모임이 %s 상태이면 409를 던지고 후보를 조회하지 않는다',
       async (status) => {
-        const { service, dataSource, courseRepository } = createService()
-        const { manager, participantRepository, candidateRepository } =
-          createConfirmTransactionMocks()
+        const { service, meetingAccessService, dataSource, courseRepository } =
+          createService()
+        const { manager, candidateRepository } = createConfirmTransactionMocks()
         dataSource.transaction.mockImplementation((callback: never) =>
           (callback as (manager: unknown) => unknown)(manager),
         )
-        participantRepository.findOne.mockResolvedValue(
+        meetingAccessService.findParticipant.mockResolvedValue(
           createParticipant({ role: ParticipantRole.Host }),
         )
         courseRepository.lockMeeting.mockResolvedValue(
@@ -1097,13 +1075,13 @@ describe('CourseService', () => {
     )
 
     it('코스 후보가 해당 모임 소속이 아니면 404를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
-      const { manager, participantRepository, candidateRepository } =
-        createConfirmTransactionMocks()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
+      const { manager, candidateRepository } = createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1143,6 +1121,7 @@ describe('CourseService', () => {
     it('검증을 통과하면 코스 후보를 확정하고 모임 상태를 전환하며 outbox 이벤트를 기록한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         courseRepository,
         voteRepository,
@@ -1150,7 +1129,6 @@ describe('CourseService', () => {
       } = createService()
       const {
         manager,
-        participantRepository,
         meetingRepository,
         candidateRepository,
         placeRepository,
@@ -1158,7 +1136,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
@@ -1222,9 +1200,10 @@ describe('CourseService', () => {
         status: MeetingStatus.CourseConfirmed,
         confirmedCourseCandidateId: '2',
       })
-      expect(participantRepository.findOne).toHaveBeenCalledWith({
-        where: { meeting: { id: '1' }, accessToken: 'token' },
-      })
+      expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
+        '1',
+        'token',
+      )
       expect(courseRepository.lockMeeting).toHaveBeenCalledWith(manager, '1')
       expect(candidateRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
@@ -1305,21 +1284,18 @@ describe('CourseService', () => {
     it('outbox payload 검증에 실패하면 코스 확정 자체를 실패시키고 이벤트를 저장하지 않는다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         courseRepository,
         voteRepository,
         outboxEventRepository,
       } = createService()
-      const {
-        manager,
-        participantRepository,
-        candidateRepository,
-        placeRepository,
-      } = createConfirmTransactionMocks()
+      const { manager, candidateRepository, placeRepository } =
+        createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
@@ -1349,21 +1325,18 @@ describe('CourseService', () => {
     it('투표가 하나도 없는 장소는 좋아요/싫어요 개수를 0으로 채워서 기록한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         courseRepository,
         voteRepository,
         outboxEventRepository,
       } = createService()
-      const {
-        manager,
-        participantRepository,
-        candidateRepository,
-        placeRepository,
-      } = createConfirmTransactionMocks()
+      const { manager, candidateRepository, placeRepository } =
+        createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
@@ -1409,21 +1382,18 @@ describe('CourseService', () => {
     it('코스 후보에 장소가 하나도 없으면 코스 확정을 실패시키고 이벤트를 저장하지 않는다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         courseRepository,
         voteRepository,
         outboxEventRepository,
       } = createService()
-      const {
-        manager,
-        participantRepository,
-        candidateRepository,
-        placeRepository,
-      } = createConfirmTransactionMocks()
+      const { manager, candidateRepository, placeRepository } =
+        createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
@@ -1448,10 +1418,13 @@ describe('CourseService', () => {
   })
 
   describe('addCoursePlace', () => {
-    it('accessToken이 빈 문자열이면 트랜잭션 없이 401을 던진다', async () => {
-      const { service, dataSource } = createService()
+    it('참여자를 찾지 못하면 401을 던지고 트랜잭션을 시작하지 않는다', async () => {
+      const { service, meetingAccessService, dataSource } = createService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new CommonException(CommonErrorCode.authenticationFailed),
+      )
 
-      const promise = service.addCoursePlace('1', '2', '', {
+      const promise = service.addCoursePlace('1', '2', 'token', {
         recommendationId: '20',
       })
 
@@ -1459,31 +1432,13 @@ describe('CourseService', () => {
       expect(dataSource.transaction).not.toHaveBeenCalled()
     })
 
-    it('참여자를 찾지 못하면 401을 던지고 아무것도 변경하지 않는다', async () => {
-      const { service, dataSource } = createService()
-      const { manager, participantRepository, placeRepository } =
-        createAddPlaceTransactionMocks()
-      dataSource.transaction.mockImplementation((callback: never) =>
-        (callback as (manager: unknown) => unknown)(manager),
-      )
-      participantRepository.findOne.mockResolvedValue(null)
-
-      const promise = service.addCoursePlace('1', '2', 'token', {
-        recommendationId: '20',
-      })
-
-      await expect(promise).rejects.toBeInstanceOf(CommonException)
-      expect(placeRepository.save).not.toHaveBeenCalled()
-    })
-
     it('참여자가 방장이 아니면 403을 던지고 아무것도 변경하지 않는다', async () => {
-      const { service, dataSource } = createService()
-      const { manager, participantRepository, placeRepository } =
-        createAddPlaceTransactionMocks()
+      const { service, meetingAccessService, dataSource } = createService()
+      const { manager, placeRepository } = createAddPlaceTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Member }),
       )
 
@@ -1497,13 +1452,13 @@ describe('CourseService', () => {
     })
 
     it('모임을 찾지 못하면 404를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
-      const { manager, participantRepository } =
-        createAddPlaceTransactionMocks()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
+      const { manager } = createAddPlaceTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(null)
@@ -1524,13 +1479,14 @@ describe('CourseService', () => {
     ])(
       '모임이 %s 상태이면 409를 던지고 코스 후보를 조회하지 않는다',
       async (status) => {
-        const { service, dataSource, courseRepository } = createService()
-        const { manager, participantRepository, candidateRepository } =
+        const { service, meetingAccessService, dataSource, courseRepository } =
+          createService()
+        const { manager, candidateRepository } =
           createAddPlaceTransactionMocks()
         dataSource.transaction.mockImplementation((callback: never) =>
           (callback as (manager: unknown) => unknown)(manager),
         )
-        participantRepository.findOne.mockResolvedValue(
+        meetingAccessService.findParticipant.mockResolvedValue(
           createParticipant({ role: ParticipantRole.Host }),
         )
         courseRepository.lockMeeting.mockResolvedValue(
@@ -1547,17 +1503,14 @@ describe('CourseService', () => {
     )
 
     it('코스 후보가 해당 모임 소속이 아니면 404를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
-      const {
-        manager,
-        participantRepository,
-        candidateRepository,
-        recommendationRepository,
-      } = createAddPlaceTransactionMocks()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
+      const { manager, candidateRepository, recommendationRepository } =
+        createAddPlaceTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1575,10 +1528,10 @@ describe('CourseService', () => {
     })
 
     it('장소 추천을 찾지 못하면 404를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -1586,7 +1539,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1607,10 +1560,10 @@ describe('CourseService', () => {
     })
 
     it('코스 경로가 하나도 없으면 데이터 정합성 오류로 500을 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -1618,7 +1571,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1643,10 +1596,10 @@ describe('CourseService', () => {
     })
 
     it('이미 코스에 포함된 장소면 409를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -1654,7 +1607,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1686,10 +1639,10 @@ describe('CourseService', () => {
     })
 
     it('코스에 이미 최대 개수만큼 장소가 있으면 409를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -1697,7 +1650,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1733,13 +1686,13 @@ describe('CourseService', () => {
     it('카카오 API 호출이 실패하면 클라이언트에는 일반화된 500을 반환한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -1747,7 +1700,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1799,13 +1752,13 @@ describe('CourseService', () => {
     it('카카오 응답 status가 OK가 아니면 클라이언트에는 일반화된 500을 반환한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -1813,7 +1766,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -1858,13 +1811,13 @@ describe('CourseService', () => {
     it('검증을 통과하면 마지막 장소의 이동 시간·거리를 갱신하고 새 장소를 코스 맨 뒤에 추가하며 카테고리 스텝과 코스 버전을 갱신한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         meetingRepository,
         candidateRepository,
         recommendationRepository,
@@ -1874,7 +1827,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
@@ -1911,9 +1864,10 @@ describe('CourseService', () => {
         recommendationId: '20',
       })
 
-      expect(participantRepository.findOne).toHaveBeenCalledWith({
-        where: { meeting: { id: '1' }, accessToken: 'token' },
-      })
+      expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
+        '1',
+        'token',
+      )
       expect(courseRepository.lockMeeting).toHaveBeenCalledWith(manager, '1')
       expect(candidateRepository.findOne).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
@@ -1992,13 +1946,13 @@ describe('CourseService', () => {
     it('기존 카테고리 스텝이 없으면 1번부터 시작한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -2007,7 +1961,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -2047,10 +2001,13 @@ describe('CourseService', () => {
   })
 
   describe('updateCoursePlaces', () => {
-    it('accessToken이 빈 문자열이면 트랜잭션 없이 401을 던진다', async () => {
-      const { service, dataSource } = createService()
+    it('참여자를 찾지 못하면 401을 던지고 트랜잭션을 시작하지 않는다', async () => {
+      const { service, meetingAccessService, dataSource } = createService()
+      meetingAccessService.findParticipant.mockRejectedValue(
+        new CommonException(CommonErrorCode.authenticationFailed),
+      )
 
-      const promise = service.updateCoursePlaces('1', '2', '', {
+      const promise = service.updateCoursePlaces('1', '2', 'token', {
         recommendationIds: ['10', '20'],
       })
 
@@ -2058,31 +2015,13 @@ describe('CourseService', () => {
       expect(dataSource.transaction).not.toHaveBeenCalled()
     })
 
-    it('참여자를 찾지 못하면 401을 던지고 아무것도 변경하지 않는다', async () => {
-      const { service, dataSource } = createService()
-      const { manager, participantRepository, placeRepository } =
-        createUpdatePlacesTransactionMocks()
-      dataSource.transaction.mockImplementation((callback: never) =>
-        (callback as (manager: unknown) => unknown)(manager),
-      )
-      participantRepository.findOne.mockResolvedValue(null)
-
-      const promise = service.updateCoursePlaces('1', '2', 'token', {
-        recommendationIds: ['10', '20'],
-      })
-
-      await expect(promise).rejects.toBeInstanceOf(CommonException)
-      expect(placeRepository.save).not.toHaveBeenCalled()
-    })
-
     it('참여자가 방장이 아니면 403을 던지고 아무것도 변경하지 않는다', async () => {
-      const { service, dataSource } = createService()
-      const { manager, participantRepository, placeRepository } =
-        createUpdatePlacesTransactionMocks()
+      const { service, meetingAccessService, dataSource } = createService()
+      const { manager, placeRepository } = createUpdatePlacesTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Member }),
       )
 
@@ -2096,13 +2035,13 @@ describe('CourseService', () => {
     })
 
     it('모임을 찾지 못하면 404를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
-      const { manager, participantRepository } =
-        createUpdatePlacesTransactionMocks()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
+      const { manager } = createUpdatePlacesTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(null)
@@ -2123,13 +2062,14 @@ describe('CourseService', () => {
     ])(
       '모임이 %s 상태이면 409를 던지고 코스 후보를 조회하지 않는다',
       async (status) => {
-        const { service, dataSource, courseRepository } = createService()
-        const { manager, participantRepository, candidateRepository } =
+        const { service, meetingAccessService, dataSource, courseRepository } =
+          createService()
+        const { manager, candidateRepository } =
           createUpdatePlacesTransactionMocks()
         dataSource.transaction.mockImplementation((callback: never) =>
           (callback as (manager: unknown) => unknown)(manager),
         )
-        participantRepository.findOne.mockResolvedValue(
+        meetingAccessService.findParticipant.mockResolvedValue(
           createParticipant({ role: ParticipantRole.Host }),
         )
         courseRepository.lockMeeting.mockResolvedValue(
@@ -2146,17 +2086,14 @@ describe('CourseService', () => {
     )
 
     it('코스 후보가 해당 모임 소속이 아니면 404를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
-      const {
-        manager,
-        participantRepository,
-        candidateRepository,
-        recommendationRepository,
-      } = createUpdatePlacesTransactionMocks()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
+      const { manager, candidateRepository, recommendationRepository } =
+        createUpdatePlacesTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -2174,10 +2111,10 @@ describe('CourseService', () => {
     })
 
     it('요청한 장소 추천 중 존재하지 않는 것이 있으면 404를 던진다', async () => {
-      const { service, dataSource, courseRepository } = createService()
+      const { service, meetingAccessService, dataSource, courseRepository } =
+        createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -2185,7 +2122,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -2211,13 +2148,13 @@ describe('CourseService', () => {
     it('카카오 API 호출이 실패하면 클라이언트에는 일반화된 500을 반환한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -2225,7 +2162,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -2263,13 +2200,13 @@ describe('CourseService', () => {
     it('카카오 응답 status가 OK가 아니면 클라이언트에는 일반화된 500을 반환한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         candidateRepository,
         recommendationRepository,
         placeRepository,
@@ -2277,7 +2214,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       courseRepository.lockMeeting.mockResolvedValue(
@@ -2310,13 +2247,13 @@ describe('CourseService', () => {
     it('검증을 통과하면 기존 장소·카테고리 스텝을 전부 삭제하고 요청 순서대로 다시 채우며 코스 버전을 한 번만 올린다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         meetingRepository,
         candidateRepository,
         recommendationRepository,
@@ -2326,7 +2263,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
@@ -2444,13 +2381,13 @@ describe('CourseService', () => {
     it('수정한 장소가 1개면 카카오 API를 호출하지 않고 이동 시간·거리 없이 저장한다', async () => {
       const {
         service,
+        meetingAccessService,
         dataSource,
         kakaoWalkingCourseService,
         courseRepository,
       } = createService()
       const {
         manager,
-        participantRepository,
         meetingRepository,
         candidateRepository,
         recommendationRepository,
@@ -2460,7 +2397,7 @@ describe('CourseService', () => {
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
       )
-      participantRepository.findOne.mockResolvedValue(
+      meetingAccessService.findParticipant.mockResolvedValue(
         createParticipant({ role: ParticipantRole.Host }),
       )
       const meeting = createMeetingWithStatus(MeetingStatus.CourseGenerated)
