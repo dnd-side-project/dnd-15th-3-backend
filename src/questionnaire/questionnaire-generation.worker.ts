@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import { DataSource } from 'typeorm'
 import { QuestionnaireGenerationProcessor } from './questionnaire-generation.processor'
 
@@ -18,6 +19,7 @@ export class QuestionnaireGenerationWorker {
   constructor(
     private readonly dataSource: DataSource,
     private readonly processor: QuestionnaireGenerationProcessor,
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   async runOnce(): Promise<boolean> {
@@ -52,14 +54,26 @@ export class QuestionnaireGenerationWorker {
       return false
     }
 
-    await this.processor.processQuestionnaire(
-      questionnaire.id,
-      questionnaire.generationAttemptCount,
-    )
+    const processQuestionnaire = () =>
+      this.processor.processQuestionnaire(
+        questionnaire.id,
+        questionnaire.generationAttemptCount,
+      )
+
+    if (this.metrics) {
+      await this.metrics.observeWorkerJob(
+        'questionnaire_generation',
+        'process_questionnaire',
+        processQuestionnaire,
+      )
+    } else {
+      await processQuestionnaire()
+    }
     return true
   }
 
   async run(): Promise<void> {
+    this.metrics?.setWorkerRunning('questionnaire_generation', true)
     this.logger.log('Questionnaire generation worker started')
     while (this.isRunning) {
       try {
@@ -77,6 +91,7 @@ export class QuestionnaireGenerationWorker {
 
   stop(): void {
     this.isRunning = false
+    this.metrics?.setWorkerRunning('questionnaire_generation', false)
   }
 
   private delay(milliseconds: number): Promise<void> {

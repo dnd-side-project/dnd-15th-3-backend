@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import { DataSource } from 'typeorm'
 import { normalizeQueryRows } from './normalize-query-rows'
 import { PLACE_SYNC_STALE_AFTER_MS } from './place-sync.constants'
@@ -18,6 +19,7 @@ export class PlaceSyncWorker {
   constructor(
     private readonly dataSource: DataSource,
     private readonly placeSyncService: PlaceSyncService,
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   async runOnce(): Promise<boolean> {
@@ -60,11 +62,18 @@ export class PlaceSyncWorker {
     const jobId = rows[0]?.id
     if (!jobId) return false
 
-    await this.placeSyncService.processJob(jobId)
+    if (this.metrics) {
+      await this.metrics.observeWorkerJob('place_sync', 'process_job', () =>
+        this.placeSyncService.processJob(jobId),
+      )
+    } else {
+      await this.placeSyncService.processJob(jobId)
+    }
     return true
   }
 
   async run(): Promise<void> {
+    this.metrics?.setWorkerRunning('place_sync', true)
     this.logger.log('Place sync worker started')
     while (this.isRunning) {
       try {
@@ -82,6 +91,7 @@ export class PlaceSyncWorker {
 
   stop(): void {
     this.isRunning = false
+    this.metrics?.setWorkerRunning('place_sync', false)
   }
 
   private delay(milliseconds: number): Promise<void> {

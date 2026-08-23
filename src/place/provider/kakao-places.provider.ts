@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import type { Env } from 'src/config/env'
 import { PlaceSource } from '../enums/place-source.enum'
 import { PlaceException } from '../exception/place.exception'
@@ -38,13 +39,26 @@ type KakaoSearchResult = {
 export class KakaoPlacesProvider implements PlaceProvider {
   readonly source = PlaceSource.Kakao
 
-  constructor(private readonly config: ConfigService<Env, true>) {}
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
   supportsCategory(categorySlug: CategorySlug): boolean {
     return KAKAO_PLACE_SEARCH_SPECS_BY_CATEGORY[categorySlug].length > 0
   }
 
-  async searchNearby(
+  searchNearby(
+    request: PlaceProviderSearchRequest,
+  ): Promise<PlaceProviderSearchResult> {
+    if (!this.metrics) return this.requestNearby(request)
+
+    return this.metrics.observeExternal('kakao_places', 'nearby_search', () =>
+      this.requestNearby(request),
+    )
+  }
+
+  private async requestNearby(
     request: PlaceProviderSearchRequest,
   ): Promise<PlaceProviderSearchResult> {
     const specs = KAKAO_PLACE_SEARCH_SPECS_BY_CATEGORY[request.categorySlug]

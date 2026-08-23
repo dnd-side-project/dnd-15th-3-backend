@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import { MediaService } from './media.service'
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000
@@ -9,13 +10,24 @@ export class MediaCleanupWorker {
   private isRunning = true
   private releaseDelay?: () => void
 
-  constructor(private readonly mediaService: MediaService) {}
+  constructor(
+    private readonly mediaService: MediaService,
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
   runOnce(): Promise<number> {
-    return this.mediaService.reconcileOrphanedMedia()
+    const cleanup = () => this.mediaService.reconcileOrphanedMedia()
+    if (!this.metrics) return cleanup()
+
+    return this.metrics.observeWorkerJob(
+      'media_cleanup',
+      'reconcile_orphaned_media',
+      cleanup,
+    )
   }
 
   async run(): Promise<void> {
+    this.metrics?.setWorkerRunning('media_cleanup', true)
     this.logger.log('Media cleanup worker started')
     while (this.isRunning) {
       try {
@@ -36,6 +48,7 @@ export class MediaCleanupWorker {
 
   stop(): void {
     this.isRunning = false
+    this.metrics?.setWorkerRunning('media_cleanup', false)
     this.releaseDelay?.()
   }
 
