@@ -64,6 +64,17 @@ export class Place extends BaseEntity {
   })
   providerCategoryCode: string | null
 
+  @Column({
+    type: 'varchar',
+    name: 'lookup_query',
+    length: 100,
+    nullable: true,
+    comment:
+      'User-entered query used to repeat a live provider lookup; never provider response data',
+  })
+  // 사용자가 입력한 검색어다. Kakao 응답 데이터는 이 컬럼에 저장하지 않는다.
+  lookupQuery: string | null
+
   @Column({ type: 'timestamp', name: 'last_synced_at', nullable: true })
   lastSyncedAt: Date | null
 

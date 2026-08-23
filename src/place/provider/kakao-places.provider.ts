@@ -99,10 +99,15 @@ export class KakaoPlacesProvider implements PlaceProvider {
     apiKey: string,
     page: number,
   ): Promise<KakaoPlaceSearchResponse> {
+    const userQuery = request.query?.trim()
+    const keywordQuery =
+      spec.type === 'keyword'
+        ? userQuery
+          ? this.combineQueries(userQuery, spec.query)
+          : spec.query
+        : userQuery
     const url = new URL(
-      spec.type === 'category'
-        ? KAKAO_CATEGORY_SEARCH_URL
-        : KAKAO_KEYWORD_SEARCH_URL,
+      keywordQuery ? KAKAO_KEYWORD_SEARCH_URL : KAKAO_CATEGORY_SEARCH_URL,
     )
     const searchParams = new URLSearchParams({
       x: String(request.longitude),
@@ -112,10 +117,11 @@ export class KakaoPlacesProvider implements PlaceProvider {
       page: String(page),
       size: String(KAKAO_PAGE_SIZE),
     })
+    if (keywordQuery) {
+      searchParams.set('query', keywordQuery)
+    }
     if (spec.type === 'category') {
       searchParams.set('category_group_code', spec.categoryGroupCode)
-    } else {
-      searchParams.set('query', spec.query)
     }
     url.search = searchParams.toString()
 
@@ -148,6 +154,11 @@ export class KakaoPlacesProvider implements PlaceProvider {
       throw new PlaceException(PlaceErrorCode.invalidProviderResponse)
     }
     return parsedResponse.data
+  }
+
+  private combineQueries(userQuery: string, categoryQuery: string): string {
+    if (userQuery.includes(categoryQuery)) return userQuery
+    return `${userQuery} ${categoryQuery}`
   }
 
   private toProviderPlace(document: KakaoPlaceDocument): PlaceProviderPlace {

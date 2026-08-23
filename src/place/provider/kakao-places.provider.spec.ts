@@ -98,6 +98,62 @@ describe('KakaoPlacesProvider', () => {
     expect(options?.headers).toEqual({ Authorization: 'KakaoAK kakao-key' })
   })
 
+  it('사용자 검색어가 있으면 반경과 카테고리를 유지한 키워드 검색을 호출한다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(createResponse([createDocument()]))
+
+    await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Cafe,
+      query: '숨은 카페',
+    })
+
+    const [input] = fetchMock.mock.calls[0]
+    const url = new URL(String(input))
+    expect(url.origin + url.pathname).toBe(
+      'https://dapi.kakao.com/v2/local/search/keyword.json',
+    )
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      x: '127',
+      y: '37.5',
+      radius: '2000',
+      sort: 'distance',
+      page: '1',
+      size: '15',
+      query: '숨은 카페',
+      category_group_code: 'CE7',
+    })
+  })
+
+  it('Kakao 그룹이 없는 서비스 카테고리는 사용자 검색어와 카테고리 키워드를 조합한다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => Promise.resolve(createResponse([])))
+
+    await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Activity,
+      query: '플레이존',
+    })
+
+    expect(
+      fetchMock.mock.calls.map(([input]) =>
+        new URL(String(input)).searchParams.get('query'),
+      ),
+    ).toEqual([
+      '플레이존 방탈출',
+      '플레이존 볼링장',
+      '플레이존 클라이밍',
+      '플레이존 보드게임카페',
+      '플레이존 놀이공원',
+    ])
+  })
+
   it('키워드별 모든 페이지를 순차 조회하고 장소 ID로 중복 제거한다', async () => {
     const shared = createDocument({
       id: 'shared',

@@ -156,6 +156,62 @@ describe('PlaceService', () => {
       expect(placeLiveDataService.searchKakao).toHaveBeenCalledWith(
         { latitude: 37.5, longitude: 127 },
         [{ id: '1', name: '카페', slug: 'cafe' }],
+        undefined,
+      )
+    })
+
+    it('검색어를 Kakao live 검색에 전달하고 Provider 결과를 그대로 페이지 처리한다', async () => {
+      const {
+        service,
+        participantRepository,
+        categoryRepository,
+        placeLiveDataService,
+      } = createService()
+      participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
+      categoryRepository.findOne.mockResolvedValue({
+        id: '1',
+        name: '카페',
+        slug: 'cafe',
+      })
+      placeLiveDataService.searchKakao.mockResolvedValue({
+        places: [
+          {
+            id: '10',
+            name: '카카오가 찾은 장소',
+            address: '서울 성동구',
+            roadAddress: null,
+            category: { id: '1', name: '카페', slug: 'cafe' },
+            latitude: 37.5,
+            longitude: 127,
+            distanceMeters: 100,
+            previewUrl: null,
+            source: PlaceSource.Kakao,
+            providerPlaceId: '12345',
+            phone: null,
+            placeUrl: null,
+          },
+        ],
+        isComplete: true,
+        unsupportedCategorySlugs: [],
+      })
+
+      await expect(
+        service.searchPlaces({
+          meetingId: '123',
+          accessToken: 'token',
+          categorySlug: 'cafe' as never,
+          q: '숨은카페',
+          page: 1,
+          size: 20,
+        }),
+      ).resolves.toMatchObject({
+        total: 1,
+        items: [{ id: '10', name: '카카오가 찾은 장소' }],
+      })
+      expect(placeLiveDataService.searchKakao).toHaveBeenCalledWith(
+        { latitude: 37.5, longitude: 127 },
+        [{ id: '1', name: '카페', slug: 'cafe' }],
+        '숨은카페',
       )
     })
 

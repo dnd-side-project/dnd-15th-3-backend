@@ -38,6 +38,7 @@ function createService() {
     phone: null,
     roadAddress: null,
     providerCategoryCode: null,
+    lookupQuery: null as string | null,
     lastSyncedAt: null,
     previewUrl: null,
   }
@@ -110,6 +111,25 @@ describe('PlaceLiveDataService', () => {
     })
   })
 
+  it('사용자 검색어를 Kakao 검색과 이후 live lookup을 위한 reference에 전달한다', async () => {
+    const { service, placeRepository, kakaoProvider } = createService()
+
+    await service.searchKakao(center, [category as never], '  숨은 카페  ')
+
+    expect(kakaoProvider.searchNearby).toHaveBeenCalledWith({
+      ...center,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Cafe,
+      query: '숨은 카페',
+    })
+    expect(placeRepository.upsert.mock.calls[0][0]).toEqual([
+      expect.objectContaining({
+        providerPlaceId: livePlace.providerPlaceId,
+        lookupQuery: '숨은 카페',
+      }),
+    ])
+  })
+
   it('저장된 Kakao reference는 카테고리 반경 검색으로 다시 해석한다', async () => {
     const { service, reference, kakaoProvider } = createService()
 
@@ -125,6 +145,46 @@ describe('PlaceLiveDataService', () => {
       address: livePlace.address,
       latitude: livePlace.latitude,
       longitude: livePlace.longitude,
+    })
+  })
+
+  it('검색어로 찾은 Kakao reference는 같은 검색어로 다시 해석한다', async () => {
+    const { service, reference, kakaoProvider } = createService()
+    reference.lookupQuery = '숨은 카페'
+
+    const result = await service.resolvePlaces([reference as never], center)
+
+    expect(kakaoProvider.searchNearby).toHaveBeenCalledTimes(1)
+    expect(kakaoProvider.searchNearby).toHaveBeenCalledWith({
+      ...center,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Cafe,
+      query: '숨은 카페',
+    })
+    expect(result.get('10')).toMatchObject({ name: livePlace.name })
+  })
+
+  it('저장된 검색어로 장소를 못 찾으면 기존 카테고리 검색으로 보완한다', async () => {
+    const { service, reference, kakaoProvider } = createService()
+    reference.lookupQuery = '이전 상호명'
+    kakaoProvider.searchNearby
+      .mockResolvedValueOnce({ places: [], isComplete: true })
+      .mockResolvedValueOnce({ places: [livePlace], isComplete: true })
+
+    await expect(
+      service.resolvePlaces([reference as never], center),
+    ).resolves.toHaveProperty('size', 1)
+
+    expect(kakaoProvider.searchNearby).toHaveBeenNthCalledWith(1, {
+      ...center,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Cafe,
+      query: '이전 상호명',
+    })
+    expect(kakaoProvider.searchNearby).toHaveBeenNthCalledWith(2, {
+      ...center,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Cafe,
     })
   })
 

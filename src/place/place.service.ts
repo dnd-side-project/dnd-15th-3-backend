@@ -77,19 +77,10 @@ export class PlaceService {
         longitude: meetingLocation.longitude,
       },
       categories,
+      request.q,
     )
-    const normalizedQuery = request.q?.toLocaleLowerCase('ko')
-    const filtered = normalizedQuery
-      ? result.places.filter((place) =>
-          [place.name, place.address, place.roadAddress]
-            .filter((value): value is string => Boolean(value))
-            .some((value) =>
-              value.toLocaleLowerCase('ko').includes(normalizedQuery),
-            ),
-        )
-      : result.places
     const offset = (request.page - 1) * request.size
-    const pageItems = filtered.slice(offset, offset + request.size)
+    const pageItems = result.places.slice(offset, offset + request.size)
     const previewImages = await this.kakaoImageSearchService.findPreviewImages(
       pageItems.map((place) => ({
         id: place.id,
@@ -125,8 +116,8 @@ export class PlaceService {
       }),
       page: request.page,
       size: request.size,
-      total: filtered.length,
-      hasNext: request.page * request.size < filtered.length,
+      total: result.places.length,
+      hasNext: request.page * request.size < result.places.length,
       collectionStatus: result.isComplete ? 'READY' : 'PARTIAL',
       lastSyncedAt: null,
       source: PlaceSource.Kakao,
