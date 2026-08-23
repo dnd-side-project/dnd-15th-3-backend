@@ -75,11 +75,11 @@ export class CourseGenerationService {
             throw new MeetingException(MeetingErrorCode.notFound)
           }
 
-          if (meeting.status === MeetingStatus.CourseGenerating) {
+          if (meeting.isCourseGenerating()) {
             return this.resumeGenerationRun(manager, meeting, participant)
           }
 
-          if (meeting.status === MeetingStatus.CourseGenerationFailed) {
+          if (meeting.isCourseGenerationFailed()) {
             return {
               runId: await this.retryFailedRun(manager, meeting, participant),
             }
@@ -160,11 +160,11 @@ export class CourseGenerationService {
       where: { meeting: { id: meeting.id } },
       order: { runVersion: 'DESC' },
     })
-    if (!latestRun || latestRun.status !== CourseGenerationRunStatus.Failed) {
+    if (!latestRun || !latestRun.isFailed()) {
       throw new CourseException(CourseErrorCode.generationRunMissing)
     }
 
-    this.prepareRunForProcessing(latestRun, participant)
+    latestRun.prepareForProcessing(participant)
     await repository.save(latestRun)
 
     meeting.startCourseGeneration()
@@ -182,40 +182,20 @@ export class CourseGenerationService {
       where: { meeting: { id: meeting.id } },
       order: { runVersion: 'DESC' },
     })
-    if (
-      !latestRun ||
-      ![
-        CourseGenerationRunStatus.Pending,
-        CourseGenerationRunStatus.Processing,
-      ].includes(latestRun.status)
-    ) {
+    if (!latestRun || !latestRun.isResumable()) {
       throw new CourseException(CourseErrorCode.generationRunMissing)
     }
 
     const staleBefore = Date.now() - COURSE_GENERATION_STALE_AFTER_MS
-    const isPending = latestRun.status === CourseGenerationRunStatus.Pending
     const isStale =
       !latestRun.startedAt || latestRun.startedAt.getTime() < staleBefore
-    if (!isPending && !isStale) {
+    if (!latestRun.isPending() && !isStale) {
       return { runId: null, status: MeetingStatus.CourseGenerating }
     }
 
-    this.prepareRunForProcessing(latestRun, participant)
+    latestRun.prepareForProcessing(participant)
     await repository.save(latestRun)
     return { runId: latestRun.id }
-  }
-
-  private prepareRunForProcessing(
-    run: CourseGenerationRun,
-    participant: MeetingParticipant,
-  ): void {
-    run.status = CourseGenerationRunStatus.Processing
-    run.requestedBy = participant
-    run.attemptCount += 1
-    run.errorMessage = null
-    run.outputSnapshot = null
-    run.startedAt = new Date()
-    run.completedAt = null
   }
 
   private hashSnapshot(snapshot: CourseGenerationInputSnapshot): string {

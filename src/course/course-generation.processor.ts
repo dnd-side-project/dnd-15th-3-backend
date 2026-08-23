@@ -188,7 +188,7 @@ export class CourseGenerationProcessor {
         .where('meeting.id = :meetingId', { meetingId })
         .setLock('pessimistic_write')
         .getOne()
-      if (!meeting || meeting.status !== MeetingStatus.CourseGenerating) {
+      if (!meeting || !meeting.isCourseGenerating()) {
         throw new Error('Meeting is not in course generating state')
       }
 
@@ -258,7 +258,7 @@ export class CourseGenerationProcessor {
       run.outputSnapshot = null
       run.errorMessage = message
       run.completedAt = new Date()
-      if (run.meeting.status === MeetingStatus.CourseGenerating) {
+      if (run.meeting.isCourseGenerating()) {
         run.meeting.failCourseGeneration()
         await manager.getRepository(Meeting).save(run.meeting)
       }

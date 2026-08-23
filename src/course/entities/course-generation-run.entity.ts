@@ -92,4 +92,29 @@ export class CourseGenerationRun extends BaseEntity {
     (answer) => answer.generationRun,
   )
   questionnaireAnswers: CourseGenerationQuestionnaireAnswer[]
+
+  isFailed(): boolean {
+    return this.status === CourseGenerationRunStatus.Failed
+  }
+
+  isPending(): boolean {
+    return this.status === CourseGenerationRunStatus.Pending
+  }
+
+  isResumable(): boolean {
+    return (
+      this.status === CourseGenerationRunStatus.Pending ||
+      this.status === CourseGenerationRunStatus.Processing
+    )
+  }
+
+  prepareForProcessing(participant: MeetingParticipant): void {
+    this.status = CourseGenerationRunStatus.Processing
+    this.requestedBy = participant
+    this.attemptCount += 1
+    this.errorMessage = null
+    this.outputSnapshot = null
+    this.startedAt = new Date()
+    this.completedAt = null
+  }
 }

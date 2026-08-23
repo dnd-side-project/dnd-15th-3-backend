@@ -56,6 +56,14 @@ export class Meeting extends BaseEntity {
     return this.status === MeetingStatus.CourseConfirmed
   }
 
+  isCourseGenerating(): boolean {
+    return this.status === MeetingStatus.CourseGenerating
+  }
+
+  isCourseGenerationFailed(): boolean {
+    return this.status === MeetingStatus.CourseGenerationFailed
+  }
+
   confirm(): void {
     this.assertStatus(
       COURSE_CONFIRMABLE_STATUSES,
