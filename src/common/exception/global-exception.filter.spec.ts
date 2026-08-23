@@ -16,8 +16,16 @@ function createHost() {
     status: jest.fn().mockReturnThis(),
     json: jest.fn(),
   }
+  const request = {
+    method: 'GET',
+    baseUrl: '',
+    route: { path: '/test' },
+  }
   const host = {
-    switchToHttp: () => ({ getResponse: () => response }),
+    switchToHttp: () => ({
+      getRequest: () => request,
+      getResponse: () => response,
+    }),
   } as unknown as ArgumentsHost
 
   return { host, response }

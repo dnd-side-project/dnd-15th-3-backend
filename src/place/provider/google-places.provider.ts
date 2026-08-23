@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import type { Env } from 'src/config/env'
 import { z } from 'zod'
 import { PlaceSource } from '../enums/place-source.enum'
@@ -40,13 +41,26 @@ const googleNearbySearchResponseSchema = z.object({
 export class GooglePlacesProvider implements PlaceProvider {
   readonly source = PlaceSource.Google
 
-  constructor(private readonly config: ConfigService<Env, true>) {}
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
   supportsCategory(categorySlug: CategorySlug): boolean {
     return GOOGLE_PLACE_TYPES_BY_CATEGORY[categorySlug].length > 0
   }
 
-  async searchNearby(
+  searchNearby(
+    request: PlaceProviderSearchRequest,
+  ): Promise<PlaceProviderSearchResult> {
+    if (!this.metrics) return this.requestNearby(request)
+
+    return this.metrics.observeExternal('google_places', 'nearby_search', () =>
+      this.requestNearby(request),
+    )
+  }
+
+  private async requestNearby(
     request: PlaceProviderSearchRequest,
   ): Promise<PlaceProviderSearchResult> {
     const apiKey = this.config

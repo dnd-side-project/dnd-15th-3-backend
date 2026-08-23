@@ -27,6 +27,9 @@ spec:
         - name: worker
           image: ghcr.io/dnd-side-project/dnd-15th-3-backend:bootstrap
           imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 9464
           command:
             - node
             - dist/place/place-sync-worker.js
@@ -35,6 +38,33 @@ spec:
                 name: momo-api-env
             - secretRef:
                 name: momo-media-storage
+          env:
+            - name: SERVICE_NAME
+              value: momo-place-sync-worker
+            - name: LOG_FORMAT
+              value: json
+            - name: LOG_LEVEL
+              value: log
+            - name: METRICS_ENABLED
+              value: "true"
+            - name: METRICS_PORT
+              value: "9464"
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: metrics
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /health/live
+              port: metrics
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: metrics
+            periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

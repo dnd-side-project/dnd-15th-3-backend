@@ -8,6 +8,7 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { CatalogModule } from './catalog/catalog.module'
 import { GlobalExceptionFilter } from './common/exception/global-exception.filter'
+import { ObservabilityModule } from './common/observability/observability.module'
 import { type Env, validateEnv } from './config/env'
 import { CourseModule } from './course/course.module'
 import {
@@ -61,6 +62,7 @@ const infrastructureModules = [
       isGlobal: true,
       validate: validateEnv,
     }),
+    ObservabilityModule,
     ...infrastructureModules,
     CatalogModule,
     CourseModule,

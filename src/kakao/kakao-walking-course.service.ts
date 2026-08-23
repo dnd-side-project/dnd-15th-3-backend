@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
+import { MetricsService } from 'src/common/observability/metrics.service'
 import type { Env } from 'src/config/env'
 import {
   type KakaoWalkingCourseRequest,
@@ -17,9 +18,22 @@ const KAKAO_REQUEST_TIMEOUT_MS = 5_000
 
 @Injectable()
 export class KakaoWalkingCourseService {
-  constructor(private readonly config: ConfigService<Env, true>) {}
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
-  async getWalkingCourse(
+  getWalkingCourse(
+    request: KakaoWalkingCourseRequest,
+  ): Promise<KakaoWalkingCourseResponse> {
+    if (!this.metrics) return this.requestWalkingCourse(request)
+
+    return this.metrics.observeExternal('kakao', 'walking_course', () =>
+      this.requestWalkingCourse(request),
+    )
+  }
+
+  private async requestWalkingCourse(
     request: KakaoWalkingCourseRequest,
   ): Promise<KakaoWalkingCourseResponse> {
     const parsedRequest = kakaoWalkingCourseRequestSchema.parse(request)

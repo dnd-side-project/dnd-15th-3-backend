@@ -7,5 +7,7 @@ resources:
   - place-sync-worker.yaml
   - statistics-worker.yaml
   - service.yaml
+  - service-monitor.yaml
+  - pod-monitor.yaml
   - ingress.yaml
   - db-readonly-access.yaml
