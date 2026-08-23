@@ -145,7 +145,6 @@ export class PlaceRepository {
         longitude: Number(row.longitude),
         distanceMeters: Number(row.distanceMeters),
         previewUrl: row.previewUrl,
-        previewImage: null,
         source: row.source,
         providerPlaceId: row.providerPlaceId,
         roadAddress: row.roadAddress,

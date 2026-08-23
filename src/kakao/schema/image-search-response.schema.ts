@@ -2,14 +2,8 @@
 import { z } from 'zod'
 
 export const kakaoImageSearchDocumentSchema = z.object({
-  collection: z.string(),
   thumbnail_url: z.string(),
   image_url: z.string(),
-  width: z.number().int().nonnegative(),
-  height: z.number().int().nonnegative(),
-  display_sitename: z.string(),
-  doc_url: z.string(),
-  datetime: z.string(),
 })
 
 export const kakaoImageSearchResponseSchema = z.object({

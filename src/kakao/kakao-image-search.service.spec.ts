@@ -69,18 +69,10 @@ describe('KakaoImageSearchService', () => {
       {
         url: 'https://images.example.com/first.jpg',
         thumbnailUrl: 'https://search.example.com/first-thumbnail.jpg',
-        sourceName: '장소 블로그',
-        sourceUrl: 'https://blog.example.com/place',
-        width: 1280,
-        height: 960,
       },
       {
         url: 'https://search.example.com/second-thumbnail.jpg',
         thumbnailUrl: 'https://search.example.com/second-thumbnail.jpg',
-        sourceName: null,
-        sourceUrl: 'http://cafe.example.com/place',
-        width: 800,
-        height: 600,
       },
     ])
 
@@ -111,31 +103,21 @@ describe('KakaoImageSearchService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('목록 장소를 조회해 ID별 첫 번째 이미지 Map으로 반환한다', async () => {
+  it('목록 장소를 조회해 ID별 대표 이미지 URL Map으로 반환한다', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockImplementation(() => Promise.resolve(createResponse()))
     const service = createService()
 
     await expect(
-      service.findPreviewImages([
+      service.findPreviewUrls([
         { id: '1', ...target },
         { id: '2', ...target, name: '다른 카페' },
       ]),
     ).resolves.toEqual(
       new Map([
-        [
-          '1',
-          expect.objectContaining({
-            thumbnailUrl: 'https://search.example.com/first-thumbnail.jpg',
-          }),
-        ],
-        [
-          '2',
-          expect.objectContaining({
-            thumbnailUrl: 'https://search.example.com/first-thumbnail.jpg',
-          }),
-        ],
+        ['1', 'https://search.example.com/first-thumbnail.jpg'],
+        ['2', 'https://search.example.com/first-thumbnail.jpg'],
       ]),
     )
   })

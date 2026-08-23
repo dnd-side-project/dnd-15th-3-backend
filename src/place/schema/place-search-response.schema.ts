@@ -8,15 +8,6 @@ const placeSearchCategorySchema = z.object({
   slug: z.string(),
 })
 
-export const placeImageResponseSchema = z.object({
-  url: z.string().url(),
-  thumbnailUrl: z.string().url(),
-  sourceName: z.string().nullable(),
-  sourceUrl: z.string().url().nullable(),
-  width: z.number().int().nonnegative().nullable(),
-  height: z.number().int().nonnegative().nullable(),
-})
-
 const collectionStatusSchema = z.enum([
   'PENDING',
   'RUNNING',
@@ -34,7 +25,6 @@ export const placeSearchItemSchema = z.object({
   longitude: z.number(),
   distanceMeters: z.number().nonnegative(),
   previewUrl: z.string().nullable(),
-  previewImage: placeImageResponseSchema.nullable(),
   source: z.enum(PlaceSource),
   providerPlaceId: z.string().nullable(),
   roadAddress: z.string().nullable(),
