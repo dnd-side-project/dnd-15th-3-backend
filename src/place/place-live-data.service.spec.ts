@@ -128,18 +128,33 @@ describe('PlaceLiveDataService', () => {
     })
   })
 
-  it('Kakao가 지원하지 않는 카테고리는 빈 결과와 unsupported 목록으로 반환한다', async () => {
+  it('기타 카테고리도 Kakao 실시간 검색 대상으로 처리한다', async () => {
+    const { service, kakaoProvider } = createService()
+    const otherCategory = { ...category, slug: CategorySlug.Other }
+
+    await expect(
+      service.searchKakao(center, [otherCategory as never]),
+    ).resolves.toMatchObject({
+      isComplete: true,
+      unsupportedCategorySlugs: [],
+    })
+    expect(kakaoProvider.searchNearby).toHaveBeenCalledWith({
+      ...center,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Other,
+    })
+  })
+
+  it('Provider가 지원하지 않는 카테고리는 빈 결과와 unsupported 목록으로 반환한다', async () => {
     const { service, kakaoProvider } = createService()
     kakaoProvider.supportsCategory.mockReturnValue(false)
 
     await expect(
-      service.searchKakao(center, [
-        { ...category, slug: CategorySlug.Other } as never,
-      ]),
+      service.searchKakao(center, [category as never]),
     ).resolves.toEqual({
       places: [],
       isComplete: true,
-      unsupportedCategorySlugs: [CategorySlug.Other],
+      unsupportedCategorySlugs: [CategorySlug.Cafe],
     })
     expect(kakaoProvider.searchNearby).not.toHaveBeenCalled()
   })

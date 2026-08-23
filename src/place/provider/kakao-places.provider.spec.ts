@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import type { Env } from 'src/config/env'
 import { PlaceErrorCode } from '../exception/place-error-code'
+import { KAKAO_OTHER_CATEGORY_GROUP_CODES } from './kakao-place-category-mapping'
 import { KakaoPlacesProvider } from './kakao-places.provider'
 
 function createProvider(apiKey = 'kakao-key') {
@@ -198,19 +199,26 @@ describe('KakaoPlacesProvider', () => {
     expect(fetchMock).toHaveBeenCalledTimes(45)
   })
 
-  it('기타 카테고리는 API 키와 무관하게 외부 API를 호출하지 않는다', async () => {
-    const fetchMock = jest.spyOn(globalThis, 'fetch')
+  it('기타 카테고리는 명시적인 카테고리를 제외한 Kakao 그룹을 모두 검색한다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => Promise.resolve(createResponse([])))
 
     await expect(
-      createProvider('').searchNearby({
+      createProvider().searchNearby({
         latitude: 37.5,
         longitude: 127,
         radiusMeters: 750,
         categorySlug: CategorySlug.Other,
       }),
     ).resolves.toEqual({ places: [], isComplete: true })
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(createProvider().supportsCategory(CategorySlug.Other)).toBe(false)
+
+    expect(
+      fetchMock.mock.calls.map(([input]) =>
+        new URL(String(input)).searchParams.get('category_group_code'),
+      ),
+    ).toEqual(KAKAO_OTHER_CATEGORY_GROUP_CODES)
+    expect(createProvider().supportsCategory(CategorySlug.Other)).toBe(true)
     expect(createProvider().supportsCategory(CategorySlug.Bar)).toBe(true)
   })
 
