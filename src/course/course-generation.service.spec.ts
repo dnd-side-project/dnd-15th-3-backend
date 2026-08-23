@@ -20,7 +20,7 @@ import { CourseGenerationCustomizationType } from './enums/course-generation-cus
 import { CourseGenerationRunStatus } from './enums/course-generation-run-status.enum'
 
 function createService() {
-  const participantRepository = { findOne: jest.fn() }
+  const meetingAccessService = { findParticipant: jest.fn() }
   const meetingRepository = {
     exists: jest.fn(),
     save: jest.fn().mockImplementation((value) => value),
@@ -40,7 +40,6 @@ function createService() {
     save: jest.fn().mockImplementation((value) => value),
   }
   const repositories = new Map<unknown, unknown>([
-    [MeetingParticipant, participantRepository],
     [Meeting, meetingRepository],
     [CourseCategoryStep, categoryStepRepository],
     [MeetingPlaceRecommendation, recommendationRepository],
@@ -74,6 +73,7 @@ function createService() {
   const service = new CourseGenerationService(
     dataSource as never,
     courseRepository as never,
+    meetingAccessService as never,
     snapshotBuilder,
     processor as never,
   )
@@ -81,7 +81,7 @@ function createService() {
   return {
     service,
     manager,
-    participantRepository,
+    meetingAccessService,
     meetingRepository,
     categoryStepRepository,
     recommendationRepository,
@@ -127,7 +127,7 @@ function arrangeGeneratableMeeting(context: ReturnType<typeof createService>) {
     },
   })
 
-  context.participantRepository.findOne.mockResolvedValue(participant)
+  context.meetingAccessService.findParticipant.mockResolvedValue(participant)
   context.courseRepository.lockMeeting.mockResolvedValue(meeting)
   context.categoryStepRepository.find.mockResolvedValue([step])
   context.recommendationRepository.find.mockResolvedValue([recommendation])
@@ -327,7 +327,7 @@ describe('CourseGenerationService', () => {
       status: CourseGenerationRunStatus.Processing,
       startedAt: new Date(),
     })
-    context.participantRepository.findOne.mockResolvedValue(participant)
+    context.meetingAccessService.findParticipant.mockResolvedValue(participant)
     context.courseRepository.lockMeeting.mockResolvedValue(meeting)
     context.runRepository.findOne.mockResolvedValue(run)
 
@@ -361,7 +361,7 @@ describe('CourseGenerationService', () => {
       attemptCount: 2,
       startedAt: new Date(Date.now() - 6 * 60 * 1000),
     })
-    context.participantRepository.findOne.mockResolvedValue(participant)
+    context.meetingAccessService.findParticipant.mockResolvedValue(participant)
     context.courseRepository.lockMeeting.mockResolvedValue(meeting)
     context.runRepository.findOne.mockResolvedValue(run)
 
@@ -416,7 +416,7 @@ describe('CourseGenerationService', () => {
       startedAt: new Date('2026-08-22T00:00:00Z'),
       completedAt: new Date('2026-08-22T00:01:00Z'),
     })
-    context.participantRepository.findOne.mockResolvedValue(participant)
+    context.meetingAccessService.findParticipant.mockResolvedValue(participant)
     context.courseRepository.lockMeeting.mockResolvedValue(meeting)
     context.runRepository.findOne.mockResolvedValue(run)
 

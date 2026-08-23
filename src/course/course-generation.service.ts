@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
-import { CommonException } from 'src/common/exception/common.exception'
-import { CommonErrorCode } from 'src/common/exception/common-error-code'
-import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
+import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { COURSE_GENERATABLE_STATUSES } from 'src/meeting/constants/meeting-status.constants'
 import { MeetingStatusResponseDto } from 'src/meeting/dto/meeting-status-response.dto'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
@@ -33,6 +31,7 @@ export class CourseGenerationService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly courseRepository: CourseRepository,
+    private readonly meetingAccessService: MeetingAccessService,
     private readonly snapshotBuilder: CourseGenerationInputSnapshotBuilder,
     private readonly processor: CourseGenerationProcessor,
   ) {}
@@ -42,31 +41,15 @@ export class CourseGenerationService {
     accessToken: string,
     request: GenerateCourseRequest,
   ): Promise<MeetingStatusResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    participant.assertHost(MeetingErrorCode.hostOnly)
 
     const preparation =
       await this.dataSource.transaction<CourseGenerationPreparation>(
         async (manager) => {
-          const participant = await manager
-            .getRepository(MeetingParticipant)
-            .findOne({
-              where: {
-                meeting: { id: meetingId },
-                accessToken: normalizedAccessToken,
-              },
-            })
-          if (!participant) {
-            const meetingExists = await manager
-              .getRepository(Meeting)
-              .exists({ where: { id: meetingId } })
-            if (!meetingExists) {
-              throw new MeetingException(MeetingErrorCode.notFound)
-            }
-            throw new CommonException(CommonErrorCode.authenticationFailed)
-          }
-          participant.assertHost(MeetingErrorCode.hostOnly)
-
           const meeting = await this.courseRepository.lockMeeting(
             manager,
             meetingId,
