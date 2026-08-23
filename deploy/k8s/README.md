@@ -54,6 +54,13 @@ depend on this database until its consumer has a tested full rebuild/backfill
 path. A dedicated backup can be added later as a recovery-time optimization;
 it must not become the only recovery path for derived data.
 
+`momo-statistics-worker` consumes Core `outbox_event` rows and writes both
+place-selection and questionnaire-answer facts to this database. The separate
+`momo-statistics-migration` PreSync hook applies only statistics migrations.
+Use `pnpm statistics:retry-dead-letter --event-id <id>` for a targeted
+manual retry, or `pnpm statistics:rebuild` to reconstruct facts and tags from
+the Core outbox.
+
 The separate StatefulSet isolates the database process, credentials, PVC, and
 deployment lifecycle. Pod anti-affinity with the maximum weight prefers a node
 that is not running Core `momo-postgres`, without allowing the derived database

@@ -71,7 +71,7 @@ export class PlaceController {
   @ApiOperation({
     summary: '주변 장소 검색',
     description:
-      '로컬 DB에 수집된 장소 중 모임 기준 위치 반경 2km 이내의 장소를 조회합니다. 외부 API를 호출하지 않습니다.',
+      'Kakao Local API에서 모임 기준 위치 반경 2km 이내의 장소를 실시간 조회합니다. Kakao 장소 ID와 URL만 저장합니다.',
   })
   @ApiQuery({
     name: 'meetingId',
@@ -88,6 +88,16 @@ export class PlaceController {
     name: 'categoryId',
     description: '카테고리 ID 필터',
     example: '1',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'categorySlug',
+    description: '카테고리 슬러그 필터. categoryId와 함께 사용할 수 없습니다.',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'q',
+    description: '현재 Kakao 반경 검색 결과 안에서 적용할 장소명·주소 검색어',
     required: false,
   })
   @ApiQuery({
@@ -139,6 +149,12 @@ export class PlaceController {
     schema: { type: 'string', example: '1', pattern: '^\\d+$' },
   })
   @ApiQuery({
+    name: 'meetingId',
+    description: '장소를 조회할 모임 ID',
+    example: '123',
+    required: true,
+  })
+  @ApiQuery({
     name: 'accessToken',
     description: '모임 참여자 전용 재접속 토큰',
     example: 'member-session-token',
@@ -156,8 +172,13 @@ export class PlaceController {
   @ApiErrorResponse(PlaceErrorCode.notFound, '장소를 찾을 수 없음')
   async getPlaceDetail(
     @Param('placeId', BigIntStringPipe) placeId: string,
+    @Query('meetingId', BigIntStringPipe) meetingId: string,
     @Query('accessToken') accessToken: string,
   ): Promise<PlaceSearchResultDto> {
-    return await this.placeService.getPlaceDetail(placeId, accessToken)
+    return await this.placeService.getPlaceDetail(
+      placeId,
+      meetingId,
+      accessToken,
+    )
   }
 }

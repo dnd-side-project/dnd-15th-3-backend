@@ -1,4 +1,10 @@
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
+import { CourseGenerationCustomizationType } from 'src/course/enums/course-generation-customization-type.enum'
+import { QuestionnaireSource } from 'src/questionnaire/enums/questionnaire-source.enum'
+import {
+  QuestionnaireDimensionCode,
+  QuestionnaireOptionCode,
+} from 'src/questionnaire/questionnaire.constants'
 import { CourseConfirmedPayloadSchema } from './course-confirmed-payload.schema'
 
 const validPayload = {
@@ -12,6 +18,45 @@ const validPayload = {
   places: [
     { placeId: '10', placeCategoryId: '1', likeCount: 3, dislikeCount: 1 },
   ],
+}
+
+const validV2Payload = {
+  ...validPayload,
+  payloadVersion: 2 as const,
+  courseGeneration: {
+    runId: '30',
+    inputHash: 'a'.repeat(64),
+    customizationType: CourseGenerationCustomizationType.Questionnaire,
+    questionnaire: {
+      questionnaireId: '40',
+      questionnaireVersion: 1,
+      schemaVersion: 1,
+      promptVersion: 1,
+      source: QuestionnaireSource.Llm,
+      provider: 'openai',
+      model: 'test-model',
+      answers: [
+        {
+          questionCode: QuestionnaireDimensionCode.primaryPurpose,
+          questionText: '목적은?',
+          optionCode: QuestionnaireOptionCode.conversation,
+          optionLabel: '대화',
+        },
+        {
+          questionCode: QuestionnaireDimensionCode.coursePace,
+          questionText: '속도는?',
+          optionCode: QuestionnaireOptionCode.relaxed,
+          optionLabel: '여유',
+        },
+        {
+          questionCode: QuestionnaireDimensionCode.atmosphere,
+          questionText: '분위기는?',
+          optionCode: QuestionnaireOptionCode.cozy,
+          optionLabel: '아늑함',
+        },
+      ],
+    },
+  },
 }
 
 function parse(payload: unknown) {
@@ -113,8 +158,33 @@ describe('CourseConfirmedPayloadSchema', () => {
   })
 
   describe('payloadVersion', () => {
-    it('1이 아닌 값은 거부한다', () => {
-      expect(parse({ ...validPayload, payloadVersion: 2 }).success).toBe(false)
+    it('v1과 v2 모두 통과한다', () => {
+      expect(parse(validPayload).success).toBe(true)
+      expect(parse(validV2Payload).success).toBe(true)
+    })
+
+    it('알 수 없는 버전은 거부한다', () => {
+      expect(parse({ ...validPayload, payloadVersion: 3 }).success).toBe(false)
+    })
+
+    it('질문 차원과 선택지 의미 코드가 다르면 거부한다', () => {
+      const invalidPayload = structuredClone(validV2Payload)
+      invalidPayload.courseGeneration.questionnaire.answers[0].optionCode =
+        QuestionnaireOptionCode.relaxed
+
+      expect(parse(invalidPayload).success).toBe(false)
+    })
+
+    it('SKIP 생성에 질문 응답이 포함되면 거부한다', () => {
+      expect(
+        parse({
+          ...validV2Payload,
+          courseGeneration: {
+            ...validV2Payload.courseGeneration,
+            customizationType: CourseGenerationCustomizationType.Skip,
+          },
+        }).success,
+      ).toBe(false)
     })
   })
 

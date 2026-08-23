@@ -15,6 +15,7 @@ export class CourseRepository {
       .getRepository(Meeting)
       .createQueryBuilder('meeting')
       .leftJoinAndSelect('meeting.meetingType', 'meetingType')
+      .leftJoinAndSelect('meeting.meetingLocation', 'meetingLocation')
       .where('meeting.id = :meetingId', { meetingId })
       .setLock('pessimistic_write')
       .getOne()

@@ -15,3 +15,4 @@ patches:
   - path: ingress.yaml
   - path: environment.yaml
   - path: worker-environment.yaml
+  - path: statistics-worker-environment.yaml

@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { PlaceSource } from '../enums/place-source.enum'
 
 export class PlaceSearchCategoryResponseDto {
   @ApiProperty({ description: '카테고리 ID', example: '1' })
@@ -45,6 +47,25 @@ export class PlaceSearchItemResponseDto {
     nullable: true,
   })
   previewUrl!: string | null
+
+  @ApiProperty({ enum: PlaceSource, example: PlaceSource.Kakao })
+  source!: PlaceSource
+
+  @ApiProperty({
+    description: '외부 장소 ID',
+    nullable: true,
+    example: '12345',
+  })
+  providerPlaceId!: string | null
+
+  @ApiProperty({ description: '도로명 주소', nullable: true })
+  roadAddress!: string | null
+
+  @ApiProperty({ description: '전화번호', nullable: true })
+  phone!: string | null
+
+  @ApiProperty({ description: 'Kakao 장소 상세 URL', nullable: true })
+  placeUrl!: string | null
 }
 
 export class PlaceSearchResponseDto {
@@ -81,4 +102,21 @@ export class PlaceSearchResponseDto {
     example: null,
   })
   lastSyncedAt!: Date | null
+
+  @ApiProperty({ enum: PlaceSource, example: PlaceSource.Kakao })
+  source!: PlaceSource.Kakao
+
+  @ApiProperty({
+    description: '매 요청 시 Kakao에서 조회하는지 여부',
+    example: true,
+  })
+  isLive!: true
+
+  @ApiProperty({
+    description: 'Kakao 검색을 지원하지 않는 카테고리',
+    enum: CategorySlug,
+    isArray: true,
+    example: [CategorySlug.Other],
+  })
+  unsupportedCategorySlugs!: CategorySlug[]
 }

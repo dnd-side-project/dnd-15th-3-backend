@@ -40,6 +40,22 @@ describe('OutboxEvent entity', () => {
     })
   })
 
+  it('타입 전용 string union 컬럼은 PostgreSQL varchar로 등록된다', () => {
+    const columns = getMetadataArgsStorage().columns.filter(
+      (column) => column.target === OutboxEvent,
+    )
+    const optionsByProperty = new Map(
+      columns.map((column) => [column.propertyName, column.options]),
+    )
+
+    expect(optionsByProperty.get('eventType')).toMatchObject({
+      type: 'varchar',
+    })
+    expect(optionsByProperty.get('aggregateType')).toMatchObject({
+      type: 'varchar',
+    })
+  })
+
   it('의도한 CHECK 제약 조건이 모두 등록된다', () => {
     const expressions = getMetadataArgsStorage()
       .checks.filter((check) => check.target === OutboxEvent)

@@ -46,6 +46,10 @@ describe('PlaceSelectionFact entity', () => {
         `"like_count" >= 0`,
         `"dislike_count" >= 0`,
         `"like_count" + "dislike_count" <= "participant_count"`,
+        `("course_generation_run_id" IS NULL AND "course_generation_customization_type" IS NULL AND "course_generation_input_hash" IS NULL) OR ("course_generation_run_id" IS NOT NULL AND "course_generation_customization_type" IS NOT NULL AND "course_generation_input_hash" IS NOT NULL)`,
+        `"course_generation_run_id" IS NULL OR "course_generation_run_id" > 0`,
+        `"course_generation_customization_type" IS NULL OR "course_generation_customization_type" IN ('SKIP', 'QUESTIONNAIRE')`,
+        `"course_generation_input_hash" IS NULL OR length("course_generation_input_hash") = 64`,
       ].sort(),
     )
   })
@@ -55,8 +59,9 @@ describe('PlaceSelectionFact entity', () => {
       (index) => index.target === PlaceSelectionFact,
     )
 
-    expect(indices).toHaveLength(1)
-    expect(indices[0].columns).toEqual(['meetingId', 'courseVersion'])
+    expect(indices.map((index) => index.columns)).toEqual(
+      expect.arrayContaining([['meetingId', 'courseVersion']]),
+    )
   })
 
   it('createdAt이 생성 시각 컬럼으로 등록된다', () => {

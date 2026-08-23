@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { Category } from 'src/category/entities/category.entity'
+import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { KakaoModule } from 'src/kakao/kakao.module'
 import { MediaModule } from 'src/media/media.module'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
@@ -13,6 +15,7 @@ import { PlaceController } from './place.controller'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
 import { PlaceImageService } from './place-image.service'
+import { PlaceLiveDataService } from './place-live-data.service'
 import { GooglePlacesProvider } from './provider/google-places.provider'
 import { KakaoPlacesProvider } from './provider/kakao-places.provider'
 import { PlaceSyncService } from './sync/place-sync.service'
@@ -26,6 +29,8 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
     TypeOrmModule.forFeature([
       MeetingLocation,
       MeetingParticipant,
+      Category,
+      CourseCategoryStep,
       Place,
       PlaceImage,
       PlaceSyncCoverage,
@@ -38,6 +43,7 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
     PlaceRepository,
     PlaceService,
     PlaceImageService,
+    PlaceLiveDataService,
     GooglePlacesProvider,
     KakaoPlacesProvider,
     // Kakao Local 검색 결과는 장소 ID와 URL 외에는 영구 저장할 수 없다.
@@ -46,6 +52,11 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
     PlaceSyncService,
     PlaceSyncWorker,
   ],
-  exports: [PlaceSyncService, PlaceRepository, PlaceImageService],
+  exports: [
+    PlaceSyncService,
+    PlaceRepository,
+    PlaceImageService,
+    PlaceLiveDataService,
+  ],
 })
 export class PlaceModule {}

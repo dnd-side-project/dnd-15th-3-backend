@@ -5,6 +5,12 @@ describe('validateStatisticsWorkerEnv', () => {
     it('applies defaults for optional values', () => {
       const env = validateStatisticsWorkerEnv({})
       expect(env.NODE_ENV).toBe('development')
+      expect(env.DB_HOST).toBe('localhost')
+      expect(env.DB_PORT).toBe(5432)
+      expect(env.DB_USERNAME).toBe('postgres')
+      expect(env.DB_PASSWORD).toBe('')
+      expect(env.DB_DATABASE).toBe('postgres')
+      expect(env.DB_SSL).toBe(false)
       expect(env.STATS_DB_HOST).toBe('localhost')
       expect(env.STATS_DB_PORT).toBe(5432)
       expect(env.STATS_DB_USERNAME).toBe('postgres')
@@ -52,6 +58,13 @@ describe('validateStatisticsWorkerEnv', () => {
       expect(() =>
         // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
         validateStatisticsWorkerEnv({ STATS_DB_PORT: 'abc' }),
+      ).toThrow('Invalid environment variables')
+    })
+
+    it('throws when DB_PORT is out of range', () => {
+      expect(() =>
+        // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+        validateStatisticsWorkerEnv({ DB_PORT: 0 }),
       ).toThrow('Invalid environment variables')
     })
 
