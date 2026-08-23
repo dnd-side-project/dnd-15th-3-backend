@@ -26,10 +26,6 @@ export type CourseFeedbackInterpretation = z.infer<
   typeof courseFeedbackInterpretationSchema
 >
 
-export function emptyCourseFeedback(): CourseFeedbackInterpretation {
-  return { constraints: [], unresolved: [] }
-}
-
 export function parseCourseFeedback(
   raw: unknown,
 ): CourseFeedbackInterpretation {

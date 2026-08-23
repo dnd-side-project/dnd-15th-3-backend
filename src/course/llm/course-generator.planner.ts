@@ -61,10 +61,6 @@ export class CoursePlanningError extends Error {
 
 const EPSILON = 1e-9
 
-function isCourseStrategy(value: string): value is CourseStrategy {
-  return COURSE_STRATEGIES.includes(value as CourseStrategy)
-}
-
 export function getRouteSequenceKey(placeIds: readonly string[]): string {
   return placeIds.join(',')
 }
@@ -581,53 +577,4 @@ export function buildCourseRoutePlan(
     balancedMaxDistanceRatio: input.strategyConfig.balancedMaxDistanceRatio,
     searchComplete,
   }
-}
-
-export function validateStrategySelection(
-  routes: readonly { strategy: string; placeIds: readonly string[] }[],
-  plan: CourseRoutePlan,
-): string[] {
-  const issues: string[] = []
-  const outputCompositions = routes.map((route) =>
-    getRouteCompositionKey(route.placeIds),
-  )
-  const usedStrategies = new Set<string>()
-
-  for (const [routeIndex, route] of routes.entries()) {
-    if (!isCourseStrategy(route.strategy)) {
-      issues.push(`${routeIndex + 1}번째 코스의 전략이 유효하지 않습니다.`)
-      continue
-    }
-    if (usedStrategies.has(route.strategy)) {
-      issues.push(`${route.strategy} 전략이 중복되었습니다.`)
-      continue
-    }
-    usedStrategies.add(route.strategy)
-
-    const sequence = getRouteSequenceKey(route.placeIds)
-    const composition = getRouteCompositionKey(route.placeIds)
-    const actual = plan.routeCandidates.find(
-      (candidate) => getRouteSequenceKey(candidate.placeIds) === sequence,
-    )
-    const pool = plan.selectionPools[route.strategy]
-    const inPool = pool.some(
-      (candidate) => getRouteSequenceKey(candidate.placeIds) === sequence,
-    )
-
-    if (!actual) {
-      issues.push(`${routeIndex + 1}번째 코스가 서버 후보에 없습니다.`)
-    } else if (!inPool) {
-      issues.push(
-        `${routeIndex + 1}번째 코스가 ${route.strategy} 전략의 Top-K 후보에 없습니다.`,
-      )
-    }
-
-    if (
-      outputCompositions.filter((value) => value === composition).length > 1
-    ) {
-      issues.push(`${routeIndex + 1}번째 코스의 장소 구성이 중복되었습니다.`)
-    }
-  }
-
-  return issues
 }
