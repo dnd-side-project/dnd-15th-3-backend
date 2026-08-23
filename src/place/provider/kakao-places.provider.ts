@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import type { Env } from 'src/config/env'
+import {
+  type KakaoPlaceDocument,
+  type KakaoPlaceSearchResponse,
+  kakaoPlaceSearchResponseSchema,
+} from 'src/kakao/schema/local-place-search-response.schema'
 import { PlaceSource } from '../enums/place-source.enum'
 import { PlaceException } from '../exception/place.exception'
 import { PlaceErrorCode } from '../exception/place-error-code'
@@ -9,11 +14,6 @@ import {
   KAKAO_PLACE_SEARCH_SPECS_BY_CATEGORY,
   type KakaoPlaceSearchSpec,
 } from './kakao-place-category-mapping'
-import {
-  type KakaoPlaceDocument,
-  type KakaoPlaceSearchResponse,
-  kakaoPlaceSearchResponseSchema,
-} from './kakao-place-search-response.schema'
 import type {
   PlaceProvider,
   PlaceProviderPlace,
