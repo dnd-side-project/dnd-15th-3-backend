@@ -7,6 +7,7 @@ import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
 import { OutboxModule } from 'src/outbox/outbox.module'
 import { PlaceModule } from 'src/place/place.module'
 import { QuestionnaireModule } from 'src/questionnaire/questionnaire.module'
+import { PlaceTagModule } from 'src/statistics/place-tag.module'
 import { CourseController } from './course.controller'
 import { CourseRepository } from './course.repository'
 import { CourseService } from './course.service'
@@ -38,6 +39,7 @@ import { ResilientCourseCandidateGenerator } from './provider/resilient-course-c
     KakaoModule,
     OutboxModule,
     QuestionnaireModule,
+    PlaceTagModule,
     TypeOrmModule.forFeature([
       CourseCandidate,
       CourseCandidateComment,

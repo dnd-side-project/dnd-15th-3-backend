@@ -3,6 +3,8 @@ import type { KakaoWalkingDistanceService } from 'src/kakao/kakao-walking-distan
 import { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
 import { QuestionnaireSource } from 'src/questionnaire/enums/questionnaire-source.enum'
 import { QuestionnaireDimensionCode } from 'src/questionnaire/questionnaire.constants'
+import { PlaceTagCode } from 'src/statistics/enums/place-tag-code.enum'
+import type { PlaceTagRepository } from 'src/statistics/place-tag.repository'
 import { calculatePreferenceScore } from '../../course-preference-score'
 import type { CourseGenerationRuntimeInput } from '../../schema/course-generation-input.schema'
 import { CourseGeneratorInputBuilder } from './course-generator-input.builder'
@@ -65,11 +67,15 @@ function createBuilder() {
       isEstimated: false,
     }),
   }
+  const placeTagRepository = {
+    findTagCodesByPlaceIds: jest.fn().mockResolvedValue(new Map()),
+  }
   const builder = new CourseGeneratorInputBuilder(
     walkingDistanceService as unknown as KakaoWalkingDistanceService,
+    placeTagRepository as unknown as PlaceTagRepository,
   )
 
-  return { builder, walkingDistanceService }
+  return { builder, walkingDistanceService, placeTagRepository }
 }
 
 describe('CourseGeneratorInputBuilder', () => {
@@ -148,6 +154,86 @@ describe('CourseGeneratorInputBuilder', () => {
       start: { 'rec-1': 250 },
       'rec-1': { 'rec-2': 250 },
     })
+  })
+
+  it('통계 DB에서 조회한 placeId별 태그를 places에 채운다', async () => {
+    const { builder, placeTagRepository } = createBuilder()
+    placeTagRepository.findTagCodesByPlaceIds.mockResolvedValue(
+      new Map([
+        ['place-rec-1', [PlaceTagCode.HighPreference, PlaceTagCode.SafeChoice]],
+      ]),
+    )
+
+    const input = await builder.build(
+      createRuntimeInput({
+        recommendations: [
+          createRecommendation('rec-1', CategorySlug.Restaurant, {
+            placeId: 'place-rec-1',
+          }),
+        ],
+      }),
+    )
+
+    expect(placeTagRepository.findTagCodesByPlaceIds).toHaveBeenCalledWith([
+      'place-rec-1',
+    ])
+    expect(input.places[0].tags).toEqual([
+      PlaceTagCode.HighPreference,
+      PlaceTagCode.SafeChoice,
+    ])
+  })
+
+  it('통계 DB에 태그가 없는 장소는 tags가 빈 배열이다', async () => {
+    const { builder } = createBuilder()
+
+    const input = await builder.build(createRuntimeInput())
+
+    expect(input.places[0].tags).toEqual([])
+  })
+
+  it('장소가 여러 개여도 placeId별로 태그가 섞이지 않고, 조회는 한 번만 배치로 이뤄진다', async () => {
+    const { builder, placeTagRepository } = createBuilder()
+    placeTagRepository.findTagCodesByPlaceIds.mockResolvedValue(
+      new Map([
+        ['place-rec-1', [PlaceTagCode.HighPreference]],
+        ['place-rec-2', [PlaceTagCode.SafeChoice]],
+      ]),
+    )
+
+    const input = await builder.build(
+      createRuntimeInput({
+        categorySteps: [
+          {
+            order: 1,
+            categoryId: 'category-1',
+            categorySlug: CategorySlug.Restaurant,
+          },
+        ],
+        recommendations: [
+          createRecommendation('rec-1', CategorySlug.Restaurant, {
+            placeId: 'place-rec-1',
+          }),
+          createRecommendation('rec-2', CategorySlug.Restaurant, {
+            placeId: 'place-rec-2',
+          }),
+          createRecommendation('rec-3', CategorySlug.Restaurant, {
+            placeId: 'place-rec-3',
+          }),
+        ],
+      }),
+    )
+
+    expect(placeTagRepository.findTagCodesByPlaceIds).toHaveBeenCalledTimes(1)
+    expect(placeTagRepository.findTagCodesByPlaceIds).toHaveBeenCalledWith([
+      'place-rec-1',
+      'place-rec-2',
+      'place-rec-3',
+    ])
+    expect(input.places.map((place) => place.tags)).toEqual([
+      [PlaceTagCode.HighPreference],
+      [PlaceTagCode.SafeChoice],
+      [],
+    ])
   })
 
   it('recommendationId를 장소 id로 사용한다 (결과를 recommendationId로 바로 되돌려받기 위함)', async () => {

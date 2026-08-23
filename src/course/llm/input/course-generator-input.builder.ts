@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { KakaoWalkingDistanceService } from 'src/kakao/kakao-walking-distance.service'
+import { PlaceTagRepository } from 'src/statistics/place-tag.repository'
 import { calculatePreferenceScore } from '../../course-preference-score'
 import type { CourseGenerationRuntimeInput } from '../../schema/course-generation-input.schema'
 import {
@@ -24,17 +25,17 @@ const SUNDAY = 0
 export class CourseGeneratorInputBuilder {
   constructor(
     private readonly walkingDistanceService: KakaoWalkingDistanceService,
+    private readonly placeTagRepository: PlaceTagRepository,
   ) {}
 
   async build(
     input: CourseGenerationRuntimeInput,
   ): Promise<CourseGeneratorInput> {
     const visitOrder = this.buildVisitOrder(input)
-    const places = this.buildPlaces(input.recommendations)
-    const distanceMatrixValues = await this.buildDistanceMatrix(
-      input,
-      visitOrder,
-    )
+    const [places, distanceMatrixValues] = await Promise.all([
+      this.buildPlaces(input.recommendations),
+      this.buildDistanceMatrix(input, visitOrder),
+    ])
 
     return parseCourseGeneratorInput({
       startNodeId: START_NODE_ID,
@@ -69,9 +70,14 @@ export class CourseGeneratorInputBuilder {
     }))
   }
 
-  private buildPlaces(
+  private async buildPlaces(
     recommendations: readonly Recommendation[],
-  ): CourseGeneratorPlace[] {
+  ): Promise<CourseGeneratorPlace[]> {
+    const tagCodesByPlaceId =
+      await this.placeTagRepository.findTagCodesByPlaceIds(
+        recommendations.map((recommendation) => recommendation.placeId),
+      )
+
     return recommendations.map((recommendation) => ({
       id: recommendation.recommendationId,
       name: recommendation.name,
@@ -80,7 +86,7 @@ export class CourseGeneratorInputBuilder {
         recommendation.likeCount,
         recommendation.dislikeCount,
       ),
-      tags: [], // TODO: 통계 DB의 PlaceTag가 연결되면 실제 태그로 교체
+      tags: tagCodesByPlaceId.get(recommendation.placeId) ?? [],
     }))
   }
 
@@ -117,12 +123,6 @@ export class CourseGeneratorInputBuilder {
     )
   }
 
-  /**
-   * 카카오 도보 경로를 못 구해도(API 오류·경로 미발견) 던지지 않고
-   * CourseGenerationRouteService와 동일하게 직선거리 기반 추정치로 대체한다.
-   * 카카오 장애 하나 때문에 AI 코스 생성 전체가 수동 생성으로 폴백되지
-   * 않게 하기 위함이다.
-   */
   private async getWalkingDistanceMeters(
     origin: Coordinate | undefined,
     destination: Coordinate | undefined,
@@ -134,10 +134,6 @@ export class CourseGeneratorInputBuilder {
     return distanceMeters
   }
 
-  /**
-   * `date`는 "YYYY-MM-DD" 형식의 순수 달력 날짜 문자열이다. 시간대 영향 없이
-   * 요일만 판단하기 위해 UTC 기준으로 계산한다.
-   */
   private isWeekendDate(date: string): boolean {
     const [year, month, day] = date.split('-').map(Number)
     const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
