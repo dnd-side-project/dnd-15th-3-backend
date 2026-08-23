@@ -70,4 +70,13 @@ describe('PlaceTagRepository', () => {
 
     expect(result.has('1')).toBe(false)
   })
+
+  it('통계 DB 조회가 실패해도 던지지 않고 빈 Map으로 대체한다 (AI 코스 생성이 통계 DB 장애로 중단되지 않도록)', async () => {
+    const { repository, queryBuilder } = createRepository()
+    queryBuilder.getRawMany.mockRejectedValue(new Error('connection refused'))
+
+    const result = await repository.findTagCodesByPlaceIds(['1'])
+
+    expect(result).toEqual(new Map())
+  })
 })
