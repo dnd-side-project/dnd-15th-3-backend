@@ -26,6 +26,8 @@ import { LlmProviderValidator } from './llm/llm-provider.validator'
 import { MeetingPlaceRecommendationRepository } from './meeting-place-recommendation.repository'
 import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recommendation-vote.repository'
 import { DeterministicCourseCandidateGenerator } from './provider/deterministic-course-candidate.generator'
+import { LlmCourseCandidateGenerator } from './provider/llm-course-candidate.generator'
+import { ResilientCourseCandidateGenerator } from './provider/resilient-course-candidate.generator'
 
 @Module({
   imports: [
@@ -49,9 +51,11 @@ import { DeterministicCourseCandidateGenerator } from './provider/deterministic-
     MeetingPlaceRecommendationRepository,
     CourseRepository,
     DeterministicCourseCandidateGenerator,
+    LlmCourseCandidateGenerator,
+    ResilientCourseCandidateGenerator,
     {
       provide: COURSE_CANDIDATE_GENERATOR,
-      useExisting: DeterministicCourseCandidateGenerator,
+      useExisting: ResilientCourseCandidateGenerator,
     },
     CourseGenerationRouteService,
     CourseGenerationProcessor,

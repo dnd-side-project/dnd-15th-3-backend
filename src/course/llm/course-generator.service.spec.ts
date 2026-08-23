@@ -126,7 +126,9 @@ describe('CourseGeneratorService', () => {
       const { client, mockChat } = createMockClient()
 
       const invalid = JSON.parse(loadExpectedOutput('input-normal'))
-      invalid.routes[0].places[1].category = '액티비티'
+      // '4'(cafe) 대신 visitOrder[1]('cafe')과 카테고리가 다른 '9'(bar)를 넣어
+      // 서버가 placeId로 조회한 실제 카테고리가 기대와 다르게 만든다.
+      invalid.routes[0].places[1].placeId = '9'
 
       mockChat
         .mockResolvedValueOnce({
@@ -195,16 +197,13 @@ describe('CourseGeneratorService', () => {
       const candidate = plan.selectionPools.distance_minimization[0]
       expect(candidate).toBeDefined()
 
-      const placesById = new Map(input.places.map((place) => [place.id, place]))
       const selectorOutput = {
         routes: [
           {
             routeId: 1,
-            strategy: 'distance_minimization',
             places: candidate.placeIds.map((placeId, index) => ({
               placeId,
               order: index + 1,
-              category: placesById.get(placeId)?.category,
             })),
           },
         ],

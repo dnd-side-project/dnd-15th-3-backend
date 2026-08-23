@@ -1,16 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
 import type { KakaoWalkingCourseResponse } from 'src/kakao/schema/walking-course-response.schema'
-import { Meeting } from 'src/meeting/entities/meeting.entity'
-import type { MeetingTypeCode } from 'src/meeting/enums/meeting-type-code.enum'
-import { MeetingException } from 'src/meeting/exception/meeting.exception'
-import { MeetingErrorCode } from 'src/meeting/exception/meeting-error-code'
-import { DataSource } from 'typeorm'
-import { CourseCategoryStep } from '../../entities/course-category-step.entity'
-import type { MeetingPlaceRecommendation } from '../../entities/meeting-place-recommendation.entity'
-import { MeetingPlaceRecommendationRepository } from '../../meeting-place-recommendation.repository'
-import { MeetingPlaceRecommendationVoteRepository } from '../../meeting-place-recommendation-vote.repository'
+import type { CourseGenerationRuntimeInput } from '../../schema/course-generation-input.schema'
 import {
   type CourseGeneratorInput,
   parseCourseGeneratorInput,
@@ -23,6 +15,7 @@ import {
 
 type Coordinate = { longitude: number; latitude: number }
 type CourseGeneratorPlace = CourseGeneratorInput['places'][number]
+type Recommendation = CourseGenerationRuntimeInput['recommendations'][number]
 
 const DISLIKE_WEIGHT = 1.5
 const SATURDAY = 6
@@ -33,33 +26,24 @@ export class CourseGeneratorInputBuilder {
   private readonly logger = new Logger(CourseGeneratorInputBuilder.name)
 
   constructor(
-    private readonly dataSource: DataSource,
-    private readonly recommendationRepository: MeetingPlaceRecommendationRepository,
-    private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
     private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
   ) {}
 
-  async build(meetingId: string): Promise<CourseGeneratorInput> {
-    const meeting = await this.findMeetingOrThrow(meetingId)
-    meeting.assertHasLocation()
-
-    const [visitOrder, recommendations] = await Promise.all([
-      this.findVisitOrder(meetingId),
-      this.recommendationRepository.findByMeeting(meetingId),
-    ])
-
-    const places = await this.buildPlaces(recommendations)
-    const distanceMatrixValues = await this.buildMeetingDistanceMatrix(
-      meeting,
+  async build(
+    input: CourseGenerationRuntimeInput,
+  ): Promise<CourseGeneratorInput> {
+    const visitOrder = this.buildVisitOrder(input)
+    const places = this.buildPlaces(input.recommendations)
+    const distanceMatrixValues = await this.buildDistanceMatrix(
+      input,
       visitOrder,
-      recommendations,
     )
 
     return parseCourseGeneratorInput({
       startNodeId: START_NODE_ID,
-      meetingType: meeting.meetingType.code as MeetingTypeCode,
-      isWeekend: this.isWeekendDate(meeting.date),
-      qna: [], // TODO: qna 엔티티가 생기면 실제 질문-답변 데이터로 교체
+      meetingType: input.meeting.meetingTypeCode,
+      isWeekend: this.isWeekendDate(input.meeting.date),
+      qna: this.buildQna(input.questionnaire),
       visitOrder,
       places,
       distanceMatrix: {
@@ -71,80 +55,57 @@ export class CourseGeneratorInputBuilder {
     })
   }
 
-  private async findMeetingOrThrow(meetingId: string): Promise<Meeting> {
-    const meeting = await this.dataSource.getRepository(Meeting).findOne({
-      where: { id: meetingId },
-      relations: { meetingType: true, meetingLocation: true },
-    })
-    if (!meeting) {
-      throw new MeetingException(MeetingErrorCode.notFound)
-    }
-    return meeting
+  private buildVisitOrder(input: CourseGenerationRuntimeInput): CategorySlug[] {
+    return input.categorySteps
+      .slice()
+      .sort((left, right) => left.order - right.order)
+      .map((step) => step.categorySlug)
   }
 
-  private async findVisitOrder(meetingId: string): Promise<CategorySlug[]> {
-    const steps = await this.dataSource.getRepository(CourseCategoryStep).find({
-      where: { meeting: { id: meetingId } },
-      relations: { category: true },
-      order: { order: 'ASC' },
-    })
-    if (steps.length === 0) {
-      throw new MeetingException(
-        MeetingErrorCode.courseCategoryStepsDataMissing,
-      )
-    }
-    return steps.map((step) => step.category.slug as CategorySlug)
+  private buildQna(
+    questionnaire: CourseGenerationRuntimeInput['questionnaire'],
+  ): CourseGeneratorInput['qna'] {
+    if (!questionnaire) return []
+    return questionnaire.answers.map((answer) => ({
+      question: answer.questionText,
+      answer: answer.optionLabel,
+    }))
   }
 
-  private async buildPlaces(
-    recommendations: readonly MeetingPlaceRecommendation[],
-  ): Promise<CourseGeneratorPlace[]> {
-    const recommendationIds = recommendations.map(
-      (recommendation) => recommendation.id,
-    )
-    const preferenceCounts =
-      await this.voteRepository.getVoteCountsByRecommendation(
-        this.dataSource.manager,
-        recommendationIds,
-      )
-
-    return recommendations.map((recommendation) => {
-      const counts = preferenceCounts.get(recommendation.id)
-      return {
-        id: recommendation.place.id,
-        name: recommendation.place.name,
-        category: recommendation.place.category.slug as CategorySlug,
-        score: this.calculatePreferenceScore(
-          counts?.likeCount ?? 0,
-          counts?.dislikeCount ?? 0,
-        ),
-        tags: [], // TODO: 통계 DB의 PlaceTag가 연결되면 실제 태그로 교체
-      }
-    })
+  private buildPlaces(
+    recommendations: readonly Recommendation[],
+  ): CourseGeneratorPlace[] {
+    return recommendations.map((recommendation) => ({
+      id: recommendation.recommendationId,
+      name: recommendation.name,
+      category: recommendation.categorySlug,
+      score: this.calculatePreferenceScore(
+        recommendation.likeCount,
+        recommendation.dislikeCount,
+      ),
+      tags: [], // TODO: 통계 DB의 PlaceTag가 연결되면 실제 태그로 교체
+    }))
   }
 
-  private buildMeetingDistanceMatrix(
-    meeting: Meeting,
+  private buildDistanceMatrix(
+    input: CourseGenerationRuntimeInput,
     visitOrder: readonly CategorySlug[],
-    recommendations: readonly MeetingPlaceRecommendation[],
   ): Promise<Record<string, Record<string, number>>> {
     const placesByCategory = new Map<CategorySlug, DistanceMatrixPlace[]>()
-    const coordinateByPlaceId = new Map<string, Coordinate>()
+    const coordinateById = new Map<string, Coordinate>()
 
-    for (const recommendation of recommendations) {
-      const { place } = recommendation
-      const category = place.category.slug as CategorySlug
-      const group = placesByCategory.get(category) ?? []
-      group.push({ id: place.id })
-      placesByCategory.set(category, group)
-      coordinateByPlaceId.set(place.id, {
-        longitude: place.longitude,
-        latitude: place.latitude,
+    for (const recommendation of input.recommendations) {
+      const group = placesByCategory.get(recommendation.categorySlug) ?? []
+      group.push({ id: recommendation.recommendationId })
+      placesByCategory.set(recommendation.categorySlug, group)
+      coordinateById.set(recommendation.recommendationId, {
+        longitude: recommendation.longitude,
+        latitude: recommendation.latitude,
       })
     }
-    coordinateByPlaceId.set(START_NODE_ID, {
-      longitude: meeting.meetingLocation.longitude,
-      latitude: meeting.meetingLocation.latitude,
+    coordinateById.set(START_NODE_ID, {
+      longitude: input.meeting.location.longitude,
+      latitude: input.meeting.location.latitude,
     })
 
     const positionPools = visitOrder.map(
@@ -153,8 +114,8 @@ export class CourseGeneratorInputBuilder {
 
     return buildDistanceMatrixValues(positionPools, (fromId, toId) =>
       this.getWalkingDistanceMeters(
-        coordinateByPlaceId.get(fromId),
-        coordinateByPlaceId.get(toId),
+        coordinateById.get(fromId),
+        coordinateById.get(toId),
       ),
     )
   }
@@ -200,8 +161,8 @@ export class CourseGeneratorInputBuilder {
   }
 
   /**
-   * `date`는 TypeORM의 `date` 컬럼에서 읽은 "YYYY-MM-DD" 문자열이다.
-   * 시간대 영향 없이 순수 달력 날짜의 요일만 판단하기 위해 UTC 기준으로 계산한다.
+   * `date`는 "YYYY-MM-DD" 형식의 순수 달력 날짜 문자열이다. 시간대 영향 없이
+   * 요일만 판단하기 위해 UTC 기준으로 계산한다.
    */
   private isWeekendDate(date: string): boolean {
     const [year, month, day] = date.split('-').map(Number)
