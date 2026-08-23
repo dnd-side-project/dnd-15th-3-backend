@@ -1,10 +1,11 @@
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { PlaceSource } from '../enums/place-source.enum'
 
 export type PlaceProviderSearchRequest = {
   latitude: number
   longitude: number
   radiusMeters: number
-  providerTypes: string[]
+  categorySlug: CategorySlug
 }
 
 export type PlaceProviderPlace = {
@@ -26,6 +27,8 @@ export type PlaceProviderSearchResult = {
 
 export interface PlaceProvider {
   readonly source: PlaceSource
+
+  supportsCategory(categorySlug: CategorySlug): boolean
 
   searchNearby(
     request: PlaceProviderSearchRequest,

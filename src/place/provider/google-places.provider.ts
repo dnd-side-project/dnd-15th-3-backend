@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import type { Env } from 'src/config/env'
 import { z } from 'zod'
 import { PlaceSource } from '../enums/place-source.enum'
 import { PlaceException } from '../exception/place.exception'
 import { PlaceErrorCode } from '../exception/place-error-code'
+import { GOOGLE_PLACE_TYPES_BY_CATEGORY } from './place-category-mapping'
 import type {
   PlaceProvider,
   PlaceProviderPlace,
@@ -40,6 +42,10 @@ export class GooglePlacesProvider implements PlaceProvider {
 
   constructor(private readonly config: ConfigService<Env, true>) {}
 
+  supportsCategory(categorySlug: CategorySlug): boolean {
+    return GOOGLE_PLACE_TYPES_BY_CATEGORY[categorySlug].length > 0
+  }
+
   async searchNearby(
     request: PlaceProviderSearchRequest,
   ): Promise<PlaceProviderSearchResult> {
@@ -51,8 +57,10 @@ export class GooglePlacesProvider implements PlaceProvider {
       throw new PlaceException(PlaceErrorCode.providerUnavailable)
     }
 
+    const providerTypes = GOOGLE_PLACE_TYPES_BY_CATEGORY[request.categorySlug]
+
     const body = {
-      includedTypes: request.providerTypes,
+      includedTypes: providerTypes,
       maxResultCount: 20,
       locationRestriction: {
         circle: {
