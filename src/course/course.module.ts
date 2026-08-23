@@ -13,6 +13,7 @@ import { CourseCandidate } from './entities/course-candidate.entity'
 import { CourseCandidateComment } from './entities/course-candidate-comment.entity'
 import { CourseCandidatePlace } from './entities/course-candidate-place.entity'
 import { CourseGeneratorService } from './llm/course-generator.service'
+import { CourseGeneratorInputBuilder } from './llm/input/course-generator-input.builder'
 import { LLM_CLIENT, LlmClient, OPENAI_API_BASE_URL } from './llm/llm-client'
 import { LlmProviderValidator } from './llm/llm-provider.validator'
 import { MeetingPlaceRecommendationRepository } from './meeting-place-recommendation.repository'
@@ -51,6 +52,7 @@ import { MeetingPlaceRecommendationVoteRepository } from './meeting-place-recomm
       inject: [ConfigService],
     },
     CourseGeneratorService,
+    CourseGeneratorInputBuilder,
     LlmProviderValidator,
   ],
   exports: [MeetingPlaceRecommendationVoteRepository],

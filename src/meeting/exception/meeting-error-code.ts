@@ -89,6 +89,12 @@ export const MeetingErrorCode = {
     message:
       '모임은 존재하지만 시작지 정보를 찾을 수 없는 데이터 정합성 오류입니다.',
   },
+  courseCategoryStepsDataMissing: {
+    code: 'MEETING_COURSE_CATEGORY_STEPS_DATA_MISSING',
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    message:
+      '모임은 존재하지만 방문 순서(카테고리 단계)를 찾을 수 없는 데이터 정합성 오류입니다.',
+  },
   courseCandidatesNotVisible: {
     code: 'MEETING_COURSE_CANDIDATES_NOT_VISIBLE',
     status: HttpStatus.CONFLICT,
