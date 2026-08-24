@@ -8,9 +8,12 @@ import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { Place } from './entities/place.entity'
 import { PlaceImage } from './entities/place-image.entity'
+import { PlacePhotoMatch } from './entities/place-photo-match.entity'
 import { PlaceSyncCoverage } from './entities/place-sync-coverage.entity'
 import { PlaceSyncJob } from './entities/place-sync-job.entity'
 import { PlaceSyncTileLease } from './entities/place-sync-tile-lease.entity'
+import { GooglePlacePhotoProvider } from './photo/google-place-photo.provider'
+import { PlacePhotoService } from './photo/place-photo.service'
 import { PlaceController } from './place.controller'
 import { PlaceRepository } from './place.repository'
 import { PlaceService } from './place.service'
@@ -33,6 +36,7 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
       CourseCategoryStep,
       Place,
       PlaceImage,
+      PlacePhotoMatch,
       PlaceSyncCoverage,
       PlaceSyncJob,
       PlaceSyncTileLease,
@@ -44,6 +48,8 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
     PlaceService,
     PlaceImageService,
     PlaceLiveDataService,
+    GooglePlacePhotoProvider,
+    PlacePhotoService,
     GooglePlacesProvider,
     KakaoPlacesProvider,
     // Kakao Local 검색 결과는 장소 ID와 URL 외에는 영구 저장할 수 없다.
@@ -57,6 +63,7 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
     PlaceRepository,
     PlaceImageService,
     PlaceLiveDataService,
+    PlacePhotoService,
   ],
 })
 export class PlaceModule {}

@@ -105,8 +105,8 @@ function createMeetingService() {
   const placeSearchRepository = {
     findSimilar: jest.fn(),
   }
-  const placeImageService = {
-    getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
+  const placePhotoService = {
+    findPreviewPhotos: jest.fn().mockResolvedValue(new Map()),
   }
   const placeLiveDataService = {
     resolvePlace: jest.fn().mockImplementation((place) =>
@@ -153,7 +153,7 @@ function createMeetingService() {
     voteRepository as unknown as MeetingPlaceRecommendationVoteRepository,
     meetingAccessService as unknown as MeetingAccessService,
     placeSearchRepository as never,
-    placeImageService as never,
+    placePhotoService as never,
     placeLiveDataService as never,
   )
 
@@ -171,7 +171,7 @@ function createMeetingService() {
     voteRepository,
     meetingAccessService,
     placeSearchRepository,
-    placeImageService,
+    placePhotoService,
     placeLiveDataService,
   }
 }
@@ -1194,6 +1194,11 @@ describe('MeetingService', () => {
           latitude: 37.5447,
           longitude: 127.0558,
           previewUrl: null,
+          source: PlaceSource.Google,
+          providerPlaceId: 'google-11',
+          roadAddress: '서울 성동구 성수이로 2',
+          phone: null,
+          placeUrl: null,
         },
       ])
 
@@ -1209,6 +1214,8 @@ describe('MeetingService', () => {
           longitude: 127.0558,
           primaryImageUrl: null,
           previewUrl: null,
+          previewPhoto: null,
+          placeUrl: null,
         },
       ])
       expect(placeRepository.findOne).toHaveBeenCalledWith({
@@ -1299,12 +1306,13 @@ describe('MeetingService', () => {
       )
     })
 
-    it('무작위 추천이 부족하면 화면에 노출 중이던 장소로 채운다', async () => {
+    it('무작위 추천이 부족하면 화면에 노출 중이던 장소와 검증된 사진으로 채운다', async () => {
       const {
         service,
         meetingAccessService,
         placeRepository,
         placeSearchRepository,
+        placePhotoService,
       } = createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
         meeting: createMeetingWithStatus(
@@ -1325,9 +1333,24 @@ describe('MeetingService', () => {
           address: '서울 성동구 성수이로 3',
           latitude: 37.5448,
           longitude: 127.0559,
-          previewUrl: 'https://preview',
+          source: PlaceSource.Google,
+          providerPlaceId: 'google-3',
+          roadAddress: '서울 성동구 성수이로 3',
+          phone: null,
+          placeUrl: 'https://maps.google.com/place/3',
         },
       ])
+      const previewPhoto = {
+        id: 'google:3:1',
+        url: 'https://places.googleapis.com/photo/3',
+        width: 800,
+        height: 600,
+        source: 'GOOGLE',
+        attributions: [],
+      }
+      placePhotoService.findPreviewPhotos.mockResolvedValue(
+        new Map([['3', previewPhoto]]),
+      )
 
       await expect(
         service.getSimilarPlaces('1', '2', 'token', ['3', '4'], 2),
@@ -1339,8 +1362,10 @@ describe('MeetingService', () => {
           address: '서울 성동구 성수이로 3',
           latitude: 37.5448,
           longitude: 127.0559,
-          primaryImageUrl: null,
-          previewUrl: 'https://preview',
+          primaryImageUrl: previewPhoto.url,
+          previewUrl: previewPhoto.url,
+          previewPhoto,
+          placeUrl: 'https://maps.google.com/place/3',
         },
       ])
       expect(placeRepository.find).toHaveBeenCalledWith({
@@ -1351,7 +1376,11 @@ describe('MeetingService', () => {
           address: true,
           latitude: true,
           longitude: true,
-          previewUrl: true,
+          source: true,
+          providerPlaceId: true,
+          roadAddress: true,
+          phone: true,
+          placeUrl: true,
         },
       })
     })
@@ -1415,6 +1444,83 @@ describe('MeetingService', () => {
       ])
 
       shuffleSpy.mockRestore()
+    })
+
+    it('Kakao 유사 장소도 업체가 검증된 사진만 응답한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        dataSource,
+        placeLiveDataService,
+        placePhotoService,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        source: PlaceSource.Kakao,
+        category: { id: '1', name: '카페', slug: 'cafe' },
+      })
+      dataSource.getRepository.mockReturnValue({
+        findOne: jest
+          .fn()
+          .mockResolvedValue({ latitude: 37.5, longitude: 127 }),
+      })
+      const candidate = {
+        id: '11',
+        source: PlaceSource.Kakao,
+        providerPlaceId: 'kakao-11',
+        category: { id: '1', name: '카페', slug: 'cafe' },
+        name: '성수 카페 2',
+        address: '서울 성동구 성수동 2',
+        roadAddress: '서울 성동구 성수이로 2',
+        latitude: 37.5447,
+        longitude: 127.0558,
+        phone: null,
+        placeUrl: 'https://place.map.kakao.com/kakao-11',
+        previewUrl: null,
+        distanceMeters: 10,
+      }
+      placeLiveDataService.searchKakao.mockResolvedValue({
+        places: [candidate],
+        isComplete: true,
+        unsupportedCategorySlugs: [],
+      })
+      const previewPhoto = {
+        id: 'google:11:1',
+        url: 'https://places.googleapis.com/photo/11',
+        width: 800,
+        height: 600,
+        source: 'GOOGLE',
+        attributions: [],
+      }
+      placePhotoService.findPreviewPhotos.mockResolvedValue(
+        new Map([['11', previewPhoto]]),
+      )
+
+      await expect(
+        service.getSimilarPlaces('1', '2', 'token', undefined, 5),
+      ).resolves.toEqual([
+        {
+          id: '11',
+          categoryId: '1',
+          name: '성수 카페 2',
+          address: '서울 성동구 성수동 2',
+          latitude: 37.5447,
+          longitude: 127.0558,
+          primaryImageUrl: previewPhoto.url,
+          previewUrl: previewPhoto.url,
+          previewPhoto,
+          placeUrl: 'https://place.map.kakao.com/kakao-11',
+        },
+      ])
+      expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+        candidate,
+      ])
     })
   })
 

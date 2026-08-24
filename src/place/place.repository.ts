@@ -35,7 +35,11 @@ type RawSimilarPlaceRow = {
   address: string
   latitude: number | string
   longitude: number | string
-  previewUrl: string | null
+  source: PlaceSource
+  providerPlaceId: string | null
+  roadAddress: string | null
+  phone: string | null
+  placeUrl: string | null
 }
 
 export type NearbyPlacesPage = {
@@ -49,7 +53,11 @@ export type SimilarPlace = {
   address: string
   latitude: number
   longitude: number
-  previewUrl: string | null
+  source: PlaceSource
+  providerPlaceId: string | null
+  roadAddress: string | null
+  phone: string | null
+  placeUrl: string | null
 }
 
 export const SIMILAR_PLACE_CANDIDATE_POOL_SIZE = 200
@@ -145,6 +153,7 @@ export class PlaceRepository {
         longitude: Number(row.longitude),
         distanceMeters: Number(row.distanceMeters),
         previewUrl: row.previewUrl,
+        previewPhoto: null,
         source: row.source,
         providerPlaceId: row.providerPlaceId,
         roadAddress: row.roadAddress,
@@ -171,7 +180,11 @@ export class PlaceRepository {
           "place"."address" AS "address",
           "place"."latitude" AS "latitude",
           "place"."longitude" AS "longitude",
-          "place"."preview_url" AS "previewUrl"
+          "place"."source" AS "source",
+          "place"."provider_place_id" AS "providerPlaceId",
+          "place"."road_address" AS "roadAddress",
+          "place"."phone" AS "phone",
+          "place"."place_url" AS "placeUrl"
         FROM "place" AS "place"
         WHERE "place"."category_id" = $1
           AND "place"."id" <> ALL($2::bigint[])
@@ -199,7 +212,11 @@ export class PlaceRepository {
       address: row.address,
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
-      previewUrl: row.previewUrl,
+      source: row.source,
+      providerPlaceId: row.providerPlaceId,
+      roadAddress: row.roadAddress,
+      phone: row.phone,
+      placeUrl: row.placeUrl,
     }))
 
     return shuffle(candidates).slice(0, limit)

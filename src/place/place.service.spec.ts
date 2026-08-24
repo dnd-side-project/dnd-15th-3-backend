@@ -1,16 +1,16 @@
 import { Category } from 'src/category/entities/category.entity'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
-import { KakaoImageSearchService } from 'src/kakao/kakao-image-search.service'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import type { Repository } from 'typeorm'
 import { Place } from './entities/place.entity'
+import { PlacePhotoSource } from './enums/place-photo-source.enum'
 import { PlaceSource } from './enums/place-source.enum'
 import { PlaceException } from './exception/place.exception'
 import { PlaceErrorCode } from './exception/place-error-code'
+import { PlacePhotoService } from './photo/place-photo.service'
 import { PlaceService } from './place.service'
-import { PlaceImageService } from './place-image.service'
 import { PlaceLiveDataService } from './place-live-data.service'
 
 function createService() {
@@ -48,12 +48,9 @@ function createService() {
       }),
     ),
   }
-  const placeImageService = {
-    getImageUrls: jest.fn().mockResolvedValue([]),
-  }
-  const kakaoImageSearchService = {
-    findPreviewUrls: jest.fn().mockResolvedValue(new Map()),
-    findImages: jest.fn().mockResolvedValue([]),
+  const placePhotoService = {
+    findPreviewPhotos: jest.fn().mockResolvedValue(new Map()),
+    findPhotos: jest.fn().mockResolvedValue([]),
   }
 
   return {
@@ -64,8 +61,7 @@ function createService() {
       categoryRepository as unknown as Repository<Category>,
       courseCategoryStepRepository as unknown as Repository<CourseCategoryStep>,
       placeLiveDataService as unknown as PlaceLiveDataService,
-      placeImageService as unknown as PlaceImageService,
-      kakaoImageSearchService as unknown as KakaoImageSearchService,
+      placePhotoService as unknown as PlacePhotoService,
     ),
     meetingLocationRepository,
     participantRepository,
@@ -73,8 +69,7 @@ function createService() {
     categoryRepository,
     courseCategoryStepRepository,
     placeLiveDataService,
-    placeImageService,
-    kakaoImageSearchService,
+    placePhotoService,
   }
 }
 
@@ -215,12 +210,12 @@ describe('PlaceService', () => {
       )
     })
 
-    it('현재 페이지 장소의 대표 이미지 URL을 기존 previewUrl로 응답한다', async () => {
+    it('현재 페이지 장소의 검증된 대표 사진을 구조화 응답과 기존 URL에 함께 담는다', async () => {
       const {
         service,
         participantRepository,
         placeLiveDataService,
-        kakaoImageSearchService,
+        placePhotoService,
       } = createService()
       participantRepository.findOne.mockResolvedValue({ id: 'participant-1' })
       placeLiveDataService.searchKakao.mockResolvedValue({
@@ -245,8 +240,16 @@ describe('PlaceService', () => {
         unsupportedCategorySlugs: [],
       })
       const previewUrl = 'https://search.example.com/place-thumbnail.jpg'
-      kakaoImageSearchService.findPreviewUrls.mockResolvedValue(
-        new Map([['10', previewUrl]]),
+      const previewPhoto = {
+        id: 'google:10:1',
+        url: previewUrl,
+        width: 800,
+        height: 600,
+        source: PlacePhotoSource.Google,
+        attributions: [{ displayName: '사진가', uri: null, photoUri: null }],
+      }
+      placePhotoService.findPreviewPhotos.mockResolvedValue(
+        new Map([['10', previewPhoto]]),
       )
 
       const result = await service.searchPlaces({
@@ -260,17 +263,18 @@ describe('PlaceService', () => {
           {
             id: '10',
             previewUrl,
+            previewPhoto,
           },
         ],
       })
-      expect(result.items[0]).not.toHaveProperty('previewImage')
-      expect(kakaoImageSearchService.findPreviewUrls).toHaveBeenCalledWith([
-        {
+      expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+        expect.objectContaining({
           id: '10',
           name: '성수 카페',
           address: '서울 성동구 성수동1가 1',
           roadAddress: '서울 성동구 성수이로 1',
-        },
+          providerPlaceId: '12345',
+        }),
       ])
     })
   })
@@ -340,12 +344,12 @@ describe('PlaceService', () => {
       ).rejects.toBeInstanceOf(PlaceException)
     })
 
-    it('이미지 URL 조회를 PlaceImageService에 위임하고 응답에 그대로 담는다', async () => {
+    it('구조화 사진을 조회하고 기존 imageUrls·previewUrl도 함께 응답한다', async () => {
       const {
         service,
         participantRepository,
         placeRepository,
-        placeImageService,
+        placePhotoService,
       } = createService()
       participantRepository.findOne.mockResolvedValue({
         id: 'participant-1',
@@ -358,10 +362,25 @@ describe('PlaceService', () => {
         previewUrl: 'https://preview.example.com/1',
         category: { name: '카페', slug: 'cafe' },
       })
-      placeImageService.getImageUrls.mockResolvedValue([
-        'https://signed.example.com/first.jpg',
-        'https://signed.example.com/second.jpg',
-      ])
+      const photos = [
+        {
+          id: 'owned:1:1',
+          url: 'https://signed.example.com/first.jpg',
+          width: null,
+          height: null,
+          source: PlacePhotoSource.Owned,
+          attributions: [],
+        },
+        {
+          id: 'owned:1:2',
+          url: 'https://signed.example.com/second.jpg',
+          width: null,
+          height: null,
+          source: PlacePhotoSource.Owned,
+          attributions: [],
+        },
+      ]
+      placePhotoService.findPhotos.mockResolvedValue(photos)
 
       await expect(service.getPlaceDetail('1', 'token')).resolves.toMatchObject(
         {
@@ -374,10 +393,14 @@ describe('PlaceService', () => {
             'https://signed.example.com/first.jpg',
             'https://signed.example.com/second.jpg',
           ],
-          previewUrl: 'https://preview.example.com/1',
+          photos,
+          previewUrl: photos[0].url,
+          previewPhoto: photos[0],
         },
       )
-      expect(placeImageService.getImageUrls).toHaveBeenCalledWith('1')
+      expect(placePhotoService.findPhotos).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1', name: '성수 카페 모모' }),
+      )
     })
 
     it('이미지가 없으면 빈 배열을 그대로 응답한다', async () => {
@@ -385,7 +408,7 @@ describe('PlaceService', () => {
         service,
         participantRepository,
         placeRepository,
-        placeImageService,
+        placePhotoService,
       } = createService()
       participantRepository.findOne.mockResolvedValue({
         id: 'participant-1',
@@ -398,23 +421,25 @@ describe('PlaceService', () => {
         previewUrl: 'https://preview.example.com/1',
         category: { name: '카페', slug: 'cafe' },
       })
-      placeImageService.getImageUrls.mockResolvedValue([])
+      placePhotoService.findPhotos.mockResolvedValue([])
 
       const result = await service.getPlaceDetail('1', 'token')
 
-      expect(result).toMatchObject({ imageUrls: [] })
-      expect(result).not.toHaveProperty('images')
-      expect(result).not.toHaveProperty('previewImage')
+      expect(result).toMatchObject({
+        imageUrls: [],
+        photos: [],
+        previewUrl: null,
+        previewPhoto: null,
+      })
     })
 
-    it('Kakao 장소는 이미지 파일을 저장하지 않고 검색된 외부 URL을 응답한다', async () => {
+    it('Kakao 장소도 업체가 검증된 Google 사진만 응답한다', async () => {
       const {
         service,
         participantRepository,
         placeRepository,
         placeLiveDataService,
-        placeImageService,
-        kakaoImageSearchService,
+        placePhotoService,
       } = createService()
       participantRepository.findOne.mockResolvedValue({
         id: 'participant-1',
@@ -444,25 +469,33 @@ describe('PlaceService', () => {
         distanceMeters: 100,
       })
       const image = {
+        id: 'google:1:1',
         url: 'https://images.example.com/place.jpg',
-        thumbnailUrl: 'https://search.example.com/place-thumbnail.jpg',
+        width: 1200,
+        height: 900,
+        source: PlacePhotoSource.Google,
+        attributions: [{ displayName: '사진가', uri: null, photoUri: null }],
       }
-      kakaoImageSearchService.findImages.mockResolvedValue([image])
+      placePhotoService.findPhotos.mockResolvedValue([image])
 
       const result = await service.getPlaceDetail('1', 'token')
 
       expect(result).toMatchObject({
         imageUrls: [image.url],
-        previewUrl: image.thumbnailUrl,
+        photos: [image],
+        previewUrl: image.url,
+        previewPhoto: image,
       })
-      expect(result).not.toHaveProperty('images')
-      expect(result).not.toHaveProperty('previewImage')
-      expect(kakaoImageSearchService.findImages).toHaveBeenCalledWith({
-        name: '성수 카페',
-        address: '서울 성동구 성수동1가 1',
-        roadAddress: '서울 성동구 성수이로 1',
-      })
-      expect(placeImageService.getImageUrls).not.toHaveBeenCalled()
+      expect(placePhotoService.findPhotos).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: '1',
+          source: PlaceSource.Kakao,
+          providerPlaceId: '12345',
+          name: '성수 카페',
+          address: '서울 성동구 성수동1가 1',
+          roadAddress: '서울 성동구 성수이로 1',
+        }),
+      )
     })
 
     it('Kakao 이미지가 없으면 기존 필드에 빈 값만 응답한다', async () => {
@@ -471,7 +504,7 @@ describe('PlaceService', () => {
         participantRepository,
         placeRepository,
         placeLiveDataService,
-        placeImageService,
+        placePhotoService,
       } = createService()
       participantRepository.findOne.mockResolvedValue({
         id: 'participant-1',
@@ -503,10 +536,13 @@ describe('PlaceService', () => {
 
       const result = await service.getPlaceDetail('1', 'token')
 
-      expect(result).toMatchObject({ imageUrls: [], previewUrl: null })
-      expect(result).not.toHaveProperty('images')
-      expect(result).not.toHaveProperty('previewImage')
-      expect(placeImageService.getImageUrls).not.toHaveBeenCalled()
+      expect(result).toMatchObject({
+        imageUrls: [],
+        photos: [],
+        previewUrl: null,
+        previewPhoto: null,
+      })
+      expect(placePhotoService.findPhotos).toHaveBeenCalled()
     })
   })
 })

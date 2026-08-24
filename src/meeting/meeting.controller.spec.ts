@@ -13,6 +13,12 @@ import {
 } from './meeting.controller'
 import { MeetingService } from './meeting.service'
 
+function tomorrowDateString() {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return tomorrow.toISOString().slice(0, 10)
+}
+
 function createController() {
   const meetingService = {
     createMeeting: jest.fn().mockResolvedValue({}),
@@ -119,6 +125,8 @@ describe('MeetingController', () => {
         longitude: 127.0557,
         primaryImageUrl: null,
         previewUrl: null,
+        previewPhoto: null,
+        placeUrl: null,
       },
     ]
     ;(meetingService.getSimilarPlaces as jest.Mock).mockResolvedValue(expected)
@@ -318,12 +326,16 @@ describe('MeetingController', () => {
       'longitude',
       'primaryImageUrl',
       'previewUrl',
+      'previewPhoto',
       'placeUrl',
     ])
     expect(
       similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
     ).toBe(true)
     expect(similarPlaceResponseSchema?.properties?.previewUrl?.nullable).toBe(
+      true,
+    )
+    expect(similarPlaceResponseSchema?.properties?.previewPhoto?.nullable).toBe(
       true,
     )
 
@@ -389,7 +401,7 @@ describe('MeetingController', () => {
     const request = {
       meetingTypeCode: MeetingTypeCode.Social,
       name: '성수 모임',
-      date: '2026-08-23',
+      date: tomorrowDateString(),
       time: '12:00',
       firstMeetingLocation: {
         displayName: '강남역',
