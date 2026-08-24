@@ -52,7 +52,7 @@ export type SimilarPlace = {
   previewUrl: string | null
 }
 
-const SIMILAR_PLACE_CANDIDATE_POOL_SIZE = 200
+export const SIMILAR_PLACE_CANDIDATE_POOL_SIZE = 200
 
 export function shuffle<T>(items: readonly T[]): T[] {
   const result = [...items]

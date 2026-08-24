@@ -21,7 +21,11 @@ import { Place } from 'src/place/entities/place.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
-import { PlaceRepository } from 'src/place/place.repository'
+import {
+  PlaceRepository,
+  SIMILAR_PLACE_CANDIDATE_POOL_SIZE,
+  shuffle,
+} from 'src/place/place.repository'
 import { PlaceImageService } from 'src/place/place-image.service'
 import {
   PlaceLiveDataService,
@@ -1236,8 +1240,10 @@ export class MeetingService {
         ...displayedIds,
         ...recommendedPlaceIds,
       ])
-      return liveResult.places
+      const nearbyCandidates = liveResult.places
         .filter((candidate) => !excluded.has(candidate.id))
+        .slice(0, SIMILAR_PLACE_CANDIDATE_POOL_SIZE)
+      return shuffle(nearbyCandidates)
         .slice(0, limit)
         .map((candidate) => ({
           id: candidate.id,
