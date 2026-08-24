@@ -30,6 +30,8 @@ const placePhotoSchema = z.object({
   height: z.number().int().positive().nullable(),
   source: z.enum(PlacePhotoSource),
   attributions: z.array(placePhotoAttributionSchema),
+  googleMapsUri: z.string().nullable(),
+  flagContentUri: z.string().nullable(),
 })
 
 export const placeSearchItemSchema = z.object({

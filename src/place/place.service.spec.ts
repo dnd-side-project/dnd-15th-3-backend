@@ -262,6 +262,8 @@ describe('PlaceService', () => {
         height: 600,
         source: PlacePhotoSource.Google,
         attributions: [{ displayName: '사진가', uri: null, photoUri: null }],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+        flagContentUri: null,
       }
       placePhotoService.findPreviewPhotos.mockResolvedValue(
         new Map([['10', previewPhoto]]),
@@ -403,6 +405,8 @@ describe('PlaceService', () => {
           height: null,
           source: PlacePhotoSource.Owned,
           attributions: [],
+          googleMapsUri: null,
+          flagContentUri: null,
         },
         {
           id: 'owned:1:2',
@@ -411,6 +415,8 @@ describe('PlaceService', () => {
           height: null,
           source: PlacePhotoSource.Owned,
           attributions: [],
+          googleMapsUri: null,
+          flagContentUri: null,
         },
       ]
       placePhotoService.findPhotos.mockResolvedValue(photos)
@@ -508,6 +514,8 @@ describe('PlaceService', () => {
         height: 900,
         source: PlacePhotoSource.Google,
         attributions: [{ displayName: '사진가', uri: null, photoUri: null }],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+        flagContentUri: null,
       }
       placePhotoService.findPhotos.mockResolvedValue([image])
 

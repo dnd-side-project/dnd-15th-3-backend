@@ -101,8 +101,11 @@ export class PlacePhotoService {
         (await this.googlePhotoProvider.getPhotoReferences(
           match.providerPlaceId,
         ))
+      const displayableReferences = references.filter(
+        (reference) => reference.googleMapsUri !== null,
+      )
       const photos = await Promise.all(
-        references.slice(0, limit).map(async (reference, index) => {
+        displayableReferences.slice(0, limit).map(async (reference, index) => {
           let url: string | null
           try {
             url = await this.googlePhotoProvider.getPhotoUrl(
@@ -120,6 +123,8 @@ export class PlacePhotoService {
             height: reference.height,
             source: PlacePhotoSource.Google,
             attributions: reference.authorAttributions,
+            googleMapsUri: reference.googleMapsUri,
+            flagContentUri: reference.flagContentUri,
           } satisfies PlacePhoto
         }),
       )
@@ -212,6 +217,8 @@ export class PlacePhotoService {
       height: null,
       source: PlacePhotoSource.Owned,
       attributions: [],
+      googleMapsUri: null,
+      flagContentUri: null,
     }
   }
 

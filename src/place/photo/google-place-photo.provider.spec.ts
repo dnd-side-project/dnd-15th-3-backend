@@ -52,6 +52,9 @@ describe('GooglePlacePhotoProvider', () => {
                       photoUri: '//example.com/avatar.jpg',
                     },
                   ],
+                  googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+                  flagContentUri:
+                    'https://www.google.com/local/imagery/report/photo-1',
                 },
               ],
             },
@@ -81,6 +84,9 @@ describe('GooglePlacePhotoProvider', () => {
                 photoUri: 'https://example.com/avatar.jpg',
               },
             ],
+            googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+            flagContentUri:
+              'https://www.google.com/local/imagery/report/photo-1',
           },
         ],
       },
@@ -119,6 +125,9 @@ describe('GooglePlacePhotoProvider', () => {
               name: 'places/google-1/photos/photo-1',
               widthPx: 1200,
               heightPx: 900,
+              googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+              flagContentUri:
+                'https://www.google.com/local/imagery/report/photo-1',
             },
           ],
         }),
@@ -134,6 +143,8 @@ describe('GooglePlacePhotoProvider', () => {
         width: 1200,
         height: 900,
         authorAttributions: [],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+        flagContentUri: 'https://www.google.com/local/imagery/report/photo-1',
       },
     ])
     expect(fetchMock.mock.calls[0][0]).toBe(

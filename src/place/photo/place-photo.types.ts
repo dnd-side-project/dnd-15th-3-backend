@@ -14,6 +14,8 @@ export type PlacePhoto = {
   height: number | null
   source: PlacePhotoSource
   attributions: PlacePhotoAttribution[]
+  googleMapsUri: string | null
+  flagContentUri: string | null
 }
 
 export type PlacePhotoTarget = {
@@ -33,6 +35,8 @@ export type GooglePhotoReference = {
   width: number
   height: number
   authorAttributions: PlacePhotoAttribution[]
+  googleMapsUri: string | null
+  flagContentUri: string | null
 }
 
 export type GooglePlacePhotoCandidate = {

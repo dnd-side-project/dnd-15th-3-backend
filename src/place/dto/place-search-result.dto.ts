@@ -26,9 +26,10 @@ export class PlaceSearchResultDto {
 
   @ApiProperty({
     description:
-      '프론트에서 직접 렌더링할 장소 이미지 URL 목록. 이미지가 없으면 빈 배열입니다.',
+      '기존 클라이언트 호환용 이미지 URL 목록. 신규 클라이언트는 photos를 사용합니다.',
     type: [String],
     example: ['https://...', 'https://...'],
+    deprecated: true,
   })
   imageUrls!: string[]
 
@@ -42,9 +43,12 @@ export class PlaceSearchResultDto {
 
   @ApiProperty({
     description:
-      '대표 이미지 미리보기 URL. 프론트에서 직접 렌더링하며 이미지가 없으면 null입니다.',
+      '기존 클라이언트 호환용 대표 이미지 URL. 신규 클라이언트는 previewPhoto를 사용합니다.',
+    type: String,
+    format: 'uri',
     example: null,
     nullable: true,
+    deprecated: true,
   })
   previewUrl!: string | null
 
@@ -60,18 +64,24 @@ export class PlaceSearchResultDto {
 
   @ApiProperty({
     description: '외부 장소 ID',
+    type: String,
     nullable: true,
     example: '12345',
   })
   providerPlaceId!: string | null
 
-  @ApiProperty({ description: '도로명 주소', nullable: true })
+  @ApiProperty({ description: '도로명 주소', type: String, nullable: true })
   roadAddress!: string | null
 
-  @ApiProperty({ description: '전화번호', nullable: true })
+  @ApiProperty({ description: '전화번호', type: String, nullable: true })
   phone!: string | null
 
-  @ApiProperty({ description: 'Kakao 장소 상세 URL', nullable: true })
+  @ApiProperty({
+    description: 'Kakao 장소 상세 URL',
+    type: String,
+    format: 'uri',
+    nullable: true,
+  })
   placeUrl!: string | null
 
   @ApiProperty({ description: '위도', example: 37.5446 })
