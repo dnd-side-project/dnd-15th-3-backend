@@ -119,6 +119,8 @@ describe('MeetingController', () => {
         longitude: 127.0557,
         primaryImageUrl: null,
         previewUrl: null,
+        previewPhoto: null,
+        placeUrl: null,
       },
     ]
     ;(meetingService.getSimilarPlaces as jest.Mock).mockResolvedValue(expected)
@@ -318,12 +320,16 @@ describe('MeetingController', () => {
       'longitude',
       'primaryImageUrl',
       'previewUrl',
+      'previewPhoto',
       'placeUrl',
     ])
     expect(
       similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
     ).toBe(true)
     expect(similarPlaceResponseSchema?.properties?.previewUrl?.nullable).toBe(
+      true,
+    )
+    expect(similarPlaceResponseSchema?.properties?.previewPhoto?.nullable).toBe(
       true,
     )
 

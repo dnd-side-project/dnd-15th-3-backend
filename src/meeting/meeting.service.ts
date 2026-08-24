@@ -21,8 +21,8 @@ import { Place } from 'src/place/entities/place.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
+import { PlacePhotoService } from 'src/place/photo/place-photo.service'
 import { PlaceRepository } from 'src/place/place.repository'
-import { PlaceImageService } from 'src/place/place-image.service'
 import {
   PlaceLiveDataService,
   type ResolvedPlace,
@@ -94,7 +94,7 @@ export class MeetingService {
     private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
     private readonly meetingAccessService: MeetingAccessService,
     private readonly placeSearchRepository: PlaceRepository,
-    private readonly placeImageService: PlaceImageService,
+    private readonly placePhotoService: PlacePhotoService,
     private readonly placeLiveDataService: PlaceLiveDataService,
   ) {}
 
@@ -1236,20 +1236,26 @@ export class MeetingService {
         ...displayedIds,
         ...recommendedPlaceIds,
       ])
-      return liveResult.places
+      const candidates = liveResult.places
         .filter((candidate) => !excluded.has(candidate.id))
         .slice(0, limit)
-        .map((candidate) => ({
+      const previewPhotos =
+        await this.placePhotoService.findPreviewPhotos(candidates)
+      return candidates.map((candidate) => {
+        const previewPhoto = previewPhotos.get(candidate.id) ?? null
+        return {
           id: candidate.id,
           categoryId: candidate.category.id,
           name: candidate.name,
           address: candidate.address,
           latitude: candidate.latitude,
           longitude: candidate.longitude,
-          primaryImageUrl: null,
-          previewUrl: null,
-          placeUrl: candidate.placeUrl,
-        }))
+          primaryImageUrl: previewPhoto?.url ?? null,
+          previewUrl: previewPhoto?.url ?? null,
+          previewPhoto,
+          placeUrl: candidate.placeUrl ?? null,
+        }
+      })
     }
 
     const similar = await this.placeSearchRepository.findSimilar(
@@ -1272,25 +1278,33 @@ export class MeetingService {
               address: true,
               latitude: true,
               longitude: true,
-              previewUrl: true,
+              source: true,
+              providerPlaceId: true,
+              roadAddress: true,
+              phone: true,
+              placeUrl: true,
             },
           })
         : []
 
     const candidates = [...similar, ...padding]
-    const primaryImageUrls = await this.placeImageService.getPrimaryImageUrls(
-      candidates.map((candidate) => candidate.id),
-    )
+    const previewPhotos =
+      await this.placePhotoService.findPreviewPhotos(candidates)
 
-    return candidates.map((candidate) => ({
-      id: candidate.id,
-      categoryId: place.category.id,
-      name: candidate.name,
-      address: candidate.address,
-      latitude: candidate.latitude,
-      longitude: candidate.longitude,
-      primaryImageUrl: primaryImageUrls.get(candidate.id) ?? null,
-      previewUrl: candidate.previewUrl,
-    }))
+    return candidates.map((candidate) => {
+      const previewPhoto = previewPhotos.get(candidate.id) ?? null
+      return {
+        id: candidate.id,
+        categoryId: place.category.id,
+        name: candidate.name,
+        address: candidate.address,
+        latitude: candidate.latitude,
+        longitude: candidate.longitude,
+        primaryImageUrl: previewPhoto?.url ?? null,
+        previewUrl: previewPhoto?.url ?? null,
+        previewPhoto,
+        placeUrl: candidate.placeUrl ?? null,
+      }
+    })
   }
 }
