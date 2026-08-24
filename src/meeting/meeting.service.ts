@@ -71,6 +71,11 @@ import type { AddRecommendationRequest } from './schema/recommendation-request.s
 
 const INVITATION_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const MAX_SIMILAR_PLACES_SIZE = 100
+// 셔플 전 후보 풀(SIMILAR_PLACE_CANDIDATE_POOL_SIZE=200)보다 조금 넉넉하게
+// 잡은, 카카오에 실제로 요청할 목표 후보 수. 이 값 이상을 요청하는 건
+// 어차피 다 잘려나가 낭비이므로 KakaoPlacesProvider가 스펙 수로 나눠
+// 필요한 만큼만 병렬로 가져오는 데 쓴다.
+const SIMILAR_PLACE_KAKAO_TARGET_TOTAL = 250
 
 export type CourseImageFile = {
   buffer: Buffer
@@ -1190,9 +1195,12 @@ export class MeetingService {
       if (!location) {
         throw new MeetingException(MeetingErrorCode.locationNotFound)
       }
-      const liveResult = await this.placeLiveDataService.searchKakao(location, [
-        place.category,
-      ])
+      const liveResult = await this.placeLiveDataService.searchKakao(
+        location,
+        [place.category],
+        undefined,
+        { targetTotal: SIMILAR_PLACE_KAKAO_TARGET_TOTAL },
+      )
       const excluded = new Set([
         placeId,
         ...displayedIds,

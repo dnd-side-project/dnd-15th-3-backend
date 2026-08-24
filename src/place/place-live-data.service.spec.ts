@@ -130,6 +130,33 @@ describe('PlaceLiveDataService', () => {
     ])
   })
 
+  it('targetTotal 옵션을 주면 Provider 요청에 그대로 전달한다', async () => {
+    const { service, kakaoProvider } = createService()
+
+    await service.searchKakao(center, [category as never], undefined, {
+      targetTotal: 250,
+    })
+
+    expect(kakaoProvider.searchNearby).toHaveBeenCalledWith({
+      ...center,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Cafe,
+      targetTotal: 250,
+    })
+  })
+
+  it('targetTotal 옵션이 없으면 Provider 요청에도 포함하지 않는다', async () => {
+    const { service, kakaoProvider } = createService()
+
+    await service.searchKakao(center, [category as never])
+
+    expect(kakaoProvider.searchNearby).toHaveBeenCalledWith({
+      ...center,
+      radiusMeters: 2000,
+      categorySlug: CategorySlug.Cafe,
+    })
+  })
+
   it('저장된 Kakao reference는 카테고리 반경 검색으로 다시 해석한다', async () => {
     const { service, reference, kakaoProvider } = createService()
 
