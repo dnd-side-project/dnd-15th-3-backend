@@ -10,6 +10,7 @@ import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import type { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
+import * as placeRepositoryModule from 'src/place/place.repository'
 import { User } from 'src/user/entities/user.entity'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { In, type Repository } from 'typeorm'
@@ -1374,6 +1375,67 @@ describe('MeetingService', () => {
           placeUrl: true,
         },
       })
+    })
+
+    it('카카오 기준 장소는 실시간 검색 후보를 shuffle하여 추천한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        dataSource,
+        placeLiveDataService,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        source: PlaceSource.Kakao,
+        category: { id: '1' },
+        latitude: 37.544,
+        longitude: 127.055,
+      })
+      dataSource.getRepository.mockReturnValue({
+        findOne: jest
+          .fn()
+          .mockResolvedValue({ latitude: 37.544, longitude: 127.055 }),
+      })
+      placeLiveDataService.searchKakao.mockResolvedValue({
+        places: [
+          {
+            id: '11',
+            category: { id: '1' },
+            name: '성수 카페 A',
+            address: '서울 성동구 성수이로 11',
+            latitude: 37.5447,
+            longitude: 127.0558,
+            placeUrl: null,
+          },
+          {
+            id: '12',
+            category: { id: '1' },
+            name: '성수 카페 B',
+            address: '서울 성동구 성수이로 12',
+            latitude: 37.5448,
+            longitude: 127.0559,
+            placeUrl: null,
+          },
+        ],
+        isComplete: true,
+        unsupportedCategorySlugs: [],
+      })
+      const shuffleSpy = jest.spyOn(placeRepositoryModule, 'shuffle')
+
+      await service.getSimilarPlaces('1', '2', 'token', undefined, 5)
+
+      expect(shuffleSpy).toHaveBeenCalledWith([
+        expect.objectContaining({ id: '11' }),
+        expect.objectContaining({ id: '12' }),
+      ])
+
+      shuffleSpy.mockRestore()
     })
 
     it('Kakao 유사 장소도 업체가 검증된 사진만 응답한다', async () => {

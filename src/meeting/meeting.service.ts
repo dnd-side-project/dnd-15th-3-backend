@@ -22,7 +22,11 @@ import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
 import { PlacePhotoService } from 'src/place/photo/place-photo.service'
-import { PlaceRepository } from 'src/place/place.repository'
+import {
+  PlaceRepository,
+  SIMILAR_PLACE_CANDIDATE_POOL_SIZE,
+  shuffle,
+} from 'src/place/place.repository'
 import {
   PlaceLiveDataService,
   type ResolvedPlace,
@@ -1190,9 +1194,10 @@ export class MeetingService {
         ...displayedIds,
         ...recommendedPlaceIds,
       ])
-      const candidates = liveResult.places
+      const nearbyCandidates = liveResult.places
         .filter((candidate) => !excluded.has(candidate.id))
-        .slice(0, limit)
+        .slice(0, SIMILAR_PLACE_CANDIDATE_POOL_SIZE)
+      const candidates = shuffle(nearbyCandidates).slice(0, limit)
       const previewPhotos =
         await this.placePhotoService.findPreviewPhotos(candidates)
       return candidates.map((candidate) => {
