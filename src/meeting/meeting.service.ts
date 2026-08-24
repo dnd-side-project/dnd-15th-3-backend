@@ -503,7 +503,6 @@ export class MeetingService {
       const locationRepository = manager.getRepository(MeetingLocation)
       const location = await locationRepository
         .createQueryBuilder('location')
-        .leftJoinAndSelect('location.meeting', 'meeting')
         .where('location.meeting_id = :meetingId', { meetingId })
         .setLock('pessimistic_write')
         .getOne()

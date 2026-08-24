@@ -555,7 +555,6 @@ describe('MeetingService', () => {
       createQueryBuilder: jest.fn(),
     }
     const locationQueryBuilder = {
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       setLock: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue(location),
