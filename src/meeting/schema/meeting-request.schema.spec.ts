@@ -9,6 +9,16 @@ import {
 } from './meeting-request.schema'
 
 describe('meeting request schemas', () => {
+  const fixedToday = new Date('2026-01-01T00:00:00.000Z')
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(fixedToday)
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
   it('초대 코드를 대문자로 정규화한다', () => {
     expect(
       invitationPreviewRequestSchema.parse({ invitationCode: ' abc234 ' }),
@@ -71,5 +81,28 @@ describe('meeting request schemas', () => {
         version: 1,
       }),
     ).toMatchObject({ categorySlugs: [CategorySlug.Cafe] })
+  })
+
+  it('오늘 날짜로는 모임을 생성할 수 있다', () => {
+    expect(
+      createMeetingRequestSchema.shape.date.safeParse('2026-01-01').success,
+    ).toBe(true)
+  })
+
+  it('미래 날짜로는 모임을 생성할 수 있다', () => {
+    expect(
+      createMeetingRequestSchema.shape.date.safeParse('2026-01-02').success,
+    ).toBe(true)
+  })
+
+  it('과거 날짜로는 모임을 생성할 수 없다', () => {
+    const result = createMeetingRequestSchema.shape.date.safeParse('2025-12-31')
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe(
+        '오늘 이전 날짜로는 모임을 생성할 수 없습니다.',
+      )
+    }
   })
 })

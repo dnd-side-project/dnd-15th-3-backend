@@ -13,6 +13,12 @@ import {
 } from './meeting.controller'
 import { MeetingService } from './meeting.service'
 
+function tomorrowDateString() {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return tomorrow.toISOString().slice(0, 10)
+}
+
 function createController() {
   const meetingService = {
     createMeeting: jest.fn().mockResolvedValue({}),
@@ -389,7 +395,7 @@ describe('MeetingController', () => {
     const request = {
       meetingTypeCode: MeetingTypeCode.Social,
       name: '성수 모임',
-      date: '2026-08-23',
+      date: tomorrowDateString(),
       time: '12:00',
       firstMeetingLocation: {
         displayName: '강남역',
