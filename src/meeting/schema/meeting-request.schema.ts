@@ -24,6 +24,15 @@ const dateSchema = z
       date.getUTCDate() === day
     )
   }, '존재하지 않는 날짜입니다.')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number)
+    const inputDate = new Date(Date.UTC(year, month - 1, day))
+    const now = new Date()
+    const today = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    )
+    return inputDate >= today
+  }, '오늘 이전 날짜로는 모임을 생성할 수 없습니다.')
 
 const timeSchema = z
   .string()
