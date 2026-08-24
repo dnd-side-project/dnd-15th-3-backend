@@ -249,7 +249,7 @@ describe('MeetingController', () => {
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
     type SchemaWithNullableProperties = {
-      properties?: Record<string, { nullable?: boolean }>
+      properties?: Record<string, { nullable?: boolean; deprecated?: boolean }>
     }
 
     const statusSchema = document.components?.schemas
@@ -332,7 +332,13 @@ describe('MeetingController', () => {
     expect(
       similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
     ).toBe(true)
+    expect(
+      similarPlaceResponseSchema?.properties?.primaryImageUrl?.deprecated,
+    ).toBe(true)
     expect(similarPlaceResponseSchema?.properties?.previewUrl?.nullable).toBe(
+      true,
+    )
+    expect(similarPlaceResponseSchema?.properties?.previewUrl?.deprecated).toBe(
       true,
     )
     expect(similarPlaceResponseSchema?.properties?.previewPhoto?.nullable).toBe(

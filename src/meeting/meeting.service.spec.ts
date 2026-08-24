@@ -1339,6 +1339,8 @@ describe('MeetingService', () => {
         height: 600,
         source: 'GOOGLE',
         attributions: [],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-3',
+        flagContentUri: null,
       }
       placePhotoService.findPreviewPhotos.mockResolvedValue(
         new Map([['3', previewPhoto]]),
@@ -1489,6 +1491,8 @@ describe('MeetingService', () => {
         height: 600,
         source: 'GOOGLE',
         attributions: [],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-11',
+        flagContentUri: null,
       }
       placePhotoService.findPreviewPhotos.mockResolvedValue(
         new Map([['11', previewPhoto]]),

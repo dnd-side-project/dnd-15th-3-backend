@@ -26,6 +26,8 @@ const googlePhotoSchema = z.object({
   widthPx: z.number().int().positive(),
   heightPx: z.number().int().positive(),
   authorAttributions: z.array(googleAttributionSchema).default([]),
+  googleMapsUri: z.string().trim().min(1).nullish(),
+  flagContentUri: z.string().trim().min(1).nullish(),
 })
 
 const googlePhotoPlaceSchema = z.object({
@@ -233,6 +235,8 @@ export class GooglePlacePhotoProvider {
         uri: this.normalizeOptionalUrl(attribution.uri),
         photoUri: this.normalizeOptionalUrl(attribution.photoUri),
       })),
+      googleMapsUri: this.normalizeOptionalUrl(photo.googleMapsUri),
+      flagContentUri: this.normalizeOptionalUrl(photo.flagContentUri),
     }
   }
 

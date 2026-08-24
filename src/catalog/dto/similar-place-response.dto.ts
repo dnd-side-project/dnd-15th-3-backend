@@ -24,18 +24,24 @@ export class SimilarPlaceResponseDto {
   longitude!: number
 
   @ApiProperty({
-    description: '대표 이미지 URL',
+    description:
+      '기존 클라이언트 호환용 대표 이미지 URL. 신규 클라이언트는 previewPhoto를 사용합니다.',
     type: 'string',
+    format: 'uri',
     example: 'https://...',
     nullable: true,
+    deprecated: true,
   })
   primaryImageUrl!: string | null
 
   @ApiProperty({
-    description: '미리보기 URL. 아직 수집되지 않았다면 null입니다.',
+    description:
+      '기존 클라이언트 호환용 미리보기 URL. 신규 클라이언트는 previewPhoto를 사용합니다.',
     type: 'string',
+    format: 'uri',
     example: 'https://...',
     nullable: true,
+    deprecated: true,
   })
   previewUrl!: string | null
 

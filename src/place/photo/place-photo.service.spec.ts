@@ -29,6 +29,8 @@ const photoReference: GooglePhotoReference = {
   width: 1200,
   height: 900,
   authorAttributions: [{ displayName: '사진가', uri: null, photoUri: null }],
+  googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+  flagContentUri: 'https://www.google.com/local/imagery/report/photo-1',
 }
 
 const matchedCandidate: GooglePlacePhotoCandidate = {
@@ -88,6 +90,8 @@ describe('PlacePhotoService', () => {
             height: null,
             source: PlacePhotoSource.Owned,
             attributions: [],
+            googleMapsUri: null,
+            flagContentUri: null,
           },
         ],
       ]),
@@ -119,6 +123,8 @@ describe('PlacePhotoService', () => {
         height: 900,
         source: PlacePhotoSource.Google,
         attributions: photoReference.authorAttributions,
+        googleMapsUri: photoReference.googleMapsUri,
+        flagContentUri: photoReference.flagContentUri,
       },
     ])
     expect(matchRepository.save).toHaveBeenCalledWith(
@@ -133,6 +139,19 @@ describe('PlacePhotoService', () => {
       photoReference.name,
       1600,
     )
+  })
+
+  it('Google Maps 원본 링크가 없는 사진은 노출하지 않는다', async () => {
+    const { service, googlePhotoProvider } = createService()
+    googlePhotoProvider.searchCandidates.mockResolvedValue([
+      {
+        ...matchedCandidate,
+        photos: [{ ...photoReference, googleMapsUri: null }],
+      },
+    ])
+
+    await expect(service.findPhotos(target)).resolves.toEqual([])
+    expect(googlePhotoProvider.getPhotoUrl).not.toHaveBeenCalled()
   })
 
   it('후보가 모호하면 매칭 상태만 저장하고 사진은 노출하지 않는다', async () => {
