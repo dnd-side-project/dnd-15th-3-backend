@@ -1436,6 +1436,12 @@ describe('MeetingService', () => {
         expect.objectContaining({ id: '11' }),
         expect.objectContaining({ id: '12' }),
       ])
+      expect(placeLiveDataService.searchKakao).toHaveBeenCalledWith(
+        { latitude: 37.544, longitude: 127.055 },
+        [{ id: '1' }],
+        undefined,
+        { targetTotal: 250 },
+      )
 
       shuffleSpy.mockRestore()
     })

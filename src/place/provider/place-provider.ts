@@ -7,6 +7,13 @@ export type PlaceProviderSearchRequest = {
   radiusMeters: number
   categorySlug: CategorySlug
   query?: string
+  /**
+   * 설정하면 스펙(카테고리 그룹/키워드)별 상한 페이지 수를
+   * `ceil(targetTotal / (페이지당 개수 × 스펙 수))`로 동적으로 계산해
+   * 필요한 만큼만 병렬·배치로 가져온다. 지정하지 않으면 기존처럼
+   * 스펙마다 끝까지(is_end 또는 최대 페이지까지) 순차 조회한다.
+   */
+  targetTotal?: number
 }
 
 export type PlaceProviderPlace = {

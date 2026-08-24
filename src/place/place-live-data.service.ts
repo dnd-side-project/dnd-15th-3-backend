@@ -58,6 +58,7 @@ export class PlaceLiveDataService {
     center: PlaceSearchCenter,
     categories: Category[],
     query?: string,
+    options?: { targetTotal?: number },
   ): Promise<LivePlaceSearchResult> {
     const lookupQuery = query?.trim() || undefined
     const supported = categories.filter((category) =>
@@ -80,6 +81,9 @@ export class PlaceLiveDataService {
           radiusMeters: PLACE_SYNC_RADIUS_METERS,
           categorySlug: category.slug as CategorySlug,
           ...(lookupQuery ? { query: lookupQuery } : {}),
+          ...(options?.targetTotal !== undefined
+            ? { targetTotal: options.targetTotal }
+            : {}),
         }),
       })),
     )

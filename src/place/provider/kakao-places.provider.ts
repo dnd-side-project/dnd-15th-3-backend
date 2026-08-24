@@ -29,10 +29,20 @@ const KAKAO_KEYWORD_SEARCH_URL =
 const KAKAO_REQUEST_TIMEOUT_MS = 5_000
 const KAKAO_PAGE_SIZE = 15
 const KAKAO_MAX_PAGE = 45
+// targetTotal이 있을 때 한 번에 동시 실행할 페이지 요청 수.
+// 카카오 API 초당 요청 제한(50회)을 넘기지 않기 위한 안전값이다.
+const KAKAO_BATCH_SIZE = 5
+const KAKAO_MAX_RETRY_ATTEMPTS = 3
+const KAKAO_RETRY_BASE_DELAY_MS = 300
 
 type KakaoSearchResult = {
   documents: KakaoPlaceDocument[]
   isComplete: boolean
+}
+
+type KakaoPageTask = {
+  spec: KakaoPlaceSearchSpec
+  page: number
 }
 
 @Injectable()
@@ -69,13 +79,21 @@ export class KakaoPlacesProvider implements PlaceProvider {
       throw new PlaceException(PlaceErrorCode.providerUnavailable)
     }
 
+    const specResults =
+      request.targetTotal === undefined
+        ? await this.searchSpecsSequentially(specs, request, apiKey)
+        : await this.searchSpecsBounded(
+            specs,
+            request,
+            apiKey,
+            request.targetTotal,
+          )
+
     const placesById = new Map<string, PlaceProviderPlace>()
     let isComplete = true
 
-    for (const spec of specs) {
-      const result = await this.searchAllPages(spec, request, apiKey)
+    for (const result of specResults) {
       isComplete = isComplete && result.isComplete
-
       for (const document of result.documents) {
         const place = this.toProviderPlace(document)
         if (!placesById.has(place.providerPlaceId)) {
@@ -85,6 +103,20 @@ export class KakaoPlacesProvider implements PlaceProvider {
     }
 
     return { places: [...placesById.values()], isComplete }
+  }
+
+  // 기존 동작: 스펙마다 순차로, is_end가 나올 때까지(최대 KAKAO_MAX_PAGE) 조회한다.
+  // targetTotal을 안 넘기는 호출(예: 일반 장소 검색)은 전부 이 경로를 그대로 탄다.
+  private async searchSpecsSequentially(
+    specs: readonly KakaoPlaceSearchSpec[],
+    request: PlaceProviderSearchRequest,
+    apiKey: string,
+  ): Promise<KakaoSearchResult[]> {
+    const results: KakaoSearchResult[] = []
+    for (const spec of specs) {
+      results.push(await this.searchAllPages(spec, request, apiKey))
+    }
+    return results
   }
 
   private async searchAllPages(
@@ -107,11 +139,73 @@ export class KakaoPlacesProvider implements PlaceProvider {
     return { documents, isComplete: false }
   }
 
+  // targetTotal이 있는 호출(비슷한 장소 추천) 전용 경로.
+  // 스펙 수로 필요한 페이지 수를 나눠 계산한 뒤, 스펙/페이지 구분 없이
+  // 하나의 요청 목록으로 모아 KAKAO_BATCH_SIZE개씩 배치로 병렬 조회한다.
+  // 배치 도중 어떤 스펙이 is_end에 도달하면, 그 스펙의 남은 페이지 요청은
+  // 이후 배치에서 건너뛴다.
+  private async searchSpecsBounded(
+    specs: readonly KakaoPlaceSearchSpec[],
+    request: PlaceProviderSearchRequest,
+    apiKey: string,
+    targetTotal: number,
+  ): Promise<KakaoSearchResult[]> {
+    const pagesPerSpec = Math.min(
+      KAKAO_MAX_PAGE,
+      Math.max(1, Math.ceil(targetTotal / (KAKAO_PAGE_SIZE * specs.length))),
+    )
+
+    const tasks: KakaoPageTask[] = []
+    for (const spec of specs) {
+      for (let page = 1; page <= pagesPerSpec; page += 1) {
+        tasks.push({ spec, page })
+      }
+    }
+
+    const documentsBySpec = new Map<KakaoPlaceSearchSpec, KakaoPlaceDocument[]>(
+      specs.map((spec) => [spec, []]),
+    )
+    const isCompleteBySpec = new Map<KakaoPlaceSearchSpec, boolean>(
+      specs.map((spec) => [spec, true]),
+    )
+    const endedSpecs = new Set<KakaoPlaceSearchSpec>()
+
+    for (let i = 0; i < tasks.length; i += KAKAO_BATCH_SIZE) {
+      const batch = tasks
+        .slice(i, i + KAKAO_BATCH_SIZE)
+        .filter((task) => !endedSpecs.has(task.spec))
+      if (batch.length === 0) continue
+
+      const responses = await Promise.all(
+        batch.map((task) =>
+          this.searchPage(task.spec, request, apiKey, task.page),
+        ),
+      )
+
+      batch.forEach((task, index) => {
+        const response = responses[index]
+        documentsBySpec.get(task.spec)?.push(...response.documents)
+        if (response.meta.total_count > response.meta.pageable_count) {
+          isCompleteBySpec.set(task.spec, false)
+        }
+        if (response.meta.is_end) {
+          endedSpecs.add(task.spec)
+        }
+      })
+    }
+
+    return specs.map((spec) => ({
+      documents: documentsBySpec.get(spec) ?? [],
+      isComplete: isCompleteBySpec.get(spec) ?? true,
+    }))
+  }
+
   private async searchPage(
     spec: KakaoPlaceSearchSpec,
     request: PlaceProviderSearchRequest,
     apiKey: string,
     page: number,
+    attempt = 1,
   ): Promise<KakaoPlaceSearchResponse> {
     const userQuery = request.query?.trim()
     const keywordQuery =
@@ -152,6 +246,11 @@ export class KakaoPlacesProvider implements PlaceProvider {
       throw new PlaceException(PlaceErrorCode.providerRequestFailed)
     }
 
+    if (response.status === 429 && attempt < KAKAO_MAX_RETRY_ATTEMPTS) {
+      await this.delay(KAKAO_RETRY_BASE_DELAY_MS * attempt)
+      return this.searchPage(spec, request, apiKey, page, attempt + 1)
+    }
+
     if (!response.ok) {
       throw new PlaceException(PlaceErrorCode.providerRequestFailed)
     }
@@ -168,6 +267,10 @@ export class KakaoPlacesProvider implements PlaceProvider {
       throw new PlaceException(PlaceErrorCode.invalidProviderResponse)
     }
     return parsedResponse.data
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   private combineQueries(userQuery: string, categoryQuery: string): string {
