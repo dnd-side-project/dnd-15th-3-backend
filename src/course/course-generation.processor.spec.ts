@@ -69,7 +69,7 @@ function createContext() {
     meeting,
   })
   const runQueryBuilder = {
-    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    innerJoinAndSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     setLock: jest.fn().mockReturnThis(),
     getOne: jest.fn().mockResolvedValue(run),

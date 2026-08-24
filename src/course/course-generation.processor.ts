@@ -248,7 +248,7 @@ export class CourseGenerationProcessor {
       const runRepository = manager.getRepository(CourseGenerationRun)
       const run = await runRepository
         .createQueryBuilder('run')
-        .leftJoinAndSelect('run.meeting', 'meeting')
+        .innerJoinAndSelect('run.meeting', 'meeting')
         .where('run.id = :runId', { runId })
         .setLock('pessimistic_write')
         .getOne()
