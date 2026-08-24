@@ -348,8 +348,7 @@ describe('MeetingService', () => {
   })
 
   it('코스 계획은 참여자만 조회하고 방장만 version을 증가시켜 수정한다', async () => {
-    const { service, dataSource, participantRepository } =
-      createMeetingService()
+    const { service, dataSource, meetingAccessService } = createMeetingService()
     const category = {
       id: 'category-1',
       slug: CategorySlug.Cafe,
@@ -357,7 +356,7 @@ describe('MeetingService', () => {
     }
     const meeting = { id: 'meeting-1', courseVersion: 1 }
     const step = { id: 'step-1', meeting, category, order: 1 }
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-1',
       role: ParticipantRole.Host,
       accessToken: 'host-token',
@@ -384,15 +383,6 @@ describe('MeetingService', () => {
       save: jest.fn().mockResolvedValue([step]),
     }
     const managerRepositories = new Map<unknown, unknown>([
-      [
-        MeetingParticipant,
-        {
-          findOne: jest.fn().mockResolvedValue({
-            id: 'participant-1',
-            role: ParticipantRole.Host,
-          }),
-        },
-      ],
       [Category, { find: jest.fn().mockResolvedValue([category]) }],
       [Meeting, meetingRepository],
       [CourseCategoryStep, stepRepository],
@@ -416,16 +406,19 @@ describe('MeetingService', () => {
       version: 2,
       categorySteps: [{ slug: CategorySlug.Cafe, order: 1 }],
     })
+    expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
+      'meeting-1',
+      'host-token',
+      manager,
+    )
     expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
       'pessimistic_write',
     )
     expect(deleteQueryBuilder.execute).toHaveBeenCalled()
 
-    managerRepositories.set(MeetingParticipant, {
-      findOne: jest.fn().mockResolvedValue({
-        id: 'participant-2',
-        role: ParticipantRole.Member,
-      }),
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-2',
+      role: ParticipantRole.Member,
     })
     await expect(
       service.updateCoursePlan('meeting-1', 'member-token', {
@@ -538,7 +531,12 @@ describe('MeetingService', () => {
   })
 
   it('기준 위치 변경 시 이전 작업을 무효화하고 새 수집 작업은 등록하지 않는다', async () => {
-    const { service, dataSource, placeSyncService } = createMeetingService()
+    const { service, dataSource, placeSyncService, meetingAccessService } =
+      createMeetingService()
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-1',
+      role: 'HOST',
+    })
     const meeting = { id: 'meeting-1' }
     const location = {
       id: 'location-1',
@@ -552,11 +550,6 @@ describe('MeetingService', () => {
       location: { type: 'Point', coordinates: [127, 37.5] },
     }
     const updatedLocation = { ...location, syncVersion: 2 }
-    const participantRepository = {
-      findOne: jest
-        .fn()
-        .mockResolvedValue({ id: 'participant-1', role: 'HOST' }),
-    }
     const locationRepository = {
       save: jest.fn().mockResolvedValue(updatedLocation),
       createQueryBuilder: jest.fn(),
@@ -583,7 +576,6 @@ describe('MeetingService', () => {
       find: jest.fn().mockResolvedValue([{ category }]),
     }
     const repositories = new Map<unknown, unknown>([
-      [MeetingParticipant, participantRepository],
       [MeetingLocation, locationRepository],
       [PlaceSyncJob, jobRepository],
       [CourseCategoryStep, stepRepository],
@@ -619,7 +611,7 @@ describe('MeetingService', () => {
     const {
       service,
       dataSource,
-      participantRepository,
+      meetingAccessService,
       placeRepository,
       recommendationRepository,
     } = createMeetingService()
@@ -634,7 +626,7 @@ describe('MeetingService', () => {
       category,
     }
     const location = { latitude: 37.5, longitude: 127 }
-    participantRepository.findOne.mockResolvedValue(participant)
+    meetingAccessService.findParticipant.mockResolvedValue(participant)
     placeRepository.findOne.mockResolvedValue(place)
     recommendationRepository.findOne.mockResolvedValue(null)
     recommendationRepository.save.mockImplementation((value) =>
@@ -1525,9 +1517,9 @@ describe('MeetingService', () => {
   })
 
   it('코스 확정 후 방장의 이미지를 원자적으로 등록한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1579,9 +1571,9 @@ describe('MeetingService', () => {
   })
 
   it('일반 모임원의 코스 이미지 등록을 거절한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-member',
       role: ParticipantRole.Member,
     })
@@ -1597,9 +1589,11 @@ describe('MeetingService', () => {
   })
 
   it('모임원이 아니면 코스 이미지를 저장하지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue(null)
+    meetingAccessService.findParticipant.mockRejectedValue(
+      new CommonException(CommonErrorCode.authenticationFailed),
+    )
 
     await expect(
       service.storeCourseImage('meeting-1', 'invalid-token', {
@@ -1614,9 +1608,9 @@ describe('MeetingService', () => {
   })
 
   it('이미 등록된 코스 이미지는 새 파일로 덮어쓰지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1643,9 +1637,9 @@ describe('MeetingService', () => {
   })
 
   it('코스 확정 전에는 코스 이미지를 저장하지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1669,9 +1663,9 @@ describe('MeetingService', () => {
   })
 
   it('동시 업로드 경쟁에서 지면 자산을 폐기하고 승자를 반환한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1720,9 +1714,9 @@ describe('MeetingService', () => {
   })
 
   it('이미지 저장 후 모임 DB 갱신이 실패하면 자산을 보상 삭제한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1757,9 +1751,9 @@ describe('MeetingService', () => {
   })
 
   it('모임원에게만 등록된 코스 이미지 다운로드를 제공한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-1',
     })
     dataSource.getRepository.mockReturnValue({
