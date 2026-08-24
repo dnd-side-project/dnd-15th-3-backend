@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm'
+import { PlaceSource } from './enums/place-source.enum'
 import { PlaceRepository, shuffle } from './place.repository'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
 
@@ -7,6 +8,16 @@ const request: PlaceSearchRequest = {
   accessToken: 'token',
   page: 2,
   size: 20,
+}
+
+function googlePlaceFields(providerPlaceId: string) {
+  return {
+    source: PlaceSource.Google,
+    providerPlaceId,
+    roadAddress: null,
+    phone: null,
+    placeUrl: null,
+  }
 }
 
 describe('PlaceRepository', () => {
@@ -26,6 +37,7 @@ describe('PlaceRepository', () => {
             categoryName: '카페',
             categorySlug: 'cafe',
             distanceMeters: 352.4,
+            ...googlePlaceFields('google-10'),
           },
         ])
         .mockResolvedValueOnce([{ total: '21' }]),
@@ -45,6 +57,8 @@ describe('PlaceRepository', () => {
           longitude: 127.0557,
           distanceMeters: 352.4,
           previewUrl: null,
+          previewPhoto: null,
+          ...googlePlaceFields('google-10'),
         },
       ],
       total: 21,
@@ -88,7 +102,7 @@ describe('PlaceRepository', () => {
             address: '서울 성동구 성수이로 2',
             latitude: 37.5447,
             longitude: 127.0558,
-            previewUrl: null,
+            ...googlePlaceFields('google-11'),
           },
         ]),
       }
@@ -105,7 +119,7 @@ describe('PlaceRepository', () => {
           address: '서울 성동구 성수이로 2',
           latitude: 37.5447,
           longitude: 127.0558,
-          previewUrl: null,
+          ...googlePlaceFields('google-11'),
         },
       ])
 
@@ -132,7 +146,7 @@ describe('PlaceRepository', () => {
           address: 'A',
           latitude: 1,
           longitude: 1,
-          previewUrl: null,
+          ...googlePlaceFields('google-1'),
         },
         {
           id: '2',
@@ -140,7 +154,7 @@ describe('PlaceRepository', () => {
           address: 'B',
           latitude: 2,
           longitude: 2,
-          previewUrl: null,
+          ...googlePlaceFields('google-2'),
         },
         {
           id: '3',
@@ -148,7 +162,7 @@ describe('PlaceRepository', () => {
           address: 'C',
           latitude: 3,
           longitude: 3,
-          previewUrl: null,
+          ...googlePlaceFields('google-3'),
         },
       ]
       const dataSource = {
@@ -169,7 +183,7 @@ describe('PlaceRepository', () => {
             address: 'B',
             latitude: 2,
             longitude: 2,
-            previewUrl: null,
+            ...googlePlaceFields('google-2'),
           },
           {
             id: '3',
@@ -177,7 +191,7 @@ describe('PlaceRepository', () => {
             address: 'C',
             latitude: 3,
             longitude: 3,
-            previewUrl: null,
+            ...googlePlaceFields('google-3'),
           },
         ])
       } finally {

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { PlacePhotoDto } from 'src/place/dto/place-photo.dto'
 
 export class SimilarPlaceResponseDto {
   @ApiProperty({ description: '장소 ID', example: '101' })
@@ -37,6 +38,13 @@ export class SimilarPlaceResponseDto {
     nullable: true,
   })
   previewUrl!: string | null
+
+  @ApiProperty({
+    description: '대표 사진과 표시 의무 정보를 함께 담은 객체',
+    type: PlacePhotoDto,
+    nullable: true,
+  })
+  previewPhoto!: PlacePhotoDto | null
 
   @ApiProperty({
     description: 'Kakao 장소 상세 URL',

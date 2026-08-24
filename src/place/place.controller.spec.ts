@@ -69,14 +69,14 @@ describe('PlaceController', () => {
       expect.arrayContaining(['placeId', 'category', 'name', 'address']),
     )
     expect(schema?.properties?.imageUrls?.type).toBe('array')
+    expect(schema?.properties?.photos?.type).toBe('array')
     expect(schema?.properties?.imageUrls?.nullable).not.toBe(true)
-    expect(schema?.properties).not.toHaveProperty('images')
-    expect(schema?.properties).not.toHaveProperty('previewImage')
+    expect(schema?.properties?.previewPhoto?.nullable).toBe(true)
 
     const searchItemSchema = document.components?.schemas
       ?.PlaceSearchItemResponseDto as SchemaWithProperties | undefined
     expect(searchItemSchema?.properties?.previewUrl?.nullable).toBe(true)
-    expect(searchItemSchema?.properties).not.toHaveProperty('previewImage')
+    expect(searchItemSchema?.properties?.previewPhoto?.nullable).toBe(true)
 
     await app.close()
   })
