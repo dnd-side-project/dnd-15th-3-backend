@@ -4,6 +4,7 @@ import { Category } from 'src/category/entities/category.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { KakaoModule } from 'src/kakao/kakao.module'
 import { MediaModule } from 'src/media/media.module'
+import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { Place } from './entities/place.entity'
@@ -29,6 +30,7 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
   imports: [
     KakaoModule,
     MediaModule,
+    MeetingAccessModule,
     TypeOrmModule.forFeature([
       MeetingLocation,
       MeetingParticipant,

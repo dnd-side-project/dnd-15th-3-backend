@@ -5,6 +5,7 @@ import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
@@ -37,21 +38,16 @@ export class PlaceService {
     private readonly courseCategoryStepRepository: Repository<CourseCategoryStep>,
     private readonly placeLiveDataService: PlaceLiveDataService,
     private readonly placePhotoService: PlacePhotoService,
+    private readonly meetingAccessService: MeetingAccessService,
   ) {}
 
   async searchPlaces(
     request: PlaceSearchRequest,
   ): Promise<PlaceSearchResponse> {
-    const participant = await this.participantRepository.findOne({
-      where: {
-        meeting: { id: request.meetingId },
-        accessToken: request.accessToken,
-      },
-    })
-
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
+    await this.meetingAccessService.findParticipant(
+      request.meetingId,
+      request.accessToken,
+    )
 
     const meetingLocation = await this.meetingLocationRepository.findOne({
       where: { meeting: { id: request.meetingId } },
