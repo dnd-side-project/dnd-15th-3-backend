@@ -34,7 +34,6 @@ import {
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
-import { assertAccessToken } from './access/meeting-access.utils'
 import {
   MAP_PINS_VISIBLE_STATUSES,
   PLACE_PREFERENCE_EDITABLE_STATUSES,
@@ -422,20 +421,12 @@ export class MeetingService {
     accessToken: string,
     request: UpdateCoursePlanRequest,
   ): Promise<CoursePlanResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-
     const result = await this.dataSource.transaction(async (manager) => {
-      const participantRepository = manager.getRepository(MeetingParticipant)
-      const participant = await participantRepository.findOne({
-        where: {
-          meeting: { id: meetingId },
-          accessToken: normalizedAccessToken,
-        },
-      })
-      if (!participant) {
-        throw new CommonException(CommonErrorCode.authenticationFailed)
-      }
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
       if (participant.role !== ParticipantRole.Host) {
         throw new MeetingException(MeetingErrorCode.hostOnly)
       }
@@ -495,20 +486,12 @@ export class MeetingService {
     accessToken: string,
     input: MeetingLocationInput,
   ): Promise<MeetingLocationResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-
     return this.dataSource.transaction(async (manager) => {
-      const participantRepository = manager.getRepository(MeetingParticipant)
-      const participant = await participantRepository.findOne({
-        where: {
-          meeting: { id: meetingId },
-          accessToken: normalizedAccessToken,
-        },
-      })
-      if (!participant) {
-        throw new CommonException(CommonErrorCode.authenticationFailed)
-      }
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
       if (participant.role !== ParticipantRole.Host) {
         throw new MeetingException(MeetingErrorCode.hostOnly)
       }

@@ -347,8 +347,7 @@ describe('MeetingService', () => {
   })
 
   it('코스 계획은 참여자만 조회하고 방장만 version을 증가시켜 수정한다', async () => {
-    const { service, dataSource, participantRepository } =
-      createMeetingService()
+    const { service, dataSource, meetingAccessService } = createMeetingService()
     const category = {
       id: 'category-1',
       slug: CategorySlug.Cafe,
@@ -356,7 +355,7 @@ describe('MeetingService', () => {
     }
     const meeting = { id: 'meeting-1', courseVersion: 1 }
     const step = { id: 'step-1', meeting, category, order: 1 }
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-1',
       role: ParticipantRole.Host,
       accessToken: 'host-token',
@@ -383,15 +382,6 @@ describe('MeetingService', () => {
       save: jest.fn().mockResolvedValue([step]),
     }
     const managerRepositories = new Map<unknown, unknown>([
-      [
-        MeetingParticipant,
-        {
-          findOne: jest.fn().mockResolvedValue({
-            id: 'participant-1',
-            role: ParticipantRole.Host,
-          }),
-        },
-      ],
       [Category, { find: jest.fn().mockResolvedValue([category]) }],
       [Meeting, meetingRepository],
       [CourseCategoryStep, stepRepository],
@@ -415,16 +405,19 @@ describe('MeetingService', () => {
       version: 2,
       categorySteps: [{ slug: CategorySlug.Cafe, order: 1 }],
     })
+    expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
+      'meeting-1',
+      'host-token',
+      manager,
+    )
     expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
       'pessimistic_write',
     )
     expect(deleteQueryBuilder.execute).toHaveBeenCalled()
 
-    managerRepositories.set(MeetingParticipant, {
-      findOne: jest.fn().mockResolvedValue({
-        id: 'participant-2',
-        role: ParticipantRole.Member,
-      }),
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-2',
+      role: ParticipantRole.Member,
     })
     await expect(
       service.updateCoursePlan('meeting-1', 'member-token', {
@@ -537,7 +530,12 @@ describe('MeetingService', () => {
   })
 
   it('기준 위치 변경 시 이전 작업을 무효화하고 새 수집 작업은 등록하지 않는다', async () => {
-    const { service, dataSource, placeSyncService } = createMeetingService()
+    const { service, dataSource, placeSyncService, meetingAccessService } =
+      createMeetingService()
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-1',
+      role: 'HOST',
+    })
     const meeting = { id: 'meeting-1' }
     const location = {
       id: 'location-1',
@@ -551,11 +549,6 @@ describe('MeetingService', () => {
       location: { type: 'Point', coordinates: [127, 37.5] },
     }
     const updatedLocation = { ...location, syncVersion: 2 }
-    const participantRepository = {
-      findOne: jest
-        .fn()
-        .mockResolvedValue({ id: 'participant-1', role: 'HOST' }),
-    }
     const locationRepository = {
       save: jest.fn().mockResolvedValue(updatedLocation),
       createQueryBuilder: jest.fn(),
@@ -582,7 +575,6 @@ describe('MeetingService', () => {
       find: jest.fn().mockResolvedValue([{ category }]),
     }
     const repositories = new Map<unknown, unknown>([
-      [MeetingParticipant, participantRepository],
       [MeetingLocation, locationRepository],
       [PlaceSyncJob, jobRepository],
       [CourseCategoryStep, stepRepository],
