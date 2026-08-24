@@ -315,7 +315,10 @@ export class MeetingService {
     accessToken: string,
     file: CourseImageFile,
   ): Promise<CourseImageResponseDto> {
-    const participant = await this.findParticipant(meetingId, accessToken)
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
     if (participant.role !== ParticipantRole.Host) {
       throw new MeetingException(MeetingErrorCode.hostOnly)
     }
@@ -376,7 +379,7 @@ export class MeetingService {
   }
 
   async downloadCourseImage(meetingId: string, accessToken: string) {
-    await this.findParticipant(meetingId, accessToken)
+    await this.meetingAccessService.findParticipant(meetingId, accessToken)
 
     const meeting = await this.dataSource.getRepository(Meeting).findOne({
       where: { id: meetingId },
@@ -559,14 +562,10 @@ export class MeetingService {
     accessToken: string,
     request: AddRecommendationRequest,
   ): Promise<RecommendationPreviewDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-    const participant = await this.participantRepository.findOne({
-      where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
-    })
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
 
     const [location, place] = await Promise.all([
       this.dataSource.getRepository(MeetingLocation).findOne({
@@ -642,14 +641,10 @@ export class MeetingService {
     meetingId: string,
     accessToken: string,
   ): Promise<RecommendationPreviewDto[]> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-    const participant = await this.participantRepository.findOne({
-      where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
-    })
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
 
     const [recommendations, location] = await Promise.all([
       this.recommendationRepository.find({
@@ -932,30 +927,6 @@ export class MeetingService {
         `Failed to discard unreferenced course image: ${asset.objectKey}`,
         detail,
       )
-    }
-  }
-
-  private async findParticipant(
-    meetingId: string,
-    accessToken: string,
-  ): Promise<MeetingParticipant> {
-    this.assertAccessToken(accessToken)
-    const participant = await this.participantRepository.findOne({
-      where: {
-        meeting: { id: meetingId },
-        accessToken: accessToken.trim(),
-      },
-      relations: { user: true },
-    })
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
-    return participant
-  }
-
-  private assertAccessToken(accessToken: string): void {
-    if (!accessToken?.trim()) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
     }
   }
 

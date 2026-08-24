@@ -618,7 +618,7 @@ describe('MeetingService', () => {
     const {
       service,
       dataSource,
-      participantRepository,
+      meetingAccessService,
       placeRepository,
       recommendationRepository,
     } = createMeetingService()
@@ -633,7 +633,7 @@ describe('MeetingService', () => {
       category,
     }
     const location = { latitude: 37.5, longitude: 127 }
-    participantRepository.findOne.mockResolvedValue(participant)
+    meetingAccessService.findParticipant.mockResolvedValue(participant)
     placeRepository.findOne.mockResolvedValue(place)
     recommendationRepository.findOne.mockResolvedValue(null)
     recommendationRepository.save.mockImplementation((value) =>
@@ -1463,9 +1463,9 @@ describe('MeetingService', () => {
   })
 
   it('코스 확정 후 방장의 이미지를 원자적으로 등록한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1517,9 +1517,9 @@ describe('MeetingService', () => {
   })
 
   it('일반 모임원의 코스 이미지 등록을 거절한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-member',
       role: ParticipantRole.Member,
     })
@@ -1535,9 +1535,11 @@ describe('MeetingService', () => {
   })
 
   it('모임원이 아니면 코스 이미지를 저장하지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue(null)
+    meetingAccessService.findParticipant.mockRejectedValue(
+      new CommonException(CommonErrorCode.authenticationFailed),
+    )
 
     await expect(
       service.storeCourseImage('meeting-1', 'invalid-token', {
@@ -1552,9 +1554,9 @@ describe('MeetingService', () => {
   })
 
   it('이미 등록된 코스 이미지는 새 파일로 덮어쓰지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1581,9 +1583,9 @@ describe('MeetingService', () => {
   })
 
   it('코스 확정 전에는 코스 이미지를 저장하지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1607,9 +1609,9 @@ describe('MeetingService', () => {
   })
 
   it('동시 업로드 경쟁에서 지면 자산을 폐기하고 승자를 반환한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1658,9 +1660,9 @@ describe('MeetingService', () => {
   })
 
   it('이미지 저장 후 모임 DB 갱신이 실패하면 자산을 보상 삭제한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-host',
       role: ParticipantRole.Host,
     })
@@ -1695,9 +1697,9 @@ describe('MeetingService', () => {
   })
 
   it('모임원에게만 등록된 코스 이미지 다운로드를 제공한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-1',
     })
     dataSource.getRepository.mockReturnValue({
