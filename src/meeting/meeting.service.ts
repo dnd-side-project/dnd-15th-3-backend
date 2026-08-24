@@ -791,7 +791,7 @@ export class MeetingService {
         profileAvatarId: participant.profileAvatarId,
       })),
       categorySteps: steps.map((step) => ({
-        id: step.id,
+        id: step.category.id,
         name: step.category.name,
         slug: step.category
           .slug as MeetingScreenResponseDto['categorySlugs'][number],
@@ -1044,7 +1044,7 @@ export class MeetingService {
         },
       ],
       categorySteps: created.steps.map((step) => ({
-        id: step.id,
+        id: step.category.id,
         name: step.category.name,
         slug: step.category
           .slug as MeetingScreenResponseDto['categorySlugs'][number],

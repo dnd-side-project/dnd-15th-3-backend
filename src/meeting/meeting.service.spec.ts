@@ -344,6 +344,7 @@ describe('MeetingService', () => {
         { id: 'participant-host', role: 'HOST' },
         { id: 'participant-guest', role: 'MEMBER' },
       ],
+      categorySteps: [{ id: 'category-1', slug: CategorySlug.Cafe, order: 1 }],
     })
   })
 
@@ -524,7 +525,7 @@ describe('MeetingService', () => {
         externalAddressId: 'kakao-address-1',
         syncVersion: 1,
       },
-      categorySteps: [{ id: 'step-1', slug: CategorySlug.Cafe }],
+      categorySteps: [{ id: 'category-1', slug: CategorySlug.Cafe }],
     })
     expect(dataSource.transaction).toHaveBeenCalledTimes(1)
     expect(placeSyncService.createJobs).not.toHaveBeenCalled()
