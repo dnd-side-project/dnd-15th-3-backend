@@ -2,6 +2,12 @@
 
 The API and place-sync worker load their general application configuration from
 `momo-api-env` and public media configuration from `momo-media-storage`.
+`momo-api-env` must include `GOOGLE_PLACES_API_KEY` to enable verified Google
+place photos and Google place synchronization. Restrict this server-side key to
+the Places API and the deployment's outbound addresses. When the key is absent
+or Google is unavailable, place endpoints remain available and return empty
+photo fields instead of falling back to unverified web-image search.
+
 Create `momo-media-storage` in each application namespace with these keys:
 
 - `MEDIA_BUCKET_NAME` (`momo-media-dev` or `momo-media-prod`)
