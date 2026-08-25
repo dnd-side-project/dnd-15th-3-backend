@@ -12,17 +12,14 @@ export const coerceBoolean = z
   })
   .default(false)
 
-function requiredInProduction<T extends z.ZodTypeAny>(schema: T) {
-  return z.union([
-    schema,
-    z.string().refine(
-      (val) => {
-        const nodeEnv = process.env.NODE_ENV
-        return nodeEnv !== 'production' || val.length > 0
-      },
-      { message: 'Required in production' },
-    ),
-  ])
+function requiredInProduction<T extends z.ZodString>(schema: T) {
+  return schema.refine(
+    (val) => {
+      const nodeEnv = process.env.NODE_ENV
+      return nodeEnv !== 'production' || val.length > 0
+    },
+    { message: 'Required in production' },
+  )
 }
 
 const envSchemaBase = z.object({
