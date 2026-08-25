@@ -59,6 +59,14 @@ export class GooglePlacePhotoProviderError extends Error {}
 
 @Injectable()
 export class GooglePlacePhotoProvider {
+  // Google 사진 이름과 URL은 응답 이후에 캐시하지 않고, 동시에 진행 중인
+  // 동일 요청만 합쳐 정책을 지키면서 중복 외부 호출을 줄인다.
+  private readonly inFlightPhotoReferences = new Map<
+    string,
+    Promise<GooglePhotoReference[]>
+  >()
+  private readonly inFlightPhotoUrls = new Map<string, Promise<string | null>>()
+
   constructor(
     private readonly config: ConfigService<Env, true>,
     @Optional() private readonly metrics?: MetricsService,
@@ -77,14 +85,22 @@ export class GooglePlacePhotoProvider {
   }
 
   getPhotoReferences(providerPlaceId: string): Promise<GooglePhotoReference[]> {
-    return this.observe('get_photo_references', () =>
-      this.requestPhotoReferences(providerPlaceId),
+    const placeId = this.normalizePlaceId(providerPlaceId)
+    if (!placeId) return Promise.resolve([])
+    return this.coalesce(this.inFlightPhotoReferences, placeId, () =>
+      this.observe('get_photo_references', () =>
+        this.requestPhotoReferences(placeId),
+      ),
     )
   }
 
   getPhotoUrl(photoName: string, maxWidthPx: number): Promise<string | null> {
-    return this.observe('get_photo_media', () =>
-      this.requestPhotoUrl(photoName, maxWidthPx),
+    const normalizedName = this.normalizePhotoName(photoName)
+    const key = `${normalizedName}:${maxWidthPx}`
+    return this.coalesce(this.inFlightPhotoUrls, key, () =>
+      this.observe('get_photo_media', () =>
+        this.requestPhotoUrl(normalizedName, maxWidthPx),
+      ),
     )
   }
 
@@ -140,11 +156,8 @@ export class GooglePlacePhotoProvider {
   private async requestPhotoReferences(
     providerPlaceId: string,
   ): Promise<GooglePhotoReference[]> {
-    const placeId = this.normalizePlaceId(providerPlaceId)
-    if (!placeId) return []
-
     const response = await this.request(
-      `${GOOGLE_PLACES_BASE_URL}/places/${encodeURIComponent(placeId)}`,
+      `${GOOGLE_PLACES_BASE_URL}/places/${encodeURIComponent(providerPlaceId)}`,
       {
         headers: { 'X-Goog-FieldMask': 'id,photos' },
       },
@@ -162,14 +175,10 @@ export class GooglePlacePhotoProvider {
     photoName: string,
     maxWidthPx: number,
   ): Promise<string | null> {
-    const normalizedName = photoName.replace(/^\/+|\/+$/g, '')
-    if (
-      !normalizedName.startsWith('places/') ||
-      !normalizedName.includes('/photos/')
-    ) {
+    if (!photoName.startsWith('places/') || !photoName.includes('/photos/')) {
       return null
     }
-    const url = new URL(`${GOOGLE_PLACES_BASE_URL}/${normalizedName}/media`)
+    const url = new URL(`${GOOGLE_PLACES_BASE_URL}/${photoName}/media`)
     url.search = new URLSearchParams({
       maxWidthPx: String(maxWidthPx),
       skipHttpRedirect: 'true',
@@ -257,6 +266,10 @@ export class GooglePlacePhotoProvider {
     return value.trim().replace(/^places\//, '')
   }
 
+  private normalizePhotoName(value: string): string {
+    return value.trim().replace(/^\/+|\/+$/g, '')
+  }
+
   private apiKey(): string {
     return this.config.get('GOOGLE_PLACES_API_KEY', { infer: true }).trim()
   }
@@ -265,5 +278,20 @@ export class GooglePlacePhotoProvider {
     return this.metrics
       ? this.metrics.observeExternal('google_places', operation, task)
       : task()
+  }
+
+  private coalesce<T>(
+    requests: Map<string, Promise<T>>,
+    key: string,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    const pending = requests.get(key)
+    if (pending) return pending
+
+    const request = task().finally(() => {
+      if (requests.get(key) === request) requests.delete(key)
+    })
+    requests.set(key, request)
+    return request
   }
 }
