@@ -4,7 +4,8 @@ import { MeetingPlaceRecommendationDto } from 'src/meeting/dto/meeting-place-rec
 
 export class ExcludedPlaceListResponseDto {
   @ApiProperty({
-    description: '코스에서 제외된 장소 목록',
+    description:
+      '코스에서 제외된 장소 목록. 각 항목의 previewPhoto를 대표 사진으로 사용합니다.',
     type: [MeetingPlaceRecommendationDto],
   })
   items!: MeetingPlaceRecommendationDto[]

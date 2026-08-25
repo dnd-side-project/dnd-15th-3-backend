@@ -128,6 +128,7 @@ describe('CourseController', () => {
           categorySlug: CategorySlug.Cafe,
           address: '서울 성동구 성수이로 1',
           primaryImageUrl: null,
+          previewPhoto: null,
           longitude: 127.0557,
           latitude: 37.5446,
           walkDurationToNextMin: null,
@@ -292,9 +293,9 @@ describe('CourseController', () => {
     )
 
     type PathOperations = {
-      get?: { responses?: Record<string, unknown> }
-      post?: { responses?: Record<string, unknown> }
-      put?: { responses?: Record<string, unknown> }
+      get?: { description?: string; responses?: Record<string, unknown> }
+      post?: { description?: string; responses?: Record<string, unknown> }
+      put?: { description?: string; responses?: Record<string, unknown> }
     }
 
     function responseCodes(responses?: Record<string, unknown>) {
@@ -317,6 +318,7 @@ describe('CourseController', () => {
     expect(responseCodes(courseDetailPath?.get?.responses)).toEqual(
       ['200', '400', '401', '404', '409', '500'].sort(),
     )
+    expect(courseDetailPath?.get?.description).toContain('route[].previewPhoto')
 
     const courseCommentsPath = document.paths?.[
       '/meetings/{meetingId}/courses/{courseCandidateId}/comments'
@@ -333,6 +335,9 @@ describe('CourseController', () => {
     ] as PathOperations | undefined
     expect(responseCodes(excludedPlacesPath?.get?.responses)).toEqual(
       ['200', '400', '401', '404', '409'].sort(),
+    )
+    expect(excludedPlacesPath?.get?.description).toContain(
+      'items[].previewPhoto',
     )
 
     const confirmationPath = document.paths?.[
@@ -357,7 +362,14 @@ describe('CourseController', () => {
       properties?: Record<string, { minLength?: number; maxLength?: number }>
     }
     type SchemaWithNullableProperties = {
-      properties?: Record<string, { nullable?: boolean }>
+      properties?: Record<
+        string,
+        {
+          nullable?: boolean
+          deprecated?: boolean
+          allOf?: Array<{ $ref?: string }>
+        }
+      >
     }
 
     const courseListSchema = document.components?.schemas
@@ -395,6 +407,7 @@ describe('CourseController', () => {
       'categorySlug',
       'address',
       'primaryImageUrl',
+      'previewPhoto',
       'longitude',
       'latitude',
       'walkDurationToNextMin',
@@ -403,6 +416,11 @@ describe('CourseController', () => {
       'placeUrl',
     ])
     expect(routeStepSchema?.properties?.primaryImageUrl?.nullable).toBe(true)
+    expect(routeStepSchema?.properties?.primaryImageUrl?.deprecated).toBe(true)
+    expect(routeStepSchema?.properties?.previewPhoto).toMatchObject({
+      nullable: true,
+      allOf: [{ $ref: '#/components/schemas/PlacePhotoDto' }],
+    })
     expect(routeStepSchema?.properties?.walkDurationToNextMin?.nullable).toBe(
       true,
     )
@@ -450,6 +468,30 @@ describe('CourseController', () => {
     expect(excludedPlaceListSchema?.properties?.appliedCategory?.nullable).toBe(
       true,
     )
+
+    const excludedPlaceSchema = document.components?.schemas
+      ?.MeetingPlaceRecommendationDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(excludedPlaceSchema?.properties ?? {})).toEqual([
+      'recommendationId',
+      'category',
+      'categorySlug',
+      'name',
+      'address',
+      'primaryImageUrl',
+      'previewPhoto',
+      'likeCount',
+      'dislikeCount',
+      'myPreference',
+    ])
+    expect(excludedPlaceSchema?.properties?.primaryImageUrl?.deprecated).toBe(
+      true,
+    )
+    expect(excludedPlaceSchema?.properties?.previewPhoto).toMatchObject({
+      nullable: true,
+      allOf: [{ $ref: '#/components/schemas/PlacePhotoDto' }],
+    })
 
     const addCoursePlaceRequestSchema = document.components?.schemas
       ?.AddCoursePlaceRequestDto as SchemaWithProperties | undefined
