@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { PlacePhotoDto } from 'src/place/dto/place-photo.dto'
 import { PlaceSummaryDto } from './place-summary.dto'
 
 export class RecommendationPreviewDto {
@@ -10,6 +11,14 @@ export class RecommendationPreviewDto {
 
   @ApiProperty({ description: '추천 장소', type: PlaceSummaryDto })
   place!: PlaceSummaryDto
+
+  @ApiProperty({
+    description:
+      '추천 장소 대표 사진. source가 GOOGLE이면 attributions를 사진과 연결된 위치에 표시합니다.',
+    type: PlacePhotoDto,
+    nullable: true,
+  })
+  previewPhoto!: PlacePhotoDto | null
 
   @ApiProperty({ description: '추천자 참여자 ID', example: '11' })
   recommendedByParticipantId!: string

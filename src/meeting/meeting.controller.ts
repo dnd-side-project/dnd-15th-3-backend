@@ -161,7 +161,7 @@ export class MeetingController {
   @ApiOperation({
     summary: '장소를 모임 추천 목록에 추가',
     description:
-      'GET /places/search 응답의 items[].id를 placeId로 전달해 현재 모임의 추천 장소로 추가합니다. GET /places/first-meeting의 id는 사용할 수 없습니다.',
+      'GET /places/search 응답의 items[].id를 placeId로 전달해 현재 모임의 추천 장소로 추가합니다. GET /places/first-meeting의 id는 사용할 수 없습니다. 응답의 previewPhoto를 추천 장소 대표 사진으로 사용합니다.',
   })
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({
@@ -213,7 +213,11 @@ export class MeetingController {
   }
 
   @Get(':meetingId/recommendations')
-  @ApiOperation({ summary: '모임 추천 장소 목록 조회' })
+  @ApiOperation({
+    summary: '모임 추천 장소 목록 조회',
+    description:
+      '응답 배열 각 항목의 previewPhoto로 추천 장소 대표 사진을 반환합니다. 사진이 없으면 null입니다.',
+  })
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({
     name: 'accessToken',
