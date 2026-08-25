@@ -63,8 +63,8 @@ function createService() {
   const courseCandidatePlaceRepository = {
     find: jest.fn().mockResolvedValue([]),
   }
-  const placeImageService = {
-    getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
+  const placePhotoService = {
+    findPreviewPhotos: jest.fn().mockResolvedValue(new Map()),
   }
   const placeLiveDataService = {
     resolvePlaces: jest
@@ -91,7 +91,7 @@ function createService() {
     courseCandidateRepository as never,
     commentRepository as never,
     courseCandidatePlaceRepository as never,
-    placeImageService as never,
+    placePhotoService as never,
     placeLiveDataService as never,
     kakaoWalkingCourseService as never,
     courseRepository as never,
@@ -107,7 +107,7 @@ function createService() {
     courseCandidateRepository,
     commentRepository,
     courseCandidatePlaceRepository,
-    placeImageService,
+    placePhotoService,
     kakaoWalkingCourseService,
     courseRepository,
     outboxEventRepository,
@@ -411,7 +411,7 @@ describe('CourseService', () => {
         meetingAccessService,
         courseCandidateRepository,
         courseCandidatePlaceRepository,
-        placeImageService,
+        placePhotoService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: '1',
@@ -428,18 +428,18 @@ describe('CourseService', () => {
       await expect(promise).rejects.toThrow(
         '코스 후보가 존재하는데 코스 경로를 찾을 수 없는 데이터 정합성 오류입니다.',
       )
-      expect(placeImageService.getPrimaryImageUrls).not.toHaveBeenCalled()
+      expect(placePhotoService.findPreviewPhotos).not.toHaveBeenCalled()
     })
 
     it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(
-      '%s 상태면 경로와 총 이동 거리를 순서대로 반환하고, 여러 구간의 거리를 합산하며, 마지막 장소의 이동 시간은 null로 반환한다',
+      '%s 상태면 경로·대표 사진·총 이동 거리를 반환하고 사진은 한 번에 조회한다',
       async (status) => {
         const {
           service,
           meetingAccessService,
           courseCandidateRepository,
           courseCandidatePlaceRepository,
-          placeImageService,
+          placePhotoService,
         } = createService()
         meetingAccessService.findParticipant.mockResolvedValue({
           id: '1',
@@ -498,8 +498,18 @@ describe('CourseService', () => {
             },
           },
         ])
-        placeImageService.getPrimaryImageUrls.mockResolvedValue(
-          new Map([['1', 'https://signed.example.com/first.jpg']]),
+        const previewPhoto = {
+          id: 'google:1:1',
+          url: 'https://places.googleapis.com/photo/first',
+          width: 800,
+          height: 600,
+          source: 'GOOGLE',
+          attributions: [],
+          googleMapsUri: 'https://www.google.com/maps/place/photo-first',
+          flagContentUri: null,
+        }
+        placePhotoService.findPreviewPhotos.mockResolvedValue(
+          new Map([['1', previewPhoto]]),
         )
 
         await expect(
@@ -517,7 +527,8 @@ describe('CourseService', () => {
               category: '카페',
               categorySlug: 'cafe',
               address: '서울 성동구 성수이로 1',
-              primaryImageUrl: 'https://signed.example.com/first.jpg',
+              primaryImageUrl: previewPhoto.url,
+              previewPhoto,
               longitude: 127.0557,
               latitude: 37.5446,
               walkDurationToNextMin: 8,
@@ -531,6 +542,7 @@ describe('CourseService', () => {
               categorySlug: 'restaurant',
               address: '서울 성동구 성수이로 2',
               primaryImageUrl: null,
+              previewPhoto: null,
               longitude: 127.0558,
               latitude: 37.5447,
               walkDurationToNextMin: 10,
@@ -544,6 +556,7 @@ describe('CourseService', () => {
               categorySlug: 'bar',
               address: '서울 성동구 성수이로 3',
               primaryImageUrl: null,
+              previewPhoto: null,
               longitude: 127.0559,
               latitude: 37.5448,
               walkDurationToNextMin: null,
@@ -557,6 +570,12 @@ describe('CourseService', () => {
           },
           order: { order: 'ASC' },
         })
+        expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledTimes(1)
+        expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+          expect.objectContaining({ id: '1', name: '성수 카페 모모' }),
+          expect.objectContaining({ id: '2', name: '성수 맛집' }),
+          expect.objectContaining({ id: '3', name: '성수 술집' }),
+        ])
       },
     )
   })
@@ -894,13 +913,13 @@ describe('CourseService', () => {
       ).not.toHaveBeenCalled()
     })
 
-    it('제외된 장소가 없으면 투표/이미지 조회 없이 빈 목록을 반환한다', async () => {
+    it('제외된 장소가 없으면 빈 목록을 반환하고 사진 조회에 빈 배열을 전달한다', async () => {
       const {
         service,
         meetingAccessService,
         courseCandidateRepository,
         voteRepository,
-        placeImageService,
+        placePhotoService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: '1',
@@ -915,7 +934,7 @@ describe('CourseService', () => {
         [],
         '1',
       )
-      expect(placeImageService.getPrimaryImageUrls).toHaveBeenCalledWith([])
+      expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([])
     })
 
     it('카테고리 필터를 저장소 조회에 그대로 전달한다', async () => {
@@ -938,14 +957,14 @@ describe('CourseService', () => {
       ).toHaveBeenCalledWith('1', '2', CategorySlug.Cafe)
     })
 
-    it('제외된 장소를 좋아요/싫어요·대표 이미지와 함께 반환한다', async () => {
+    it('제외된 장소를 좋아요/싫어요·구조화 대표 사진과 함께 반환한다', async () => {
       const {
         service,
         meetingAccessService,
         courseCandidateRepository,
         recommendationRepository,
         voteRepository,
-        placeImageService,
+        placePhotoService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
         id: '1',
@@ -975,8 +994,18 @@ describe('CourseService', () => {
           ],
         ]),
       )
-      placeImageService.getPrimaryImageUrls.mockResolvedValue(
-        new Map([['1', 'https://signed.example.com/first.jpg']]),
+      const previewPhoto = {
+        id: 'google:1:1',
+        url: 'https://places.googleapis.com/photo/first',
+        width: 800,
+        height: 600,
+        source: 'GOOGLE',
+        attributions: [],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-first',
+        flagContentUri: null,
+      }
+      placePhotoService.findPreviewPhotos.mockResolvedValue(
+        new Map([['1', previewPhoto]]),
       )
 
       await expect(
@@ -989,7 +1018,8 @@ describe('CourseService', () => {
             categorySlug: 'cafe',
             name: '성수 카페 모모',
             address: '서울 성동구 성수이로 1',
-            primaryImageUrl: 'https://signed.example.com/first.jpg',
+            primaryImageUrl: previewPhoto.url,
+            previewPhoto,
             likeCount: 3,
             dislikeCount: 1,
             myPreference: PreferenceType.Like,
@@ -1002,6 +1032,10 @@ describe('CourseService', () => {
         ['1'],
         '1',
       )
+      expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledTimes(1)
+      expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+        expect.objectContaining({ id: '1', name: '성수 카페 모모' }),
+      ])
     })
   })
 
@@ -1961,6 +1995,7 @@ describe('CourseService', () => {
             categorySlug: 'cafe',
             address: '주소 10',
             primaryImageUrl: null,
+            previewPhoto: null,
             longitude: 127.0,
             latitude: 37.5,
             walkDurationToNextMin: 5,
@@ -1974,6 +2009,7 @@ describe('CourseService', () => {
             categorySlug: 'restaurant',
             address: '주소 20',
             primaryImageUrl: null,
+            previewPhoto: null,
             longitude: 127.1,
             latitude: 37.51,
             walkDurationToNextMin: null,
@@ -2411,6 +2447,7 @@ describe('CourseService', () => {
             categorySlug: 'cafe',
             address: '주소 10',
             primaryImageUrl: null,
+            previewPhoto: null,
             longitude: 127.0,
             latitude: 37.5,
             walkDurationToNextMin: 5,
@@ -2424,6 +2461,7 @@ describe('CourseService', () => {
             categorySlug: 'restaurant',
             address: '주소 20',
             primaryImageUrl: null,
+            previewPhoto: null,
             longitude: 127.1,
             latitude: 37.51,
             walkDurationToNextMin: null,
@@ -2501,6 +2539,7 @@ describe('CourseService', () => {
             categorySlug: 'cafe',
             address: '주소 10',
             primaryImageUrl: null,
+            previewPhoto: null,
             longitude: 127.0,
             latitude: 37.5,
             walkDurationToNextMin: null,
