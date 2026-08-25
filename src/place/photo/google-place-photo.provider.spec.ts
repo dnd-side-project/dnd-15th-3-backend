@@ -171,6 +171,52 @@ describe('GooglePlacePhotoProvider', () => {
     expect(requestUrl.searchParams.get('skipHttpRedirect')).toBe('true')
   })
 
+  it('동일한 사진 참조와 URL의 동시 요청을 각각 한 번만 전송한다', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch')
+    let resolveReferences: (response: Response) => void = () => undefined
+    let resolveUrl: (response: Response) => void = () => undefined
+    fetchMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveReferences = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveUrl = resolve
+          }),
+      )
+    const provider = createProvider()
+
+    const firstReferences = provider.getPhotoReferences('google-1')
+    const secondReferences = provider.getPhotoReferences('places/google-1')
+    resolveReferences(new Response(JSON.stringify({ photos: [] })))
+    await expect(
+      Promise.all([firstReferences, secondReferences]),
+    ).resolves.toEqual([[], []])
+
+    const firstUrl = provider.getPhotoUrl('places/google-1/photos/photo-1', 400)
+    const secondUrl = provider.getPhotoUrl(
+      '/places/google-1/photos/photo-1/',
+      400,
+    )
+    resolveUrl(
+      new Response(
+        JSON.stringify({
+          photoUri: 'https://lh3.googleusercontent.com/places/photo-1',
+        }),
+      ),
+    )
+    await expect(Promise.all([firstUrl, secondUrl])).resolves.toEqual([
+      'https://lh3.googleusercontent.com/places/photo-1',
+      'https://lh3.googleusercontent.com/places/photo-1',
+    ])
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('키가 없거나 사진 리소스 이름이 올바르지 않으면 외부 요청을 막는다', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch')
 

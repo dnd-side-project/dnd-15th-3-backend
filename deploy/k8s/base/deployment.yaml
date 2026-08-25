@@ -49,6 +49,8 @@ spec:
               value: "true"
             - name: METRICS_PORT
               value: "9464"
+            - name: PLACE_PHOTO_PREVIEW_CONCURRENCY
+              value: "10"
           startupProbe:
             httpGet:
               path: /health

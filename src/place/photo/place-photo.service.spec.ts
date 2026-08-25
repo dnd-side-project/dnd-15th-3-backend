@@ -1,3 +1,5 @@
+import type { ConfigService } from '@nestjs/config'
+import type { Env } from 'src/config/env'
 import type { Repository } from 'typeorm'
 import type { PlacePhotoMatch } from '../entities/place-photo-match.entity'
 import { PlacePhotoMatchStatus } from '../enums/place-photo-match-status.enum'
@@ -45,6 +47,7 @@ const matchedCandidate: GooglePlacePhotoCandidate = {
 
 function createService(configured = true) {
   const matchRepository = {
+    find: jest.fn().mockResolvedValue([]),
     findOne: jest.fn().mockResolvedValue(null),
     create: jest.fn((value) => value),
     save: jest.fn(async (value) => value),
@@ -59,16 +62,21 @@ function createService(configured = true) {
     getPhotoReferences: jest.fn().mockResolvedValue([]),
     getPhotoUrl: jest.fn().mockResolvedValue(null),
   }
+  const config = {
+    get: jest.fn().mockReturnValue(10),
+  }
 
   return {
     service: new PlacePhotoService(
       matchRepository as unknown as Repository<PlacePhotoMatch>,
       placeImageService as unknown as PlaceImageService,
       googlePhotoProvider as unknown as GooglePlacePhotoProvider,
+      config as unknown as ConfigService<Env, true>,
     ),
     matchRepository,
     placeImageService,
     googlePhotoProvider,
+    config,
   }
 }
 
@@ -187,6 +195,100 @@ describe('PlacePhotoService', () => {
     expect(googlePhotoProvider.searchCandidates).not.toHaveBeenCalled()
     expect(googlePhotoProvider.getPhotoReferences).toHaveBeenCalledWith(
       'google-1',
+    )
+  })
+
+  it('대표 사진의 기존 Google 매칭을 한 번에 조회한다', async () => {
+    const { service, matchRepository, googlePhotoProvider } = createService()
+    const secondTarget = { ...target, id: '2', providerPlaceId: 'kakao-2' }
+    matchRepository.find.mockResolvedValue([
+      {
+        place: { id: '1' },
+        providerPlaceId: 'google-1',
+        status: PlacePhotoMatchStatus.Matched,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      {
+        place: { id: '2' },
+        providerPlaceId: 'google-2',
+        status: PlacePhotoMatchStatus.Matched,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    ])
+    googlePhotoProvider.getPhotoReferences.mockResolvedValue([photoReference])
+    googlePhotoProvider.getPhotoUrl.mockResolvedValue(
+      'https://lh3.googleusercontent.com/places/photo-1',
+    )
+
+    const result = await service.findPreviewPhotos([target, secondTarget])
+
+    expect(result.size).toBe(2)
+    expect(matchRepository.find).toHaveBeenCalledTimes(1)
+    expect(matchRepository.findOne).not.toHaveBeenCalled()
+    expect(googlePhotoProvider.searchCandidates).not.toHaveBeenCalled()
+  })
+
+  it('동시에 들어온 동일 대표 사진 조회는 외부 요청을 공유한다', async () => {
+    const { service, googlePhotoProvider } = createService()
+    let resolveCandidates!: (candidates: GooglePlacePhotoCandidate[]) => void
+    const candidates = new Promise<GooglePlacePhotoCandidate[]>((resolve) => {
+      resolveCandidates = resolve
+    })
+    googlePhotoProvider.searchCandidates.mockReturnValue(candidates)
+    googlePhotoProvider.getPhotoUrl.mockResolvedValue(
+      'https://lh3.googleusercontent.com/places/photo-1',
+    )
+
+    const first = service.findPreviewPhotos([target])
+    const second = service.findPreviewPhotos([target])
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(googlePhotoProvider.searchCandidates).toHaveBeenCalledTimes(1)
+    resolveCandidates([matchedCandidate])
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+    expect(googlePhotoProvider.searchCandidates).toHaveBeenCalledTimes(1)
+    expect(googlePhotoProvider.getPhotoUrl).toHaveBeenCalledTimes(1)
+  })
+
+  it('설정된 동시성만큼만 대표 사진을 조회한다', async () => {
+    const { service, config, googlePhotoProvider } = createService()
+    config.get.mockReturnValue(2)
+    const resolvers: Array<(candidates: GooglePlacePhotoCandidate[]) => void> =
+      []
+    googlePhotoProvider.searchCandidates.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        }),
+    )
+    const targets = [
+      target,
+      { ...target, id: '2', providerPlaceId: 'kakao-2' },
+      { ...target, id: '3', providerPlaceId: 'kakao-3' },
+    ]
+
+    const result = service.findPreviewPhotos(targets)
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(googlePhotoProvider.searchCandidates).toHaveBeenCalledTimes(2)
+
+    resolvers[0]([])
+    resolvers[1]([])
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(googlePhotoProvider.searchCandidates).toHaveBeenCalledTimes(3)
+
+    resolvers[2]([])
+    await expect(result).resolves.toEqual(new Map())
+  })
+
+  it('매칭 배치 조회가 실패해도 장소 응답을 사진 오류로 깨뜨리지 않는다', async () => {
+    const { service, matchRepository, googlePhotoProvider } = createService()
+    matchRepository.find.mockRejectedValue(new Error('database unavailable'))
+    googlePhotoProvider.searchCandidates.mockRejectedValue(
+      new Error('provider unavailable'),
+    )
+
+    await expect(service.findPreviewPhotos([target])).resolves.toEqual(
+      new Map(),
     )
   })
 
