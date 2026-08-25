@@ -22,6 +22,7 @@ import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
 import { PlacePhotoService } from 'src/place/photo/place-photo.service'
+import type { PlacePhoto } from 'src/place/photo/place-photo.types'
 import {
   PlaceRepository,
   SIMILAR_PLACE_CANDIDATE_POOL_SIZE,
@@ -630,7 +631,15 @@ export class MeetingService {
       throw error
     }
 
-    return this.toRecommendationResponse(recommendation, resolvedPlace)
+    const previewPhotos = await this.placePhotoService.findPreviewPhotos([
+      resolvedPlace,
+    ])
+
+    return this.toRecommendationResponse(
+      recommendation,
+      resolvedPlace,
+      previewPhotos.get(resolvedPlace.id) ?? null,
+    )
   }
 
   async getRecommendations(
@@ -655,25 +664,11 @@ export class MeetingService {
     if (!location) {
       throw new MeetingException(MeetingErrorCode.locationNotFound)
     }
-    const [resolved, preferences] = await Promise.all([
-      this.placeLiveDataService.resolvePlaces(
-        recommendations.map((recommendation) => recommendation.place),
-        location,
-      ),
-      this.voteRepository.getPreferenceSummaries(
-        recommendations.map((recommendation) => recommendation.id),
-        participant.id,
-      ),
-    ])
-
-    return recommendations.map((recommendation) => {
-      const summary = preferences.get(recommendation.id)
-      return this.toRecommendationResponse(
-        recommendation,
-        resolved.get(recommendation.place.id)!,
-        summary,
-      )
-    })
+    return this.toRecommendationResponses(
+      recommendations,
+      location,
+      participant.id,
+    )
   }
 
   async getMeetingStatus(
@@ -943,6 +938,7 @@ export class MeetingService {
   private toRecommendationResponse(
     recommendation: MeetingPlaceRecommendation,
     place: ResolvedPlace,
+    previewPhoto: PlacePhoto | null,
     preference: {
       likeCount: number
       dislikeCount: number
@@ -962,6 +958,7 @@ export class MeetingService {
         providerPlaceId: place.providerPlaceId,
         placeUrl: place.placeUrl,
       },
+      previewPhoto,
       recommendedByParticipantId: recommendation.recommendedBy.id,
       likeCount: preference.likeCount,
       dislikeCount: preference.dislikeCount,
@@ -985,10 +982,17 @@ export class MeetingService {
         viewerId,
       ),
     ])
+    const resolvedPlaces = recommendations.map(
+      (recommendation) => resolved.get(recommendation.place.id)!,
+    )
+    const previewPhotos =
+      await this.placePhotoService.findPreviewPhotos(resolvedPlaces)
+
     return recommendations.map((recommendation) =>
       this.toRecommendationResponse(
         recommendation,
         resolved.get(recommendation.place.id)!,
+        previewPhotos.get(recommendation.place.id) ?? null,
         preferences.get(recommendation.id),
       ),
     )

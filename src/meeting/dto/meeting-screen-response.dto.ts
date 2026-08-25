@@ -85,7 +85,8 @@ export class MeetingScreenResponseDto extends MeetingResponseDto {
   categorySteps!: CourseCategoryStepResponseDto[]
 
   @ApiProperty({
-    description: '화면에 표시할 추천 장소',
+    description:
+      '화면에 표시할 추천 장소. 각 항목의 previewPhoto를 대표 사진으로 사용합니다.',
     type: RecommendationPreviewDto,
     isArray: true,
   })

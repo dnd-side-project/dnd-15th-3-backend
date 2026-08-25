@@ -98,6 +98,7 @@ function createMeetingService() {
   }
   const voteRepository = {
     applyPreference: jest.fn(),
+    getPreferenceSummaries: jest.fn().mockResolvedValue(new Map()),
   }
   const meetingAccessService = {
     findParticipant: jest.fn(),
@@ -614,6 +615,7 @@ describe('MeetingService', () => {
       meetingAccessService,
       placeRepository,
       recommendationRepository,
+      placePhotoService,
     } = createMeetingService()
     const participant = { id: 'participant-1' }
     const category = { id: 'category-1', slug: CategorySlug.Cafe }
@@ -626,11 +628,24 @@ describe('MeetingService', () => {
       category,
     }
     const location = { latitude: 37.5, longitude: 127 }
+    const previewPhoto = {
+      id: 'google:place-1:1',
+      url: 'https://places.googleapis.com/photo/place-1',
+      width: 800,
+      height: 600,
+      source: 'GOOGLE',
+      attributions: [],
+      googleMapsUri: 'https://www.google.com/maps/place/photo-place-1',
+      flagContentUri: null,
+    }
     meetingAccessService.findParticipant.mockResolvedValue(participant)
     placeRepository.findOne.mockResolvedValue(place)
     recommendationRepository.findOne.mockResolvedValue(null)
     recommendationRepository.save.mockImplementation((value) =>
       Promise.resolve({ id: 'recommendation-1', ...value }),
+    )
+    placePhotoService.findPreviewPhotos.mockResolvedValue(
+      new Map([['place-1', previewPhoto]]),
     )
 
     const locationRepository = {
@@ -650,7 +665,11 @@ describe('MeetingService', () => {
     ).resolves.toMatchObject({
       id: 'recommendation-1',
       place: { id: 'place-1' },
+      previewPhoto,
     })
+    expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'place-1', name: '카페' }),
+    ])
 
     recommendationRepository.findOne.mockResolvedValue({ id: 'existing' })
     await expect(
@@ -660,6 +679,100 @@ describe('MeetingService', () => {
     ).rejects.toMatchObject({
       errorCode: MeetingErrorCode.recommendationAlreadyExists,
     })
+  })
+
+  it('추천 목록의 대표 사진을 장소별 반복 호출 없이 한 번에 조회한다', async () => {
+    const {
+      service,
+      dataSource,
+      meetingAccessService,
+      recommendationRepository,
+      voteRepository,
+      placePhotoService,
+    } = createMeetingService()
+    const category = { id: 'category-1', slug: CategorySlug.Cafe }
+    const places = [
+      {
+        id: 'place-1',
+        name: '첫 번째 카페',
+        address: '첫 번째 주소',
+        latitude: 37.5,
+        longitude: 127,
+        category,
+      },
+      {
+        id: 'place-2',
+        name: '두 번째 카페',
+        address: '두 번째 주소',
+        latitude: 37.5001,
+        longitude: 127.0001,
+        category,
+      },
+    ]
+    const recommendations = places.map((place, index) => ({
+      id: `recommendation-${index + 1}`,
+      place,
+      recommendedBy: { id: `participant-${index + 1}` },
+    }))
+    const previewPhoto = {
+      id: 'google:place-1:1',
+      url: 'https://places.googleapis.com/photo/place-1',
+      width: 800,
+      height: 600,
+      source: 'GOOGLE',
+      attributions: [],
+      googleMapsUri: 'https://www.google.com/maps/place/photo-place-1',
+      flagContentUri: null,
+    }
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-viewer',
+    })
+    recommendationRepository.find.mockResolvedValue(recommendations)
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        latitude: 37.5,
+        longitude: 127,
+      }),
+    })
+    voteRepository.getPreferenceSummaries.mockResolvedValue(
+      new Map([
+        [
+          'recommendation-1',
+          {
+            likeCount: 2,
+            dislikeCount: 0,
+            myPreference: PreferenceType.Like,
+          },
+        ],
+      ]),
+    )
+    placePhotoService.findPreviewPhotos.mockResolvedValue(
+      new Map([['place-1', previewPhoto]]),
+    )
+
+    await expect(
+      service.getRecommendations('meeting-1', 'participant-token'),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: 'recommendation-1',
+        previewPhoto,
+        likeCount: 2,
+        dislikeCount: 0,
+        viewerPreference: PreferenceType.Like,
+      }),
+      expect.objectContaining({
+        id: 'recommendation-2',
+        previewPhoto: null,
+        likeCount: 0,
+        dislikeCount: 0,
+        viewerPreference: null,
+      }),
+    ])
+    expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledTimes(1)
+    expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'place-1', name: '첫 번째 카페' }),
+      expect.objectContaining({ id: 'place-2', name: '두 번째 카페' }),
+    ])
   })
 
   it('손상된 모임의 방장 정보를 노출하지 않고 공통 내부 오류로 처리한다', async () => {

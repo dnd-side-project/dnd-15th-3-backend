@@ -345,6 +345,29 @@ describe('MeetingController', () => {
       true,
     )
 
+    const recommendationPreviewSchema = document.components?.schemas
+      ?.RecommendationPreviewDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(recommendationPreviewSchema?.properties ?? {})).toEqual([
+      'id',
+      'categoryId',
+      'place',
+      'previewPhoto',
+      'recommendedByParticipantId',
+      'likeCount',
+      'dislikeCount',
+      'viewerPreference',
+    ])
+    expect(
+      recommendationPreviewSchema?.properties?.previewPhoto?.nullable,
+    ).toBe(true)
+    expect(recommendationPreviewSchema?.properties?.previewPhoto).toMatchObject(
+      {
+        allOf: [{ $ref: '#/components/schemas/PlacePhotoDto' }],
+      },
+    )
+
     await app.close()
   })
 
