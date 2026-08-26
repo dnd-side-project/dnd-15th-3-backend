@@ -5,6 +5,7 @@ import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
+import { CourseCandidatePlace } from 'src/course/entities/course-candidate-place.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import type { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
@@ -96,6 +97,9 @@ function createMeetingService() {
   const courseCandidateRepository = {
     findOne: jest.fn(),
   }
+  const courseCandidatePlaceRepository = {
+    find: jest.fn(),
+  }
   const voteRepository = {
     applyPreference: jest.fn(),
     getPreferenceSummaries: jest.fn().mockResolvedValue(new Map()),
@@ -151,6 +155,7 @@ function createMeetingService() {
     recommendationRepository as never,
     meetingRepository as unknown as Repository<Meeting>,
     courseCandidateRepository as unknown as Repository<CourseCandidate>,
+    courseCandidatePlaceRepository as unknown as Repository<CourseCandidatePlace>,
     voteRepository as unknown as MeetingPlaceRecommendationVoteRepository,
     meetingAccessService as unknown as MeetingAccessService,
     placeSearchRepository as never,
@@ -169,6 +174,7 @@ function createMeetingService() {
     dataSource,
     meetingRepository,
     courseCandidateRepository,
+    courseCandidatePlaceRepository,
     voteRepository,
     meetingAccessService,
     placeSearchRepository,
@@ -237,7 +243,7 @@ describe('MeetingService', () => {
       externalAddressId: null,
       syncVersion: 1,
     }
-    const meeting = {
+    const meeting = Object.assign(new Meeting(), {
       id: 'meeting-1',
       accessToken: 'ABC234',
       name: '성수 모임',
@@ -248,7 +254,8 @@ describe('MeetingService', () => {
       courseVersion: 1,
       courseImageKey: 'media/course.png',
       courseImageUploadedAt: new Date('2026-08-17T12:00:00.000Z'),
-    }
+      status: MeetingStatus.RecommendationCollecting,
+    })
     const hostUser = {
       id: 'user-host',
       userKey: 'device-host',
@@ -829,6 +836,132 @@ describe('MeetingService', () => {
     ).rejects.toMatchObject({
       errorCode: CommonErrorCode.internalServerError,
     })
+  })
+
+  it('코스가 확정된 모임은 상세 조회에 selectedCourse를 채운다', async () => {
+    const {
+      service,
+      dataSource,
+      participantRepository,
+      recommendationRepository,
+      meetingAccessService,
+      courseCandidateRepository,
+      courseCandidatePlaceRepository,
+    } = createMeetingService()
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      accessToken: 'ABC234',
+      name: '성수 모임',
+      date: '2026-08-23',
+      time: '12:00',
+      meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
+      meetingLocation: {
+        id: 'location-1',
+        displayName: '강남역',
+        address: '서울 강남구',
+        latitude: 37.5,
+        longitude: 127,
+        externalAddressId: null,
+        syncVersion: 1,
+      },
+      courseImageKey: null,
+      status: MeetingStatus.CourseConfirmed,
+    })
+    const host = {
+      id: 'participant-host',
+      role: ParticipantRole.Host,
+      nickname: '방장',
+      accessToken: 'host-token',
+      profileAvatarId: ProfileAvatarId.MomoBlue,
+      user: { id: 'user-host', userKey: 'device-host' },
+    }
+    meetingAccessService.findParticipant.mockResolvedValue(host)
+    participantRepository.find.mockResolvedValue([host])
+    recommendationRepository.find.mockResolvedValue([])
+    dataSource.getRepository.mockImplementation((entity) => {
+      if (entity === Meeting) {
+        return { findOne: jest.fn().mockResolvedValue(meeting) }
+      }
+      if (entity === CourseCategoryStep) {
+        return { find: jest.fn().mockResolvedValue([]) }
+      }
+      return undefined
+    })
+    courseCandidateRepository.findOne.mockResolvedValue({ id: 'candidate-1' })
+    courseCandidatePlaceRepository.find.mockResolvedValue([
+      { order: 1, meetingPlaceRecommendation: { id: 'recommendation-1' } },
+      { order: 2, meetingPlaceRecommendation: { id: 'recommendation-2' } },
+    ])
+
+    const result = await service.getMeetingDetail('meeting-1', 'host-token')
+
+    expect(result.selectedCourse).toEqual({
+      id: 'candidate-1',
+      recommendationIds: ['recommendation-1', 'recommendation-2'],
+    })
+    expect(courseCandidateRepository.findOne).toHaveBeenCalledWith({
+      where: { meeting: { id: 'meeting-1' }, isSelected: true },
+    })
+    expect(courseCandidatePlaceRepository.find).toHaveBeenCalledWith({
+      where: { courseCandidate: { id: 'candidate-1' } },
+      relations: { meetingPlaceRecommendation: true },
+      order: { order: 'ASC' },
+    })
+  })
+
+  it('코스가 확정되지 않은 모임은 상세 조회에서 selectedCourse가 null이고 후보를 조회하지 않는다', async () => {
+    const {
+      service,
+      dataSource,
+      participantRepository,
+      recommendationRepository,
+      meetingAccessService,
+      courseCandidateRepository,
+    } = createMeetingService()
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      accessToken: 'ABC234',
+      name: '성수 모임',
+      date: '2026-08-23',
+      time: '12:00',
+      meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
+      meetingLocation: {
+        id: 'location-1',
+        displayName: '강남역',
+        address: '서울 강남구',
+        latitude: 37.5,
+        longitude: 127,
+        externalAddressId: null,
+        syncVersion: 1,
+      },
+      courseImageKey: null,
+      status: MeetingStatus.CourseGenerated,
+    })
+    const host = {
+      id: 'participant-host',
+      role: ParticipantRole.Host,
+      nickname: '방장',
+      accessToken: 'host-token',
+      profileAvatarId: ProfileAvatarId.MomoBlue,
+      user: { id: 'user-host', userKey: 'device-host' },
+    }
+    meetingAccessService.findParticipant.mockResolvedValue(host)
+    participantRepository.find.mockResolvedValue([host])
+    recommendationRepository.find.mockResolvedValue([])
+    dataSource.getRepository.mockImplementation((entity) => {
+      if (entity === Meeting) {
+        return { findOne: jest.fn().mockResolvedValue(meeting) }
+      }
+      if (entity === CourseCategoryStep) {
+        return { find: jest.fn().mockResolvedValue([]) }
+      }
+      return undefined
+    })
+
+    const result = await service.getMeetingDetail('meeting-1', 'host-token')
+
+    expect(result.selectedCourse).toBeNull()
+    expect(courseCandidateRepository.findOne).not.toHaveBeenCalled()
   })
 
   it('사용자 upsert 뒤 조회가 실패하면 공통 내부 오류로 처리한다', async () => {
