@@ -67,7 +67,7 @@ function createService(questionnaire: MeetingQuestionnaire | null) {
     }),
   }
   return {
-    service: new QuestionnaireService({} as never),
+    service: new QuestionnaireService({} as never, {} as never),
     manager,
     questionnaireRepository,
   }
@@ -211,19 +211,11 @@ describe('QuestionnaireService.createQuestionnaire', () => {
         }),
       ),
     }
-    const participantRepository = {
-      findOne: jest.fn().mockResolvedValue(
-        Object.assign(new MeetingParticipant(), {
-          role: ParticipantRole.Host,
-        }),
-      ),
-    }
     const meetingRepository = {
       createQueryBuilder: jest.fn().mockReturnValue(meetingQueryBuilder),
     }
     const manager = {
       getRepository: jest.fn((entity: unknown) => {
-        if (entity === MeetingParticipant) return participantRepository
         if (entity === Meeting) return meetingRepository
         if (entity === MeetingQuestionnaire) return questionnaireRepository
         if (entity === MeetingQuestion) return questionRepository
@@ -238,7 +230,17 @@ describe('QuestionnaireService.createQuestionnaire', () => {
         throw new Error('unexpected repository')
       }),
     }
-    const service = new QuestionnaireService(dataSource as never)
+    const meetingAccessService = {
+      findParticipant: jest.fn().mockResolvedValue(
+        Object.assign(new MeetingParticipant(), {
+          role: ParticipantRole.Host,
+        }),
+      ),
+    }
+    const service = new QuestionnaireService(
+      dataSource as never,
+      meetingAccessService as never,
+    )
 
     await expect(
       service.createQuestionnaire('10', 'host-token'),
@@ -265,5 +267,10 @@ describe('QuestionnaireService.createQuestionnaire', () => {
     expect(questionnaireRepository.save).toHaveBeenCalledTimes(1)
     expect(questionRepository.save).toHaveBeenCalledTimes(1)
     expect(optionRepository.save).toHaveBeenCalledTimes(1)
+    expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
+      '10',
+      'host-token',
+      manager,
+    )
   })
 })

@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { CommonException } from 'src/common/exception/common.exception'
-import { CommonErrorCode } from 'src/common/exception/common-error-code'
-import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
+import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
-import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
 import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { MeetingException } from 'src/meeting/exception/meeting.exception'
@@ -55,34 +52,22 @@ export type ResolvedQuestionnaireAnswers = {
 
 @Injectable()
 export class QuestionnaireService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly meetingAccessService: MeetingAccessService,
+  ) {}
 
   async createQuestionnaire(
     meetingId: string,
     accessToken: string,
   ): Promise<QuestionnaireResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-
     const questionnaireId = await this.dataSource.transaction(
       async (manager) => {
-        const participant = await manager
-          .getRepository(MeetingParticipant)
-          .findOne({
-            where: {
-              meeting: { id: meetingId },
-              accessToken: normalizedAccessToken,
-            },
-          })
-        if (!participant) {
-          const meetingExists = await manager
-            .getRepository(Meeting)
-            .exists({ where: { id: meetingId } })
-          if (!meetingExists) {
-            throw new MeetingException(MeetingErrorCode.notFound)
-          }
-          throw new CommonException(CommonErrorCode.authenticationFailed)
-        }
+        const participant = await this.meetingAccessService.findParticipant(
+          meetingId,
+          accessToken,
+          manager,
+        )
         if (participant.role !== ParticipantRole.Host) {
           throw new MeetingException(MeetingErrorCode.hostOnly)
         }
@@ -158,24 +143,10 @@ export class QuestionnaireService {
     meetingId: string,
     accessToken: string,
   ): Promise<QuestionnaireResponseDto> {
-    assertAccessToken(accessToken)
-    const participant = await this.dataSource
-      .getRepository(MeetingParticipant)
-      .findOne({
-        where: {
-          meeting: { id: meetingId },
-          accessToken: accessToken.trim(),
-        },
-      })
-    if (!participant) {
-      const meetingExists = await this.dataSource
-        .getRepository(Meeting)
-        .exists({ where: { id: meetingId } })
-      if (!meetingExists) {
-        throw new MeetingException(MeetingErrorCode.notFound)
-      }
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
     if (participant.role !== ParticipantRole.Host) {
       throw new MeetingException(MeetingErrorCode.hostOnly)
     }
