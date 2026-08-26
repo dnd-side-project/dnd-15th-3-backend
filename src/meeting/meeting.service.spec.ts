@@ -1654,12 +1654,12 @@ describe('MeetingService', () => {
         role: ParticipantRole.Host,
       }),
     )
-    const meeting = {
+    const meeting = Object.assign(new Meeting(), {
       id: 'meeting-1',
       status: MeetingStatus.CourseConfirmed,
       courseImageKey: null,
       courseImageUploadedAt: null,
-    }
+    })
     const execute = jest.fn().mockResolvedValue({ affected: 1 })
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
@@ -1751,12 +1751,14 @@ describe('MeetingService', () => {
     )
     const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
     dataSource.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({
-        id: 'meeting-1',
-        status: MeetingStatus.CourseConfirmed,
-        courseImageKey: 'media/winner.png',
-        courseImageUploadedAt: uploadedAt,
-      }),
+      findOne: jest.fn().mockResolvedValue(
+        Object.assign(new Meeting(), {
+          id: 'meeting-1',
+          status: MeetingStatus.CourseConfirmed,
+          courseImageKey: 'media/winner.png',
+          courseImageUploadedAt: uploadedAt,
+        }),
+      ),
     })
 
     await expect(
@@ -1781,11 +1783,13 @@ describe('MeetingService', () => {
       }),
     )
     dataSource.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({
-        id: 'meeting-1',
-        status: MeetingStatus.CourseGenerated,
-        courseImageKey: null,
-      }),
+      findOne: jest.fn().mockResolvedValue(
+        Object.assign(new Meeting(), {
+          id: 'meeting-1',
+          status: MeetingStatus.CourseGenerated,
+          courseImageKey: null,
+        }),
+      ),
     })
 
     await expect(
@@ -1809,17 +1813,17 @@ describe('MeetingService', () => {
       }),
     )
     const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
-    const initial = {
+    const initial = Object.assign(new Meeting(), {
       id: 'meeting-1',
       status: MeetingStatus.CourseConfirmed,
       courseImageKey: null,
       courseImageUploadedAt: null,
-    }
-    const winner = {
+    })
+    const winner = Object.assign(new Meeting(), {
       ...initial,
       courseImageKey: 'media/winner.png',
       courseImageUploadedAt: uploadedAt,
-    }
+    })
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
@@ -1869,11 +1873,13 @@ describe('MeetingService', () => {
       execute: jest.fn().mockRejectedValue(new Error('db unavailable')),
     }
     dataSource.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({
-        id: 'meeting-1',
-        status: MeetingStatus.CourseConfirmed,
-        courseImageKey: null,
-      }),
+      findOne: jest.fn().mockResolvedValue(
+        Object.assign(new Meeting(), {
+          id: 'meeting-1',
+          status: MeetingStatus.CourseConfirmed,
+          courseImageKey: null,
+        }),
+      ),
       createQueryBuilder: jest.fn(() => queryBuilder),
     })
     const asset = { objectKey: 'media/orphan.png' }

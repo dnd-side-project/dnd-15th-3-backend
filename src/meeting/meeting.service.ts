@@ -338,7 +338,10 @@ export class MeetingService {
     if (!meeting) {
       throw new MeetingException(MeetingErrorCode.notFound)
     }
-    this.assertCourseImageState(meeting)
+    meeting.assertStatus(
+      [MeetingStatus.CourseConfirmed],
+      MeetingErrorCode.courseImageStateInvalid,
+    )
 
     if (meeting.courseImageKey) {
       return this.toCourseImageResponse(meeting)
@@ -382,7 +385,10 @@ export class MeetingService {
     if (!winner) {
       throw new MeetingException(MeetingErrorCode.notFound)
     }
-    this.assertCourseImageState(winner)
+    winner.assertStatus(
+      [MeetingStatus.CourseConfirmed],
+      MeetingErrorCode.courseImageStateInvalid,
+    )
     return this.toCourseImageResponse(winner)
   }
 
@@ -883,12 +889,6 @@ export class MeetingService {
       'code' in driverError &&
       driverError.code === '23505'
     )
-  }
-
-  private assertCourseImageState(meeting: Meeting): void {
-    if (meeting.status !== MeetingStatus.CourseConfirmed) {
-      throw new MeetingException(MeetingErrorCode.courseImageStateInvalid)
-    }
   }
 
   private toCourseImageResponse(meeting: Meeting): CourseImageResponseDto {
