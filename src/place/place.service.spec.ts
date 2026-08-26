@@ -2,6 +2,7 @@ import { Category } from 'src/category/entities/category.entity'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import type { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
@@ -29,6 +30,9 @@ function createService() {
     findOne: jest.fn(),
   }
   const courseCategoryStepRepository = {
+    find: jest.fn().mockResolvedValue([]),
+  }
+  const meetingPlaceRecommendationRepository = {
     find: jest.fn().mockResolvedValue([]),
   }
   const placeLiveDataService = {
@@ -65,6 +69,7 @@ function createService() {
       placeRepository as unknown as Repository<Place>,
       categoryRepository as unknown as Repository<Category>,
       courseCategoryStepRepository as unknown as Repository<CourseCategoryStep>,
+      meetingPlaceRecommendationRepository as unknown as Repository<MeetingPlaceRecommendation>,
       placeLiveDataService as unknown as PlaceLiveDataService,
       placePhotoService as unknown as PlacePhotoService,
       meetingAccessService as unknown as MeetingAccessService,
@@ -74,6 +79,7 @@ function createService() {
     placeRepository,
     categoryRepository,
     courseCategoryStepRepository,
+    meetingPlaceRecommendationRepository,
     placeLiveDataService,
     placePhotoService,
     meetingAccessService,
@@ -87,6 +93,7 @@ describe('PlaceService', () => {
         service,
         placeLiveDataService,
         meetingLocationRepository,
+        meetingPlaceRecommendationRepository,
         meetingAccessService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
@@ -105,6 +112,7 @@ describe('PlaceService', () => {
         errorCode: PlaceErrorCode.meetingLocationNotFound,
       })
       expect(placeLiveDataService.searchKakao).not.toHaveBeenCalled()
+      expect(meetingPlaceRecommendationRepository.find).not.toHaveBeenCalled()
     })
 
     it('기준 좌표와 페이지 결과를 사용해 hasNext를 계산한다', async () => {
@@ -295,9 +303,80 @@ describe('PlaceService', () => {
       ])
     })
 
+    it('이미 모임에 추천된 장소는 isRecommended를 true로 응답한다', async () => {
+      const {
+        service,
+        placeLiveDataService,
+        meetingPlaceRecommendationRepository,
+        meetingAccessService,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: 'participant-1',
+      })
+      placeLiveDataService.searchKakao.mockResolvedValue({
+        places: [
+          {
+            id: '10',
+            name: '이미 추천된 카페',
+            address: '서울 성동구',
+            roadAddress: null,
+            category: { id: '1', name: '카페', slug: 'cafe' },
+            latitude: 37.5,
+            longitude: 127,
+            distanceMeters: 100,
+            previewUrl: null,
+            source: PlaceSource.Kakao,
+            providerPlaceId: '12345',
+            phone: null,
+            placeUrl: null,
+          },
+          {
+            id: '20',
+            name: '추천되지 않은 카페',
+            address: '서울 성동구',
+            roadAddress: null,
+            category: { id: '1', name: '카페', slug: 'cafe' },
+            latitude: 37.5,
+            longitude: 127,
+            distanceMeters: 200,
+            previewUrl: null,
+            source: PlaceSource.Kakao,
+            providerPlaceId: '67890',
+            phone: null,
+            placeUrl: null,
+          },
+        ],
+        isComplete: true,
+        unsupportedCategorySlugs: [],
+      })
+      meetingPlaceRecommendationRepository.find.mockResolvedValue([
+        { place: { id: '10' } },
+      ])
+
+      const result = await service.searchPlaces({
+        meetingId: '123',
+        accessToken: 'token',
+        page: 1,
+        size: 20,
+      })
+
+      expect(meetingPlaceRecommendationRepository.find).toHaveBeenCalledWith({
+        where: { meeting: { id: '123' } },
+        relations: { place: true },
+      })
+      expect(result.items).toMatchObject([
+        { id: '10', isRecommended: true },
+        { id: '20', isRecommended: false },
+      ])
+    })
+
     it('참여자를 찾지 못하면 401을 던지고 위치를 조회하지 않는다', async () => {
-      const { service, meetingAccessService, meetingLocationRepository } =
-        createService()
+      const {
+        service,
+        meetingAccessService,
+        meetingLocationRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
       meetingAccessService.findParticipant.mockRejectedValue(
         new CommonException(CommonErrorCode.authenticationFailed),
       )
@@ -311,6 +390,7 @@ describe('PlaceService', () => {
         }),
       ).rejects.toBeInstanceOf(CommonException)
       expect(meetingLocationRepository.findOne).not.toHaveBeenCalled()
+      expect(meetingPlaceRecommendationRepository.find).not.toHaveBeenCalled()
     })
   })
 

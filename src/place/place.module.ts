@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Category } from 'src/category/entities/category.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { KakaoModule } from 'src/kakao/kakao.module'
 import { MediaModule } from 'src/media/media.module'
 import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
@@ -36,6 +37,7 @@ import { PlaceSyncWorker } from './sync/place-sync.worker'
       MeetingParticipant,
       Category,
       CourseCategoryStep,
+      MeetingPlaceRecommendation,
       Place,
       PlaceImage,
       PlacePhotoMatch,
