@@ -358,11 +358,13 @@ describe('MeetingService', () => {
     }
     const meeting = { id: 'meeting-1', courseVersion: 1 }
     const step = { id: 'step-1', meeting, category, order: 1 }
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-1',
-      role: ParticipantRole.Host,
-      accessToken: 'host-token',
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-1',
+        role: ParticipantRole.Host,
+        accessToken: 'host-token',
+      }),
+    )
     const meetingQueryBuilder = {
       where: jest.fn().mockReturnThis(),
       setLock: jest.fn().mockReturnThis(),
@@ -418,10 +420,12 @@ describe('MeetingService', () => {
     )
     expect(deleteQueryBuilder.execute).toHaveBeenCalled()
 
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-2',
-      role: ParticipantRole.Member,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-2',
+        role: ParticipantRole.Member,
+      }),
+    )
     await expect(
       service.updateCoursePlan('meeting-1', 'member-token', {
         categorySlugs: [CategorySlug.Cafe],
@@ -535,10 +539,12 @@ describe('MeetingService', () => {
   it('기준 위치 변경 시 이전 작업을 무효화하고 새 수집 작업은 등록하지 않는다', async () => {
     const { service, dataSource, placeSyncService, meetingAccessService } =
       createMeetingService()
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-1',
-      role: 'HOST',
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-1',
+        role: ParticipantRole.Host,
+      }),
+    )
     const meeting = { id: 'meeting-1' }
     const location = {
       id: 'location-1',
@@ -1642,10 +1648,12 @@ describe('MeetingService', () => {
   it('코스 확정 후 방장의 이미지를 원자적으로 등록한다', async () => {
     const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     const meeting = {
       id: 'meeting-1',
       status: MeetingStatus.CourseConfirmed,
@@ -1696,10 +1704,12 @@ describe('MeetingService', () => {
   it('일반 모임원의 코스 이미지 등록을 거절한다', async () => {
     const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-member',
-      role: ParticipantRole.Member,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-member',
+        role: ParticipantRole.Member,
+      }),
+    )
 
     await expect(
       service.storeCourseImage('meeting-1', 'member-token', {
@@ -1733,10 +1743,12 @@ describe('MeetingService', () => {
   it('이미 등록된 코스 이미지는 새 파일로 덮어쓰지 않는다', async () => {
     const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
     dataSource.getRepository.mockReturnValue({
       findOne: jest.fn().mockResolvedValue({
@@ -1762,10 +1774,12 @@ describe('MeetingService', () => {
   it('코스 확정 전에는 코스 이미지를 저장하지 않는다', async () => {
     const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     dataSource.getRepository.mockReturnValue({
       findOne: jest.fn().mockResolvedValue({
         id: 'meeting-1',
@@ -1788,10 +1802,12 @@ describe('MeetingService', () => {
   it('동시 업로드 경쟁에서 지면 자산을 폐기하고 승자를 반환한다', async () => {
     const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
     const initial = {
       id: 'meeting-1',
@@ -1839,10 +1855,12 @@ describe('MeetingService', () => {
   it('이미지 저장 후 모임 DB 갱신이 실패하면 자산을 보상 삭제한다', async () => {
     const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    meetingAccessService.findParticipant.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
