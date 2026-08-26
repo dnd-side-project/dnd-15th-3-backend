@@ -88,6 +88,12 @@ export class PlaceSearchItemResponseDto {
     nullable: true,
   })
   placeUrl!: string | null
+
+  @ApiProperty({
+    description: '이 모임에 이미 추천된 장소인지 여부',
+    example: false,
+  })
+  isRecommended!: boolean
 }
 
 export class PlaceSearchResponseDto {

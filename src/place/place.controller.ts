@@ -71,7 +71,7 @@ export class PlaceController {
   @ApiOperation({
     summary: '주변 장소 검색',
     description:
-      'Kakao Local API에서 모임 기준 위치 반경 2km 이내의 장소를 실시간 조회합니다. 직접 소유한 사진을 우선 사용하고, 없으면 업체명·주소·좌표·전화번호로 검증한 Google Places 사진만 제공합니다. 매칭이 불확실하면 previewPhoto는 null입니다. 신규 클라이언트는 previewPhoto를 사용하며, Google 사진은 source, attributions, googleMapsUri에 따라 표시해야 합니다.',
+      'Kakao Local API에서 모임 기준 위치 반경 2km 이내의 장소를 실시간 조회합니다. 직접 소유한 사진을 우선 사용하고, 없으면 업체명·주소·좌표·전화번호로 검증한 Google Places 사진만 제공합니다. 매칭이 불확실하면 previewPhoto는 null입니다. 신규 클라이언트는 previewPhoto를 사용하며, Google 사진은 source, attributions, googleMapsUri에 따라 표시해야 합니다. isRecommended로 각 장소가 모임에 이미 추천되었는지 여부를 함께 제공합니다.',
   })
   @ApiQuery({
     name: 'meetingId',
@@ -142,7 +142,7 @@ export class PlaceController {
   @ApiOperation({
     summary: '장소 상세 조회',
     description:
-      '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다. accessToken이 속한 모임의 기준 위치를 사용하며 모임 상태와 무관하게 조회 가능합니다. 신규 클라이언트는 photos와 previewPhoto를 사용합니다. Google 사진은 source, attributions, googleMapsUri에 따라 표시하며, imageUrls와 previewUrl은 기존 클라이언트 호환 필드입니다. 업체 매칭이 불확실하면 사진을 제공하지 않습니다.',
+      '검색 리스트에서 장소를 클릭했을 때 상세 정보를 조회합니다. accessToken이 속한 모임의 기준 위치를 사용하며 모임 상태와 무관하게 조회 가능합니다. 신규 클라이언트는 photos와 previewPhoto를 사용합니다. Google 사진은 source, attributions, googleMapsUri에 따라 표시하며, imageUrls와 previewUrl은 기존 클라이언트 호환 필드입니다. 업체 매칭이 불확실하면 사진을 제공하지 않습니다. isRecommended로 이 장소가 모임에 이미 추천되었는지 여부를 함께 제공합니다.',
   })
   @ApiParam({
     name: 'placeId',

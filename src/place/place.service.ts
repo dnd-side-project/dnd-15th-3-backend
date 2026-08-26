@@ -5,6 +5,7 @@ import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
@@ -36,6 +37,8 @@ export class PlaceService {
     private readonly categoryRepository: Repository<Category>,
     @InjectRepository(CourseCategoryStep)
     private readonly courseCategoryStepRepository: Repository<CourseCategoryStep>,
+    @InjectRepository(MeetingPlaceRecommendation)
+    private readonly meetingPlaceRecommendationRepository: Repository<MeetingPlaceRecommendation>,
     private readonly placeLiveDataService: PlaceLiveDataService,
     private readonly placePhotoService: PlacePhotoService,
     private readonly meetingAccessService: MeetingAccessService,
@@ -58,13 +61,22 @@ export class PlaceService {
     }
 
     const categories = await this.findSearchCategories(request)
-    const result = await this.placeLiveDataService.searchKakao(
-      {
-        latitude: meetingLocation.latitude,
-        longitude: meetingLocation.longitude,
-      },
-      categories,
-      request.q,
+    const [result, recommendations] = await Promise.all([
+      this.placeLiveDataService.searchKakao(
+        {
+          latitude: meetingLocation.latitude,
+          longitude: meetingLocation.longitude,
+        },
+        categories,
+        request.q,
+      ),
+      this.meetingPlaceRecommendationRepository.find({
+        where: { meeting: { id: request.meetingId } },
+        relations: { place: true },
+      }),
+    ])
+    const recommendedPlaceIds = new Set(
+      recommendations.map((recommendation) => recommendation.place.id),
     )
     const offset = (request.page - 1) * request.size
     const pageItems = result.places.slice(offset, offset + request.size)
@@ -93,6 +105,7 @@ export class PlaceService {
           roadAddress: place.roadAddress,
           phone: place.phone,
           placeUrl: place.placeUrl,
+          isRecommended: recommendedPlaceIds.has(place.id),
         }
       }),
       page: request.page,
@@ -141,10 +154,18 @@ export class PlaceService {
     if (!meetingLocation) {
       throw new PlaceException(PlaceErrorCode.meetingLocationNotFound)
     }
-    const resolved = await this.placeLiveDataService.resolvePlace(place, {
-      latitude: meetingLocation.latitude,
-      longitude: meetingLocation.longitude,
-    })
+    const [resolved, recommendation] = await Promise.all([
+      this.placeLiveDataService.resolvePlace(place, {
+        latitude: meetingLocation.latitude,
+        longitude: meetingLocation.longitude,
+      }),
+      this.meetingPlaceRecommendationRepository.findOne({
+        where: {
+          meeting: { id: participant.meeting.id },
+          place: { id: placeId },
+        },
+      }),
+    ])
 
     const photos = await this.placePhotoService.findPhotos(resolved)
     const previewPhoto = photos[0] ?? null
@@ -166,6 +187,7 @@ export class PlaceService {
       placeUrl: resolved.placeUrl,
       latitude: resolved.latitude,
       longitude: resolved.longitude,
+      isRecommended: recommendation !== null,
     }
   }
 

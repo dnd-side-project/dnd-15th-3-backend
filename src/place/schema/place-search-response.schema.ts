@@ -49,6 +49,7 @@ export const placeSearchItemSchema = z.object({
   roadAddress: z.string().nullable(),
   phone: z.string().nullable(),
   placeUrl: z.string().nullable(),
+  isRecommended: z.boolean(),
 })
 
 export const placeSearchResponseSchema = z.object({

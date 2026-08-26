@@ -2,6 +2,7 @@ import { Category } from 'src/category/entities/category.entity'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import type { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
@@ -30,6 +31,10 @@ function createService() {
   }
   const courseCategoryStepRepository = {
     find: jest.fn().mockResolvedValue([]),
+  }
+  const meetingPlaceRecommendationRepository = {
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
   }
   const placeLiveDataService = {
     searchKakao: jest.fn().mockResolvedValue({
@@ -65,6 +70,7 @@ function createService() {
       placeRepository as unknown as Repository<Place>,
       categoryRepository as unknown as Repository<Category>,
       courseCategoryStepRepository as unknown as Repository<CourseCategoryStep>,
+      meetingPlaceRecommendationRepository as unknown as Repository<MeetingPlaceRecommendation>,
       placeLiveDataService as unknown as PlaceLiveDataService,
       placePhotoService as unknown as PlacePhotoService,
       meetingAccessService as unknown as MeetingAccessService,
@@ -74,6 +80,7 @@ function createService() {
     placeRepository,
     categoryRepository,
     courseCategoryStepRepository,
+    meetingPlaceRecommendationRepository,
     placeLiveDataService,
     placePhotoService,
     meetingAccessService,
@@ -87,6 +94,7 @@ describe('PlaceService', () => {
         service,
         placeLiveDataService,
         meetingLocationRepository,
+        meetingPlaceRecommendationRepository,
         meetingAccessService,
       } = createService()
       meetingAccessService.findParticipant.mockResolvedValue({
@@ -105,6 +113,7 @@ describe('PlaceService', () => {
         errorCode: PlaceErrorCode.meetingLocationNotFound,
       })
       expect(placeLiveDataService.searchKakao).not.toHaveBeenCalled()
+      expect(meetingPlaceRecommendationRepository.find).not.toHaveBeenCalled()
     })
 
     it('기준 좌표와 페이지 결과를 사용해 hasNext를 계산한다', async () => {
@@ -295,9 +304,80 @@ describe('PlaceService', () => {
       ])
     })
 
+    it('이미 모임에 추천된 장소는 isRecommended를 true로 응답한다', async () => {
+      const {
+        service,
+        placeLiveDataService,
+        meetingPlaceRecommendationRepository,
+        meetingAccessService,
+      } = createService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        id: 'participant-1',
+      })
+      placeLiveDataService.searchKakao.mockResolvedValue({
+        places: [
+          {
+            id: '10',
+            name: '이미 추천된 카페',
+            address: '서울 성동구',
+            roadAddress: null,
+            category: { id: '1', name: '카페', slug: 'cafe' },
+            latitude: 37.5,
+            longitude: 127,
+            distanceMeters: 100,
+            previewUrl: null,
+            source: PlaceSource.Kakao,
+            providerPlaceId: '12345',
+            phone: null,
+            placeUrl: null,
+          },
+          {
+            id: '20',
+            name: '추천되지 않은 카페',
+            address: '서울 성동구',
+            roadAddress: null,
+            category: { id: '1', name: '카페', slug: 'cafe' },
+            latitude: 37.5,
+            longitude: 127,
+            distanceMeters: 200,
+            previewUrl: null,
+            source: PlaceSource.Kakao,
+            providerPlaceId: '67890',
+            phone: null,
+            placeUrl: null,
+          },
+        ],
+        isComplete: true,
+        unsupportedCategorySlugs: [],
+      })
+      meetingPlaceRecommendationRepository.find.mockResolvedValue([
+        { place: { id: '10' } },
+      ])
+
+      const result = await service.searchPlaces({
+        meetingId: '123',
+        accessToken: 'token',
+        page: 1,
+        size: 20,
+      })
+
+      expect(meetingPlaceRecommendationRepository.find).toHaveBeenCalledWith({
+        where: { meeting: { id: '123' } },
+        relations: { place: true },
+      })
+      expect(result.items).toMatchObject([
+        { id: '10', isRecommended: true },
+        { id: '20', isRecommended: false },
+      ])
+    })
+
     it('참여자를 찾지 못하면 401을 던지고 위치를 조회하지 않는다', async () => {
-      const { service, meetingAccessService, meetingLocationRepository } =
-        createService()
+      const {
+        service,
+        meetingAccessService,
+        meetingLocationRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
       meetingAccessService.findParticipant.mockRejectedValue(
         new CommonException(CommonErrorCode.authenticationFailed),
       )
@@ -311,28 +391,43 @@ describe('PlaceService', () => {
         }),
       ).rejects.toBeInstanceOf(CommonException)
       expect(meetingLocationRepository.findOne).not.toHaveBeenCalled()
+      expect(meetingPlaceRecommendationRepository.find).not.toHaveBeenCalled()
     })
   })
 
   describe('getPlaceDetail', () => {
     it('accessToken이 비어있으면 참여자 저장소를 조회하지 않고 401을 던진다', async () => {
-      const { service, participantRepository } = createService()
+      const {
+        service,
+        participantRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
 
       await expect(service.getPlaceDetail('1', '')).rejects.toBeInstanceOf(
         CommonException,
       )
       expect(participantRepository.findOne).not.toHaveBeenCalled()
+      expect(
+        meetingPlaceRecommendationRepository.findOne,
+      ).not.toHaveBeenCalled()
     })
 
     it('참여자 토큰이 유효하지 않으면 장소를 조회하지 않는다', async () => {
-      const { service, participantRepository, placeRepository } =
-        createService()
+      const {
+        service,
+        participantRepository,
+        placeRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
       participantRepository.findOne.mockResolvedValue(null)
 
       await expect(
         service.getPlaceDetail('1', 'invalid-token'),
       ).rejects.toBeInstanceOf(CommonException)
       expect(placeRepository.findOne).not.toHaveBeenCalled()
+      expect(
+        meetingPlaceRecommendationRepository.findOne,
+      ).not.toHaveBeenCalled()
     })
 
     it('accessToken 앞뒤 공백을 제거한 값으로 참여자를 조회한다', async () => {
@@ -366,8 +461,12 @@ describe('PlaceService', () => {
     })
 
     it('장소를 찾을 수 없으면 404를 던진다', async () => {
-      const { service, participantRepository, placeRepository } =
-        createService()
+      const {
+        service,
+        participantRepository,
+        placeRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
       participantRepository.findOne.mockResolvedValue({
         id: 'participant-1',
         meeting: { id: '123' },
@@ -377,6 +476,61 @@ describe('PlaceService', () => {
       await expect(
         service.getPlaceDetail('999', 'token'),
       ).rejects.toBeInstanceOf(PlaceException)
+      expect(
+        meetingPlaceRecommendationRepository.findOne,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('이미 모임에 추천된 장소는 isRecommended를 true로 응답한다', async () => {
+      const {
+        service,
+        participantRepository,
+        placeRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { id: '123' },
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '1',
+        name: '성수 카페 모모',
+        address: '서울 성동구 성수이로 1',
+        previewUrl: 'https://preview.example.com/1',
+        category: { name: '카페', slug: 'cafe' },
+      })
+      meetingPlaceRecommendationRepository.findOne.mockResolvedValue({
+        id: 'recommendation-1',
+      })
+
+      const result = await service.getPlaceDetail('1', 'token')
+
+      expect(meetingPlaceRecommendationRepository.findOne).toHaveBeenCalledWith(
+        {
+          where: { meeting: { id: '123' }, place: { id: '1' } },
+        },
+      )
+      expect(result).toMatchObject({ isRecommended: true })
+    })
+
+    it('추천된 적 없는 장소는 isRecommended를 false로 응답한다', async () => {
+      const { service, participantRepository, placeRepository } =
+        createService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { id: '123' },
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '1',
+        name: '성수 카페 모모',
+        address: '서울 성동구 성수이로 1',
+        previewUrl: 'https://preview.example.com/1',
+        category: { name: '카페', slug: 'cafe' },
+      })
+
+      const result = await service.getPlaceDetail('1', 'token')
+
+      expect(result).toMatchObject({ isRecommended: false })
     })
 
     it('구조화 사진을 조회하고 기존 imageUrls·previewUrl도 함께 응답한다', async () => {
