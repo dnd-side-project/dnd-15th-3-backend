@@ -154,10 +154,18 @@ export class PlaceService {
     if (!meetingLocation) {
       throw new PlaceException(PlaceErrorCode.meetingLocationNotFound)
     }
-    const resolved = await this.placeLiveDataService.resolvePlace(place, {
-      latitude: meetingLocation.latitude,
-      longitude: meetingLocation.longitude,
-    })
+    const [resolved, recommendation] = await Promise.all([
+      this.placeLiveDataService.resolvePlace(place, {
+        latitude: meetingLocation.latitude,
+        longitude: meetingLocation.longitude,
+      }),
+      this.meetingPlaceRecommendationRepository.findOne({
+        where: {
+          meeting: { id: participant.meeting.id },
+          place: { id: placeId },
+        },
+      }),
+    ])
 
     const photos = await this.placePhotoService.findPhotos(resolved)
     const previewPhoto = photos[0] ?? null
@@ -179,6 +187,7 @@ export class PlaceService {
       placeUrl: resolved.placeUrl,
       latitude: resolved.latitude,
       longitude: resolved.longitude,
+      isRecommended: recommendation !== null,
     }
   }
 

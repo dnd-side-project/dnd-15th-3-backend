@@ -34,6 +34,7 @@ function createService() {
   }
   const meetingPlaceRecommendationRepository = {
     find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
   }
   const placeLiveDataService = {
     searchKakao: jest.fn().mockResolvedValue({
@@ -396,23 +397,37 @@ describe('PlaceService', () => {
 
   describe('getPlaceDetail', () => {
     it('accessToken이 비어있으면 참여자 저장소를 조회하지 않고 401을 던진다', async () => {
-      const { service, participantRepository } = createService()
+      const {
+        service,
+        participantRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
 
       await expect(service.getPlaceDetail('1', '')).rejects.toBeInstanceOf(
         CommonException,
       )
       expect(participantRepository.findOne).not.toHaveBeenCalled()
+      expect(
+        meetingPlaceRecommendationRepository.findOne,
+      ).not.toHaveBeenCalled()
     })
 
     it('참여자 토큰이 유효하지 않으면 장소를 조회하지 않는다', async () => {
-      const { service, participantRepository, placeRepository } =
-        createService()
+      const {
+        service,
+        participantRepository,
+        placeRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
       participantRepository.findOne.mockResolvedValue(null)
 
       await expect(
         service.getPlaceDetail('1', 'invalid-token'),
       ).rejects.toBeInstanceOf(CommonException)
       expect(placeRepository.findOne).not.toHaveBeenCalled()
+      expect(
+        meetingPlaceRecommendationRepository.findOne,
+      ).not.toHaveBeenCalled()
     })
 
     it('accessToken 앞뒤 공백을 제거한 값으로 참여자를 조회한다', async () => {
@@ -446,8 +461,12 @@ describe('PlaceService', () => {
     })
 
     it('장소를 찾을 수 없으면 404를 던진다', async () => {
-      const { service, participantRepository, placeRepository } =
-        createService()
+      const {
+        service,
+        participantRepository,
+        placeRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
       participantRepository.findOne.mockResolvedValue({
         id: 'participant-1',
         meeting: { id: '123' },
@@ -457,6 +476,61 @@ describe('PlaceService', () => {
       await expect(
         service.getPlaceDetail('999', 'token'),
       ).rejects.toBeInstanceOf(PlaceException)
+      expect(
+        meetingPlaceRecommendationRepository.findOne,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('이미 모임에 추천된 장소는 isRecommended를 true로 응답한다', async () => {
+      const {
+        service,
+        participantRepository,
+        placeRepository,
+        meetingPlaceRecommendationRepository,
+      } = createService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { id: '123' },
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '1',
+        name: '성수 카페 모모',
+        address: '서울 성동구 성수이로 1',
+        previewUrl: 'https://preview.example.com/1',
+        category: { name: '카페', slug: 'cafe' },
+      })
+      meetingPlaceRecommendationRepository.findOne.mockResolvedValue({
+        id: 'recommendation-1',
+      })
+
+      const result = await service.getPlaceDetail('1', 'token')
+
+      expect(meetingPlaceRecommendationRepository.findOne).toHaveBeenCalledWith(
+        {
+          where: { meeting: { id: '123' }, place: { id: '1' } },
+        },
+      )
+      expect(result).toMatchObject({ isRecommended: true })
+    })
+
+    it('추천된 적 없는 장소는 isRecommended를 false로 응답한다', async () => {
+      const { service, participantRepository, placeRepository } =
+        createService()
+      participantRepository.findOne.mockResolvedValue({
+        id: 'participant-1',
+        meeting: { id: '123' },
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '1',
+        name: '성수 카페 모모',
+        address: '서울 성동구 성수이로 1',
+        previewUrl: 'https://preview.example.com/1',
+        category: { name: '카페', slug: 'cafe' },
+      })
+
+      const result = await service.getPlaceDetail('1', 'token')
+
+      expect(result).toMatchObject({ isRecommended: false })
     })
 
     it('구조화 사진을 조회하고 기존 imageUrls·previewUrl도 함께 응답한다', async () => {

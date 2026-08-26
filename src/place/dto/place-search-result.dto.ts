@@ -89,4 +89,10 @@ export class PlaceSearchResultDto {
 
   @ApiProperty({ description: '경도', example: 127.0557 })
   longitude!: number
+
+  @ApiProperty({
+    description: '이 모임에 이미 추천된 장소인지 여부',
+    example: false,
+  })
+  isRecommended!: boolean
 }
