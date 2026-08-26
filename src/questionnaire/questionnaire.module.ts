@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
+import { MeetingAccessModule } from 'src/meeting/access/meeting-access.module'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { MeetingQuestion } from './entities/meeting-question.entity'
@@ -18,6 +19,7 @@ import { QuestionnaireGenerationWorker } from './questionnaire-generation.worker
 
 @Module({
   imports: [
+    MeetingAccessModule,
     TypeOrmModule.forFeature([
       CourseCategoryStep,
       MeetingPlaceRecommendation,
