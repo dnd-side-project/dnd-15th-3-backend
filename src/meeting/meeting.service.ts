@@ -10,6 +10,7 @@ import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { type Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
+import { CourseCandidatePlace } from 'src/course/entities/course-candidate-place.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
@@ -53,6 +54,7 @@ import { MeetingScreenResponseDto } from './dto/meeting-screen-response.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
 import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
+import { SelectedCourseResponseDto } from './dto/selected-course-response.dto'
 import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
 import { MeetingParticipant } from './entities/meeting-participant.entity'
@@ -101,6 +103,8 @@ export class MeetingService {
     private readonly meetingRepository: Repository<Meeting>,
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
+    @InjectRepository(CourseCandidatePlace)
+    private readonly courseCandidatePlaceRepository: Repository<CourseCandidatePlace>,
     private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
     private readonly meetingAccessService: MeetingAccessService,
     private readonly placeSearchRepository: PlaceRepository,
@@ -701,6 +705,24 @@ export class MeetingService {
     return confirmed.id
   }
 
+  private async buildSelectedCourseResponse(
+    meetingId: string,
+  ): Promise<SelectedCourseResponseDto> {
+    const candidateId = await this.findConfirmedCourseCandidateId(meetingId)
+    const steps = await this.courseCandidatePlaceRepository.find({
+      where: { courseCandidate: { id: candidateId } },
+      relations: { meetingPlaceRecommendation: true },
+      order: { order: 'ASC' },
+    })
+
+    return {
+      id: candidateId,
+      recommendationIds: steps.map(
+        (step) => step.meetingPlaceRecommendation.id,
+      ),
+    }
+  }
+
   private async getMeetingScreen(
     meetingId: string,
     accessToken: string,
@@ -802,7 +824,9 @@ export class MeetingService {
         meeting.meetingLocation,
         viewer.id,
       ),
-      selectedCourse: null,
+      selectedCourse: meeting.isConfirmed()
+        ? await this.buildSelectedCourseResponse(meetingId)
+        : null,
     }
   }
 
