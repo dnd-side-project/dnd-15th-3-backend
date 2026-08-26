@@ -71,7 +71,7 @@ export class PlaceController {
   @ApiOperation({
     summary: '주변 장소 검색',
     description:
-      'Kakao Local API에서 모임 기준 위치 반경 2km 이내의 장소를 실시간 조회합니다. 직접 소유한 사진을 우선 사용하고, 없으면 업체명·주소·좌표·전화번호로 검증한 Google Places 사진만 제공합니다. 매칭이 불확실하면 previewPhoto는 null입니다. 신규 클라이언트는 previewPhoto를 사용하며, Google 사진은 source, attributions, googleMapsUri에 따라 표시해야 합니다.',
+      'Kakao Local API에서 모임 기준 위치 반경 2km 이내의 장소를 실시간 조회합니다. 직접 소유한 사진을 우선 사용하고, 없으면 업체명·주소·좌표·전화번호로 검증한 Google Places 사진만 제공합니다. 매칭이 불확실하면 previewPhoto는 null입니다. 신규 클라이언트는 previewPhoto를 사용하며, Google 사진은 source, attributions, googleMapsUri에 따라 표시해야 합니다. isRecommended로 각 장소가 모임에 이미 추천되었는지 여부를 함께 제공합니다.',
   })
   @ApiQuery({
     name: 'meetingId',
