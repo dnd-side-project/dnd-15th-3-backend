@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
-import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { MeetingException } from 'src/meeting/exception/meeting.exception'
 import { MeetingErrorCode } from 'src/meeting/exception/meeting-error-code'
 import type { EntityManager } from 'typeorm'
@@ -68,9 +67,7 @@ export class QuestionnaireService {
           accessToken,
           manager,
         )
-        if (participant.role !== ParticipantRole.Host) {
-          throw new MeetingException(MeetingErrorCode.hostOnly)
-        }
+        participant.assertHost(MeetingErrorCode.hostOnly)
 
         const meeting = await manager
           .getRepository(Meeting)
@@ -147,9 +144,7 @@ export class QuestionnaireService {
       meetingId,
       accessToken,
     )
-    if (participant.role !== ParticipantRole.Host) {
-      throw new MeetingException(MeetingErrorCode.hostOnly)
-    }
+    participant.assertHost(MeetingErrorCode.hostOnly)
 
     const questionnaire = await this.dataSource
       .getRepository(MeetingQuestionnaire)

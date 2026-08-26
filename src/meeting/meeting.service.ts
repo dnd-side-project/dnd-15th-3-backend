@@ -329,9 +329,7 @@ export class MeetingService {
       meetingId,
       accessToken,
     )
-    if (participant.role !== ParticipantRole.Host) {
-      throw new MeetingException(MeetingErrorCode.hostOnly)
-    }
+    participant.assertHost(MeetingErrorCode.hostOnly)
 
     const meetingRepository = this.dataSource.getRepository(Meeting)
     const meeting = await meetingRepository.findOne({
@@ -440,9 +438,7 @@ export class MeetingService {
         accessToken,
         manager,
       )
-      if (participant.role !== ParticipantRole.Host) {
-        throw new MeetingException(MeetingErrorCode.hostOnly)
-      }
+      participant.assertHost(MeetingErrorCode.hostOnly)
 
       const categoryRepository = manager.getRepository(Category)
       const categories = await categoryRepository.find({
@@ -507,9 +503,7 @@ export class MeetingService {
         accessToken,
         manager,
       )
-      if (participant.role !== ParticipantRole.Host) {
-        throw new MeetingException(MeetingErrorCode.hostOnly)
-      }
+      participant.assertHost(MeetingErrorCode.hostOnly)
 
       const locationRepository = manager.getRepository(MeetingLocation)
       const location = await locationRepository
