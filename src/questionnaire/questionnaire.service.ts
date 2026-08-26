@@ -56,6 +56,42 @@ export class QuestionnaireService {
     private readonly meetingAccessService: MeetingAccessService,
   ) {}
 
+  async restartAfterMeetingDetailsChange(
+    manager: EntityManager,
+    meetingId: string,
+  ): Promise<void> {
+    const questionnaireRepository = manager.getRepository(MeetingQuestionnaire)
+    const questionnaire = await questionnaireRepository
+      .createQueryBuilder('questionnaire')
+      .where('questionnaire.meeting_id = :meetingId', { meetingId })
+      .orderBy('questionnaire.version', 'DESC')
+      .setLock('pessimistic_write')
+      .getOne()
+    if (!questionnaire) return
+
+    await manager
+      .getRepository(MeetingQuestion)
+      .createQueryBuilder()
+      .delete()
+      .from(MeetingQuestion)
+      .where('questionnaire_id = :questionnaireId', {
+        questionnaireId: questionnaire.id,
+      })
+      .andWhere('"order" > 1')
+      .execute()
+
+    questionnaire.version += 1
+    questionnaire.generationStatus = QuestionnaireGenerationStatus.Generating
+    questionnaire.source = null
+    questionnaire.provider = 'pending'
+    questionnaire.model = 'pending'
+    questionnaire.generationError = null
+    questionnaire.generationAttemptCount += 1
+    questionnaire.generationStartedAt = null
+    questionnaire.generatedAt = null
+    await questionnaireRepository.save(questionnaire)
+  }
+
   async createQuestionnaire(
     meetingId: string,
     accessToken: string,
