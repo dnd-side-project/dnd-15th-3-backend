@@ -37,17 +37,20 @@ import {
   haversineDistanceMeters,
   PLACE_SYNC_RADIUS_METERS,
 } from 'src/place/sync/place-sync.constants'
+import { QuestionnaireService } from 'src/questionnaire/questionnaire.service'
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
 import { assertAccessToken } from './access/meeting-access.utils'
 import {
   MAP_PINS_VISIBLE_STATUSES,
+  MEETING_DETAILS_EDITABLE_STATUSES,
   PLACE_PREFERENCE_EDITABLE_STATUSES,
   SIMILAR_PLACES_RECOMMENDABLE_STATUSES,
 } from './constants/meeting-status.constants'
 import { CourseImageResponseDto } from './dto/course-image-response.dto'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
+import { MeetingDetailsResponseDto } from './dto/meeting-details-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import { MeetingLocationResponseDto } from './dto/meeting-location.dto'
 import { MeetingScreenResponseDto } from './dto/meeting-screen-response.dto'
@@ -69,6 +72,7 @@ import type {
   JoinMeetingRequest,
   MeetingLocationInput,
   UpdateCoursePlanRequest,
+  UpdateMeetingDetailsRequest,
 } from './schema/meeting-request.schema'
 import type { AddRecommendationRequest } from './schema/recommendation-request.schema'
 
@@ -110,6 +114,7 @@ export class MeetingService {
     private readonly placeSearchRepository: PlaceRepository,
     private readonly placePhotoService: PlacePhotoService,
     private readonly placeLiveDataService: PlaceLiveDataService,
+    private readonly questionnaireService: QuestionnaireService,
   ) {}
 
   async createMeeting(
@@ -125,6 +130,77 @@ export class MeetingService {
     }
 
     throw new MeetingException(MeetingErrorCode.invitationCodeIssuanceFailed)
+  }
+
+  updateMeetingDetails(
+    meetingId: string,
+    accessToken: string,
+    request: UpdateMeetingDetailsRequest,
+  ): Promise<MeetingDetailsResponseDto> {
+    assertAccessToken(accessToken)
+
+    return this.dataSource.transaction(async (manager) => {
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
+      participant.assertHost(MeetingErrorCode.hostOnly)
+
+      const meetingRepository = manager.getRepository(Meeting)
+      const meeting = await meetingRepository
+        .createQueryBuilder('meeting')
+        .innerJoinAndSelect('meeting.meetingType', 'meetingType')
+        .where('meeting.id = :meetingId', { meetingId })
+        .setLock('pessimistic_write', undefined, ['meeting'])
+        .getOne()
+      if (!meeting) {
+        throw new MeetingException(MeetingErrorCode.notFound)
+      }
+      meeting.assertStatus(
+        MEETING_DETAILS_EDITABLE_STATUSES,
+        MeetingErrorCode.meetingDetailsNotEditable,
+      )
+
+      let changed = false
+      if (request.name !== undefined && meeting.name !== request.name) {
+        meeting.name = request.name
+        changed = true
+      }
+      if (request.date !== undefined && meeting.date !== request.date) {
+        meeting.date = request.date
+        changed = true
+      }
+      if (
+        request.time !== undefined &&
+        this.normalizeMeetingTime(meeting.time) !== request.time
+      ) {
+        meeting.time = request.time
+        changed = true
+      }
+      if (request.meetingTypeCode !== undefined) {
+        const meetingType = await manager.getRepository(MeetingType).findOne({
+          where: { code: request.meetingTypeCode },
+        })
+        if (!meetingType) {
+          throw new MeetingException(MeetingErrorCode.meetingTypeNotFound)
+        }
+        if (meeting.meetingType.id !== meetingType.id) {
+          meeting.meetingType = meetingType
+          changed = true
+        }
+      }
+
+      if (changed) {
+        await meetingRepository.save(meeting)
+        await this.questionnaireService.restartAfterMeetingDetailsChange(
+          manager,
+          meetingId,
+        )
+      }
+
+      return this.toMeetingDetailsResponse(meeting)
+    })
   }
 
   private createMeetingInTransaction(request: CreateMeetingRequest): Promise<{
@@ -846,6 +922,29 @@ export class MeetingService {
         order: step.order,
       })),
     }
+  }
+
+  private toMeetingDetailsResponse(
+    meeting: Meeting,
+  ): MeetingDetailsResponseDto {
+    const meetingTypeCode = meeting.meetingType
+      .code as MeetingDetailsResponseDto['meetingTypeCode']
+    return {
+      meetingId: meeting.id,
+      name: meeting.name,
+      date: meeting.date,
+      time: this.normalizeMeetingTime(meeting.time),
+      meetingTypeCode,
+      meetingType: {
+        id: meeting.meetingType.id,
+        code: meetingTypeCode,
+        name: meeting.meetingType.name,
+      },
+    }
+  }
+
+  private normalizeMeetingTime(time: string): string {
+    return time.slice(0, 5)
   }
 
   private toInvitationResponse(meeting: Meeting): MeetingInvitationResponseDto {

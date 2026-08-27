@@ -154,6 +154,117 @@ describe('QuestionnaireService.resolveAnswers', () => {
   })
 })
 
+describe('QuestionnaireService.restartAfterMeetingDetailsChange', () => {
+  it.each([
+    QuestionnaireGenerationStatus.Ready,
+    QuestionnaireGenerationStatus.Generating,
+  ])(
+    '%s 질문지의 기존 작업을 fencing하고 후속 질문 재생성을 예약한다',
+    async (generationStatus) => {
+      const questionnaire = Object.assign(new MeetingQuestionnaire(), {
+        id: '60',
+        version: 2,
+        generationStatus,
+        source: QuestionnaireSource.Llm,
+        provider: 'openai',
+        model: 'test-model',
+        generationError: 'old error',
+        generationAttemptCount: 4,
+        generationStartedAt: new Date('2026-01-01T00:00:00.000Z'),
+        generatedAt: new Date('2026-01-01T00:00:10.000Z'),
+      })
+      const questionnaireQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(questionnaire),
+      }
+      const questionnaireRepository = {
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValue(questionnaireQueryBuilder),
+        save: jest.fn(async (value) => value),
+      }
+      const deleteQueryBuilder = {
+        delete: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+      }
+      const questionRepository = {
+        createQueryBuilder: jest.fn().mockReturnValue(deleteQueryBuilder),
+      }
+      const manager = {
+        getRepository: jest.fn((entity: unknown) => {
+          if (entity === MeetingQuestionnaire) return questionnaireRepository
+          if (entity === MeetingQuestion) return questionRepository
+          throw new Error('unexpected repository')
+        }),
+      }
+      const service = new QuestionnaireService({} as never, {} as never)
+
+      await service.restartAfterMeetingDetailsChange(manager as never, '10')
+
+      expect(questionnaireQueryBuilder.where).toHaveBeenCalledWith(
+        'questionnaire.meeting_id = :meetingId',
+        { meetingId: '10' },
+      )
+      expect(questionnaireQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'questionnaire.version',
+        'DESC',
+      )
+      expect(questionnaireQueryBuilder.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+      )
+      expect(deleteQueryBuilder.where).toHaveBeenCalledWith(
+        'questionnaire_id = :questionnaireId',
+        { questionnaireId: '60' },
+      )
+      expect(deleteQueryBuilder.andWhere).toHaveBeenCalledWith('"order" > 1')
+      expect(questionnaireRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 3,
+          generationStatus: QuestionnaireGenerationStatus.Generating,
+          source: null,
+          provider: 'pending',
+          model: 'pending',
+          generationError: null,
+          generationAttemptCount: 5,
+          generationStartedAt: null,
+          generatedAt: null,
+        }),
+      )
+    },
+  )
+
+  it('질문지가 없는 모임은 아무 것도 변경하지 않는다', async () => {
+    const questionnaireQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      setLock: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    }
+    const questionnaireRepository = {
+      createQueryBuilder: jest.fn().mockReturnValue(questionnaireQueryBuilder),
+      save: jest.fn(),
+    }
+    const manager = {
+      getRepository: jest.fn((entity: unknown) => {
+        if (entity === MeetingQuestionnaire) return questionnaireRepository
+        throw new Error('unexpected repository')
+      }),
+    }
+    const service = new QuestionnaireService({} as never, {} as never)
+
+    await expect(
+      service.restartAfterMeetingDetailsChange(manager as never, '10'),
+    ).resolves.toBeUndefined()
+    expect(questionnaireRepository.save).not.toHaveBeenCalled()
+    expect(manager.getRepository).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('QuestionnaireService.createQuestionnaire', () => {
   it('LLM을 기다리지 않고 고정 첫 질문만 담긴 GENERATING 응답을 반환한다', async () => {
     const questionnaire = Object.assign(new MeetingQuestionnaire(), {

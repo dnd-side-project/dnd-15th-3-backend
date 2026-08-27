@@ -6,6 +6,7 @@ import {
   invitationPreviewRequestSchema,
   joinMeetingRequestSchema,
   updateCoursePlanRequestSchema,
+  updateMeetingDetailsRequestSchema,
 } from './meeting-request.schema'
 
 describe('meeting request schemas', () => {
@@ -83,6 +84,30 @@ describe('meeting request schemas', () => {
     ).toMatchObject({ categorySlugs: [CategorySlug.Cafe] })
   })
 
+  it.each([
+    ['meetingTypeCode', { meetingTypeCode: MeetingTypeCode.DatingHobby }],
+    ['name', { name: '저녁 모임' }],
+    ['date', { date: '2026-01-02' }],
+    ['time', { time: '18:30' }],
+  ])('모임 기본 정보 수정은 %s 필드만 전달할 수 있다', (_, input) => {
+    expect(updateMeetingDetailsRequestSchema.parse(input)).toEqual(input)
+  })
+
+  it('모임 기본 정보 수정은 최소 한 필드를 요구한다', () => {
+    expect(updateMeetingDetailsRequestSchema.safeParse({}).success).toBe(false)
+  })
+
+  it.each([
+    ['긴 이름', { name: '열한글자모임이름입니다' }],
+    ['과거 날짜', { date: '2025-12-31' }],
+    ['잘못된 시간', { time: '24:00' }],
+    ['잘못된 모임 유형', { meetingTypeCode: 'UNKNOWN' }],
+  ])('모임 기본 정보 수정은 %s 입력을 거부한다', (_, input) => {
+    expect(updateMeetingDetailsRequestSchema.safeParse(input).success).toBe(
+      false,
+    )
+  })
+
   it('오늘 날짜로는 모임을 생성할 수 있다', () => {
     expect(
       createMeetingRequestSchema.shape.date.safeParse('2026-01-01').success,
@@ -101,7 +126,7 @@ describe('meeting request schemas', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.error.issues[0].message).toBe(
-        '오늘 이전 날짜로는 모임을 생성할 수 없습니다.',
+        '오늘 이전 날짜로는 모임 날짜를 설정할 수 없습니다.',
       )
     }
   })

@@ -145,6 +145,9 @@ function createMeetingService() {
     ),
     searchKakao: jest.fn(),
   }
+  const questionnaireService = {
+    restartAfterMeetingDetailsChange: jest.fn().mockResolvedValue(undefined),
+  }
 
   const service = new MeetingService(
     config as unknown as ConfigService<Env, true>,
@@ -161,6 +164,7 @@ function createMeetingService() {
     placeSearchRepository as never,
     placePhotoService as never,
     placeLiveDataService as never,
+    questionnaireService as never,
   )
 
   return {
@@ -180,10 +184,239 @@ function createMeetingService() {
     placeSearchRepository,
     placePhotoService,
     placeLiveDataService,
+    questionnaireService,
+  }
+}
+
+function setupMeetingDetailsUpdate() {
+  const context = createMeetingService()
+  const currentMeetingType = Object.assign(new MeetingType(), {
+    id: 'type-1',
+    code: MeetingTypeCode.Social,
+    name: '친목',
+  })
+  const nextMeetingType = Object.assign(new MeetingType(), {
+    id: 'type-2',
+    code: MeetingTypeCode.DatingHobby,
+    name: '데이트·취미',
+  })
+  const meeting = Object.assign(new Meeting(), {
+    id: 'meeting-1',
+    status: MeetingStatus.RecommendationCollecting,
+    name: '기존 모임',
+    date: '2026-08-23',
+    time: '12:00:00',
+    meetingType: currentMeetingType,
+  })
+  const participant = Object.assign(new MeetingParticipant(), {
+    id: 'participant-1',
+    role: ParticipantRole.Host,
+  })
+  context.meetingAccessService.findParticipant.mockResolvedValue(participant)
+
+  const meetingQueryBuilder = {
+    innerJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    setLock: jest.fn().mockReturnThis(),
+    getOne: jest.fn().mockResolvedValue(meeting),
+  }
+  const transactionMeetingRepository = {
+    createQueryBuilder: jest.fn().mockReturnValue(meetingQueryBuilder),
+    save: jest.fn(async (value) => value),
+  }
+  const meetingTypeRepository = {
+    findOne: jest
+      .fn()
+      .mockImplementation(({ where: { code } }) =>
+        Promise.resolve(
+          code === MeetingTypeCode.Social
+            ? currentMeetingType
+            : nextMeetingType,
+        ),
+      ),
+  }
+  const manager = {
+    getRepository: jest.fn((entity: unknown) => {
+      if (entity === Meeting) return transactionMeetingRepository
+      if (entity === MeetingType) return meetingTypeRepository
+      throw new Error('unexpected repository')
+    }),
+  }
+  context.dataSource.transaction.mockImplementation(async (callback) =>
+    callback(manager),
+  )
+
+  return {
+    ...context,
+    currentMeetingType,
+    nextMeetingType,
+    meeting,
+    participant,
+    meetingQueryBuilder,
+    transactionMeetingRepository,
+    meetingTypeRepository,
+    manager,
   }
 }
 
 describe('MeetingService', () => {
+  describe('updateMeetingDetails', () => {
+    it('모임 기본 정보 전체를 잠금 트랜잭션에서 변경하고 질문지를 재생성한다', async () => {
+      const {
+        service,
+        dataSource,
+        meeting,
+        meetingQueryBuilder,
+        transactionMeetingRepository,
+        questionnaireService,
+        manager,
+        nextMeetingType,
+      } = setupMeetingDetailsUpdate()
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          meetingTypeCode: MeetingTypeCode.DatingHobby,
+          name: '저녁 모임',
+          date: '2026-09-10',
+          time: '18:30',
+        }),
+      ).resolves.toEqual({
+        meetingId: 'meeting-1',
+        name: '저녁 모임',
+        date: '2026-09-10',
+        time: '18:30',
+        meetingTypeCode: MeetingTypeCode.DatingHobby,
+        meetingType: {
+          id: 'type-2',
+          code: MeetingTypeCode.DatingHobby,
+          name: '데이트·취미',
+        },
+      })
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1)
+      expect(meetingQueryBuilder.innerJoinAndSelect).toHaveBeenCalledWith(
+        'meeting.meetingType',
+        'meetingType',
+      )
+      expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+        undefined,
+        ['meeting'],
+      )
+      expect(transactionMeetingRepository.save).toHaveBeenCalledWith(meeting)
+      expect(meeting.meetingType).toBe(nextMeetingType)
+      expect(
+        questionnaireService.restartAfterMeetingDetailsChange,
+      ).toHaveBeenCalledWith(manager, 'meeting-1')
+    })
+
+    it.each([
+      ['name', { name: '저녁 모임' }],
+      ['date', { date: '2026-09-10' }],
+      ['time', { time: '18:30' }],
+      ['meetingTypeCode', { meetingTypeCode: MeetingTypeCode.DatingHobby }],
+    ])('%s 필드만 부분 수정할 수 있다', async (_, input) => {
+      const { service, transactionMeetingRepository, questionnaireService } =
+        setupMeetingDetailsUpdate()
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', input),
+      ).resolves.toMatchObject(input)
+      expect(transactionMeetingRepository.save).toHaveBeenCalledTimes(1)
+      expect(
+        questionnaireService.restartAfterMeetingDetailsChange,
+      ).toHaveBeenCalledTimes(1)
+    })
+
+    it('공개 시간과 DB 시간이 같으면 no-op으로 처리하고 질문지를 유지한다', async () => {
+      const { service, transactionMeetingRepository, questionnaireService } =
+        setupMeetingDetailsUpdate()
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          meetingTypeCode: MeetingTypeCode.Social,
+          name: '기존 모임',
+          date: '2026-08-23',
+          time: '12:00',
+        }),
+      ).resolves.toMatchObject({ time: '12:00' })
+
+      expect(transactionMeetingRepository.save).not.toHaveBeenCalled()
+      expect(
+        questionnaireService.restartAfterMeetingDetailsChange,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('빈 accessToken은 트랜잭션 전에 거부한다', () => {
+      const { service, dataSource } = setupMeetingDetailsUpdate()
+
+      expect(() =>
+        service.updateMeetingDetails('meeting-1', '', { name: '저녁 모임' }),
+      ).toThrow(
+        expect.objectContaining({
+          errorCode: CommonErrorCode.authenticationFailed,
+        }),
+      )
+      expect(dataSource.transaction).not.toHaveBeenCalled()
+    })
+
+    it('일반 참여자의 수정 요청을 거부한다', async () => {
+      const { service, meetingAccessService } = setupMeetingDetailsUpdate()
+      meetingAccessService.findParticipant.mockResolvedValue(
+        Object.assign(new MeetingParticipant(), {
+          role: ParticipantRole.Member,
+        }),
+      )
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'member-token', {
+          name: '저녁 모임',
+        }),
+      ).rejects.toMatchObject({ errorCode: MeetingErrorCode.hostOnly })
+    })
+
+    it('없는 모임의 수정 요청을 거부한다', async () => {
+      const { service, meetingQueryBuilder } = setupMeetingDetailsUpdate()
+      meetingQueryBuilder.getOne.mockResolvedValue(null)
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          name: '저녁 모임',
+        }),
+      ).rejects.toMatchObject({ errorCode: MeetingErrorCode.notFound })
+    })
+
+    it('없는 모임 유형으로 변경할 수 없다', async () => {
+      const { service, meetingTypeRepository } = setupMeetingDetailsUpdate()
+      meetingTypeRepository.findOne.mockResolvedValue(null)
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          meetingTypeCode: MeetingTypeCode.DatingHobby,
+        }),
+      ).rejects.toMatchObject({
+        errorCode: MeetingErrorCode.meetingTypeNotFound,
+      })
+    })
+
+    it.each(
+      Object.values(MeetingStatus).filter(
+        (status) => status !== MeetingStatus.RecommendationCollecting,
+      ),
+    )('%s 상태에서는 모임 기본 정보를 수정할 수 없다', async (status) => {
+      const { service, meeting } = setupMeetingDetailsUpdate()
+      meeting.status = status
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          name: '저녁 모임',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: MeetingErrorCode.meetingDetailsNotEditable,
+      })
+    })
+  })
+
   it('초대 코드 미리보기는 참여자 토큰을 발급하지 않고 모임 요약을 반환한다', async () => {
     const { service, dataSource } = createMeetingService()
     const meeting = {

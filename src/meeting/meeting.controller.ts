@@ -23,6 +23,7 @@ import {
   ApiConflictResponse,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
@@ -34,6 +35,7 @@ import {
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
+  getSchemaPath,
 } from '@nestjs/swagger'
 import { SimilarPlaceResponseDto } from 'src/catalog/dto/similar-place-response.dto'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
@@ -52,6 +54,7 @@ import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { CreateMeetingDto } from './dto/create-meeting.dto'
 import { InvitationPreviewRequestDto } from './dto/invitation-preview-request.dto'
 import { JoinMeetingDto } from './dto/join-meeting.dto'
+import { MeetingDetailsResponseDto } from './dto/meeting-details-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import {
   MeetingLocationDto,
@@ -62,6 +65,7 @@ import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
 import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
 import { UpdateCoursePlanDto } from './dto/update-course-plan.dto'
+import { UpdateMeetingDetailsDto } from './dto/update-meeting-details.dto'
 import { UpdatePlacePreferenceRequestDto } from './dto/update-place-preference-request.dto'
 import { MeetingErrorCode } from './exception/meeting-error-code'
 import { type CourseImageFile, MeetingService } from './meeting.service'
@@ -71,6 +75,7 @@ import {
   joinMeetingRequestSchema,
   meetingLocationSchema,
   updateCoursePlanRequestSchema,
+  updateMeetingDetailsRequestSchema,
 } from './schema/meeting-request.schema'
 import { addRecommendationRequestSchema } from './schema/recommendation-request.schema'
 
@@ -108,6 +113,65 @@ export class MeetingController {
     }
 
     return this.meetingService.createMeeting(parsed.data)
+  }
+
+  @Patch(':meetingId')
+  @ApiOperation({
+    summary: '모임 기본 정보 변경',
+    description:
+      '방장이 코스 생성 전 모임 이름·날짜·시간·유형 중 하나 이상을 변경합니다.',
+  })
+  @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
+  @ApiOkResponse({
+    description: '모임 기본 정보 변경 성공',
+    type: MeetingDetailsResponseDto,
+  })
+  @ApiExtraModels(UpdateMeetingDetailsDto)
+  @ApiBody({
+    description: '이름·날짜·시간·모임 유형 중 하나 이상을 전달합니다.',
+    schema: {
+      allOf: [{ $ref: getSchemaPath(UpdateMeetingDetailsDto) }],
+      minProperties: 1,
+    },
+  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    '수정할 필드가 없거나 입력 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '참여자 토큰이 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.hostOnly, '방장 권한이 필요함')
+  @ApiErrorResponse(
+    [MeetingErrorCode.notFound, MeetingErrorCode.meetingTypeNotFound],
+    '모임 또는 모임 유형을 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.meetingDetailsNotEditable,
+    '코스 생성을 시작한 상태여서 기본 정보를 변경할 수 없음',
+  )
+  updateMeetingDetails(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') accessToken: string,
+    @Body() dto: UpdateMeetingDetailsDto,
+  ): Promise<MeetingDetailsResponseDto> {
+    const parsed = updateMeetingDetailsRequestSchema.safeParse(dto)
+    if (!parsed.success) {
+      throw createValidationException(parsed.error.issues)
+    }
+
+    return this.meetingService.updateMeetingDetails(
+      meetingId,
+      accessToken,
+      parsed.data,
+    )
   }
 
   @Put(':meetingId/location')
