@@ -56,7 +56,7 @@ export class QuestionnaireService {
     private readonly meetingAccessService: MeetingAccessService,
   ) {}
 
-  async restartAfterMeetingDetailsChange(
+  async restartAfterMeetingInputChange(
     manager: EntityManager,
     meetingId: string,
   ): Promise<void> {

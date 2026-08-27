@@ -7,8 +7,10 @@ import type { Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
 import { CourseCandidatePlace } from 'src/course/entities/course-candidate-place.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import type { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
+import { Place } from 'src/place/entities/place.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
 import * as placeRepositoryModule from 'src/place/place.repository'
@@ -146,7 +148,7 @@ function createMeetingService() {
     searchKakao: jest.fn(),
   }
   const questionnaireService = {
-    restartAfterMeetingDetailsChange: jest.fn().mockResolvedValue(undefined),
+    restartAfterMeetingInputChange: jest.fn().mockResolvedValue(undefined),
   }
 
   const service = new MeetingService(
@@ -306,7 +308,7 @@ describe('MeetingService', () => {
       expect(transactionMeetingRepository.save).toHaveBeenCalledWith(meeting)
       expect(meeting.meetingType).toBe(nextMeetingType)
       expect(
-        questionnaireService.restartAfterMeetingDetailsChange,
+        questionnaireService.restartAfterMeetingInputChange,
       ).toHaveBeenCalledWith(manager, 'meeting-1')
     })
 
@@ -324,7 +326,7 @@ describe('MeetingService', () => {
       ).resolves.toMatchObject(input)
       expect(transactionMeetingRepository.save).toHaveBeenCalledTimes(1)
       expect(
-        questionnaireService.restartAfterMeetingDetailsChange,
+        questionnaireService.restartAfterMeetingInputChange,
       ).toHaveBeenCalledTimes(1)
     })
 
@@ -343,7 +345,7 @@ describe('MeetingService', () => {
 
       expect(transactionMeetingRepository.save).not.toHaveBeenCalled()
       expect(
-        questionnaireService.restartAfterMeetingDetailsChange,
+        questionnaireService.restartAfterMeetingInputChange,
       ).not.toHaveBeenCalled()
     })
 
@@ -590,13 +592,18 @@ describe('MeetingService', () => {
   })
 
   it('코스 계획은 참여자만 조회하고 방장만 version을 증가시켜 수정한다', async () => {
-    const { service, dataSource, meetingAccessService } = createMeetingService()
+    const { service, dataSource, meetingAccessService, questionnaireService } =
+      createMeetingService()
     const category = {
       id: 'category-1',
       slug: CategorySlug.Cafe,
       name: '카페',
     }
-    const meeting = { id: 'meeting-1', courseVersion: 1 }
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      courseVersion: 1,
+      status: MeetingStatus.RecommendationCollecting,
+    })
     const step = { id: 'step-1', meeting, category, order: 1 }
     meetingAccessService.findParticipant.mockResolvedValue(
       Object.assign(new MeetingParticipant(), {
@@ -659,6 +666,20 @@ describe('MeetingService', () => {
       'pessimistic_write',
     )
     expect(deleteQueryBuilder.execute).toHaveBeenCalled()
+    expect(
+      questionnaireService.restartAfterMeetingInputChange,
+    ).toHaveBeenCalledWith(manager, 'meeting-1')
+
+    meeting.status = MeetingStatus.CourseGenerating
+    await expect(
+      service.updateCoursePlan('meeting-1', 'host-token', {
+        categorySlugs: [CategorySlug.Cafe],
+        version: 2,
+      }),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseInputNotEditable,
+    })
+    expect(deleteQueryBuilder.execute).toHaveBeenCalledTimes(1)
 
     meetingAccessService.findParticipant.mockResolvedValue(
       Object.assign(new MeetingParticipant(), {
@@ -785,7 +806,10 @@ describe('MeetingService', () => {
         role: ParticipantRole.Host,
       }),
     )
-    const meeting = { id: 'meeting-1' }
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      status: MeetingStatus.RecommendationCollecting,
+    })
     const location = {
       id: 'location-1',
       meeting,
@@ -810,6 +834,14 @@ describe('MeetingService', () => {
     locationRepository.createQueryBuilder.mockImplementation(
       () => locationQueryBuilder,
     )
+    const meetingQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      setLock: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(meeting),
+    }
+    const meetingRepository = {
+      createQueryBuilder: jest.fn(() => meetingQueryBuilder),
+    }
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
@@ -823,6 +855,7 @@ describe('MeetingService', () => {
       find: jest.fn().mockResolvedValue([{ category }]),
     }
     const repositories = new Map<unknown, unknown>([
+      [Meeting, meetingRepository],
       [MeetingLocation, locationRepository],
       [PlaceSyncJob, jobRepository],
       [CourseCategoryStep, stepRepository],
@@ -851,7 +884,23 @@ describe('MeetingService', () => {
     expect(locationQueryBuilder.setLock).toHaveBeenCalledWith(
       'pessimistic_write',
     )
+    expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+      'pessimistic_write',
+    )
     expect(placeSyncService.createJobs).not.toHaveBeenCalled()
+
+    meeting.status = MeetingStatus.CourseGenerating
+    await expect(
+      service.updateLocation('meeting-1', 'participant-token', {
+        displayName: '다음 위치',
+        address: '다음 주소',
+        latitude: 37.52,
+        longitude: 127.02,
+      }),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseInputNotEditable,
+    })
+    expect(locationQueryBuilder.getOne).toHaveBeenCalledTimes(1)
   })
 
   it('선택한 코스의 반경 내 장소만 중복 없이 추천한다', async () => {
@@ -859,11 +908,16 @@ describe('MeetingService', () => {
       service,
       dataSource,
       meetingAccessService,
-      placeRepository,
       recommendationRepository,
       placePhotoService,
+      placeLiveDataService,
+      questionnaireService,
     } = createMeetingService()
     const participant = { id: 'participant-1' }
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      status: MeetingStatus.RecommendationCollecting,
+    })
     const category = { id: 'category-1', slug: CategorySlug.Cafe }
     const place = {
       id: 'place-1',
@@ -885,7 +939,6 @@ describe('MeetingService', () => {
       flagContentUri: null,
     }
     meetingAccessService.findParticipant.mockResolvedValue(participant)
-    placeRepository.findOne.mockResolvedValue(place)
     recommendationRepository.findOne.mockResolvedValue(null)
     recommendationRepository.save.mockImplementation((value) =>
       Promise.resolve({ id: 'recommendation-1', ...value }),
@@ -894,14 +947,32 @@ describe('MeetingService', () => {
       new Map([['place-1', previewPhoto]]),
     )
 
+    const meetingQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      setLock: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(meeting),
+    }
     const locationRepository = {
       findOne: jest.fn().mockResolvedValue(location),
     }
     const stepRepository = {
       findOne: jest.fn().mockResolvedValue({ id: 'step-1' }),
     }
-    dataSource.getRepository.mockImplementation((entity) =>
-      entity === MeetingLocation ? locationRepository : stepRepository,
+    const repositories = new Map<unknown, unknown>([
+      [
+        Meeting,
+        { createQueryBuilder: jest.fn().mockReturnValue(meetingQueryBuilder) },
+      ],
+      [MeetingLocation, locationRepository],
+      [Place, { findOne: jest.fn().mockResolvedValue(place) }],
+      [CourseCategoryStep, stepRepository],
+      [MeetingPlaceRecommendation, recommendationRepository],
+    ])
+    const manager = {
+      getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
+    }
+    dataSource.transaction.mockImplementation(async (callback) =>
+      callback(manager),
     )
 
     await expect(
@@ -916,6 +987,9 @@ describe('MeetingService', () => {
     expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'place-1', name: '카페' }),
     ])
+    expect(
+      questionnaireService.restartAfterMeetingInputChange,
+    ).toHaveBeenCalledWith(manager, 'meeting-1')
 
     recommendationRepository.findOne.mockResolvedValue({ id: 'existing' })
     await expect(
@@ -925,6 +999,17 @@ describe('MeetingService', () => {
     ).rejects.toMatchObject({
       errorCode: MeetingErrorCode.recommendationAlreadyExists,
     })
+
+    meeting.status = MeetingStatus.CourseGenerating
+    recommendationRepository.findOne.mockResolvedValue(null)
+    await expect(
+      service.addRecommendation('meeting-1', 'participant-token', {
+        placeId: 'place-1',
+      }),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseInputNotEditable,
+    })
+    expect(placeLiveDataService.resolvePlace).toHaveBeenCalledTimes(2)
   })
 
   it('추천 목록의 대표 사진을 장소별 반복 호출 없이 한 번에 조회한다', async () => {

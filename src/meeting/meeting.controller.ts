@@ -204,6 +204,10 @@ export class MeetingController {
     MeetingErrorCode.locationNotFound,
     '모임 기준 위치를 찾을 수 없음',
   )
+  @ApiErrorResponse(
+    MeetingErrorCode.courseInputNotEditable,
+    '코스 생성을 시작한 상태여서 기준 위치를 변경할 수 없음',
+  )
   updateLocation(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -258,6 +262,10 @@ export class MeetingController {
   @ApiErrorResponse(
     [MeetingErrorCode.locationNotFound, MeetingErrorCode.placeNotFound],
     '모임 기준 위치 또는 장소를 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.courseInputNotEditable,
+    '코스 생성을 시작한 상태여서 추천 장소를 추가할 수 없음',
   )
   addRecommendation(
     @Param('meetingId') meetingId: string,
@@ -364,6 +372,10 @@ export class MeetingController {
   @ApiErrorResponse(
     MeetingErrorCode.staleCoursePlan,
     '오래된 version으로 저장을 시도함',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.courseInputNotEditable,
+    '코스 생성을 시작한 상태여서 코스 계획을 변경할 수 없음',
   )
   updateCoursePlan(
     @Param('meetingId') meetingId: string,
