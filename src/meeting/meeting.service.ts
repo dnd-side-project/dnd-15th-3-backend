@@ -1222,13 +1222,21 @@ export class MeetingService {
     const resolved = await this.placeLiveDataService.resolvePlaces(
       recommendations.map((recommendation) => recommendation.place),
       meetingWithLocation.meetingLocation,
+      { allowPartial: true },
     )
 
     return {
       startPlace: this.toStartPlacePin(meetingWithLocation.meetingLocation),
-      sharedPlaces: recommendations.map((recommendation) =>
-        this.toPlacePin(resolved.get(recommendation.place.id)!),
-      ),
+      sharedPlaces: recommendations.flatMap((recommendation) => {
+        const place = resolved.get(recommendation.place.id)
+        if (!place) {
+          this.logger.warn(
+            `카카오 장소 조회에 실패해 해당 추천을 지도 핀에서 제외합니다. recommendationId=${recommendation.id}`,
+          )
+          return []
+        }
+        return [this.toPlacePin(place)]
+      }),
     }
   }
 

@@ -1447,6 +1447,73 @@ describe('MeetingService', () => {
       })
     })
 
+    it('공유 장소 중 일부만 카카오 조회에 실패해도 나머지 핀만으로 반환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        meetingRepository,
+        recommendationRepository,
+        placeLiveDataService,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      const meetingWithLocation = new Meeting()
+      meetingWithLocation.meetingLocation = {
+        displayName: '강남역',
+        longitude: 127.0276,
+        latitude: 37.4979,
+      } as MeetingLocation
+      meetingRepository.findOne.mockResolvedValue(meetingWithLocation)
+      const resolvablePlace = {
+        id: 'place-1',
+        name: '성수 카페 모모',
+        longitude: 127.0557,
+        latitude: 37.5446,
+        category: { name: '카페', slug: CategorySlug.Cafe },
+      }
+      const unresolvablePlace = {
+        id: 'place-2',
+        name: '조회 실패 장소',
+        longitude: 127.06,
+        latitude: 37.55,
+        category: { name: '카페', slug: CategorySlug.Cafe },
+      }
+      recommendationRepository.find.mockResolvedValue([
+        { id: 'recommendation-1', place: resolvablePlace },
+        { id: 'recommendation-2', place: unresolvablePlace },
+      ])
+      // place-2는 카카오 조회 실패를 흉내 내어 Map에서 아예 빠진 채로 반환됨
+      placeLiveDataService.resolvePlaces.mockResolvedValueOnce(
+        new Map([['place-1', resolvablePlace]]),
+      )
+
+      await expect(service.getMapPins('1', 'token')).resolves.toEqual({
+        startPlace: {
+          name: '강남역',
+          longitude: 127.0276,
+          latitude: 37.4979,
+        },
+        sharedPlaces: [
+          {
+            placeId: 'place-1',
+            name: '성수 카페 모모',
+            category: '카페',
+            categorySlug: CategorySlug.Cafe,
+            longitude: 127.0557,
+            latitude: 37.5446,
+          },
+        ],
+      })
+      expect(placeLiveDataService.resolvePlaces).toHaveBeenCalledWith(
+        [resolvablePlace, unresolvablePlace],
+        expect.objectContaining({ latitude: 37.4979, longitude: 127.0276 }),
+        { allowPartial: true },
+      )
+    })
+
     it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(
       '%s 상태에서는 DB 조회 없이 409를 던진다',
       async (status) => {
