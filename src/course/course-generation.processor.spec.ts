@@ -246,6 +246,88 @@ describe('CourseGenerationProcessor', () => {
     )
   })
 
+  it('카카오 조회에 일부만 실패해도 조회에 성공한 추천만으로 코스 생성을 계속 진행한다', async () => {
+    const context = createContext()
+    context.run.inputSnapshot = {
+      ...input,
+      recommendations: [
+        {
+          recommendationId: '40',
+          placeId: '50',
+          placeCategoryId: '20',
+          categorySlug: CategorySlug.Cafe,
+          likeCount: 2,
+          dislikeCount: 0,
+          source: PlaceSource.Kakao,
+          providerPlaceId: '12345',
+          placeUrl: 'https://place.map.kakao.com/12345',
+        },
+        {
+          recommendationId: '41',
+          placeId: '51',
+          placeCategoryId: '20',
+          categorySlug: CategorySlug.Cafe,
+          likeCount: 0,
+          dislikeCount: 0,
+          source: PlaceSource.Kakao,
+          providerPlaceId: '54321',
+          placeUrl: 'https://place.map.kakao.com/54321',
+        },
+      ],
+    }
+    const resolvablePlace = {
+      id: '50',
+      source: PlaceSource.Kakao,
+      providerPlaceId: '12345',
+      category: { id: '20', slug: CategorySlug.Cafe },
+    }
+    const unresolvablePlace = {
+      id: '51',
+      source: PlaceSource.Kakao,
+      providerPlaceId: '54321',
+      category: { id: '20', slug: CategorySlug.Cafe },
+    }
+    context.placeRepository.find.mockResolvedValue([
+      resolvablePlace,
+      unresolvablePlace,
+    ])
+    // 카카오 조회 실패한 장소(placeId '51')는 Map에서 아예 빠진 채로 반환됨
+    context.placeLiveDataService.resolvePlaces.mockResolvedValue(
+      new Map([
+        [
+          '50',
+          {
+            ...resolvablePlace,
+            name: '성수 카페',
+            address: '서울 성동구',
+            latitude: 37.501,
+            longitude: 127.001,
+          },
+        ],
+      ]),
+    )
+
+    await expect(context.processor.processRun('70')).resolves.toBe(
+      MeetingStatus.CourseGenerated,
+    )
+
+    expect(context.placeLiveDataService.resolvePlaces).toHaveBeenCalledWith(
+      expect.arrayContaining([resolvablePlace, unresolvablePlace]),
+      input.meeting.location,
+      { allowPartial: true },
+    )
+    expect(context.generator.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recommendations: [
+          expect.objectContaining({
+            recommendationId: '40',
+            name: '성수 카페',
+          }),
+        ],
+      }),
+    )
+  })
+
   it('생성 결과가 입력 스냅샷과 다르면 run과 모임을 실패 상태로 전환한다', async () => {
     const context = createContext()
     context.generator.generate.mockResolvedValue({

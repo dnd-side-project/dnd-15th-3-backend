@@ -2,6 +2,7 @@ import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import type { Repository } from 'typeorm'
 import { Place } from './entities/place.entity'
 import { PlaceSource } from './enums/place-source.enum'
+import { PlaceException } from './exception/place.exception'
 import { PlaceLiveDataService } from './place-live-data.service'
 import type { KakaoPlacesProvider } from './provider/kakao-places.provider'
 
@@ -213,6 +214,32 @@ describe('PlaceLiveDataService', () => {
       radiusMeters: 2000,
       categorySlug: CategorySlug.Cafe,
     })
+  })
+
+  it('일부 장소를 못 찾으면 기본적으로 예외를 던진다', async () => {
+    const { service, reference, kakaoProvider } = createService()
+    kakaoProvider.searchNearby.mockResolvedValueOnce({
+      places: [],
+      isComplete: true,
+    })
+
+    await expect(
+      service.resolvePlaces([reference as never], center),
+    ).rejects.toThrow(PlaceException)
+  })
+
+  it('allowPartial 옵션을 주면 일부 장소를 못 찾아도 예외 대신 조회된 것만 반환한다', async () => {
+    const { service, reference, kakaoProvider } = createService()
+    kakaoProvider.searchNearby.mockResolvedValueOnce({
+      places: [],
+      isComplete: true,
+    })
+
+    await expect(
+      service.resolvePlaces([reference as never], center, {
+        allowPartial: true,
+      }),
+    ).resolves.toHaveProperty('size', 0)
   })
 
   it('기타 카테고리도 Kakao 실시간 검색 대상으로 처리한다', async () => {

@@ -146,23 +146,29 @@ export class CourseGenerationProcessor {
     const resolved = await this.placeLiveDataService.resolvePlaces(
       places,
       input.meeting.location,
+      { allowPartial: true },
     )
 
     return {
       ...input,
-      recommendations: input.recommendations.map((recommendation) => {
-        if ('name' in recommendation) return recommendation
+      recommendations: input.recommendations.flatMap((recommendation) => {
+        if ('name' in recommendation) return [recommendation]
         const place = resolved.get(recommendation.placeId)
         if (!place) {
-          throw new Error('Kakao place could not be resolved')
+          this.logger.warn(
+            `카카오 장소 조회에 실패해 해당 추천을 코스 생성 대상에서 제외합니다. recommendationId=${recommendation.recommendationId}`,
+          )
+          return []
         }
-        return {
-          ...recommendation,
-          name: place.name,
-          address: place.address,
-          latitude: place.latitude,
-          longitude: place.longitude,
-        }
+        return [
+          {
+            ...recommendation,
+            name: place.name,
+            address: place.address,
+            latitude: place.latitude,
+            longitude: place.longitude,
+          },
+        ]
       }),
     }
   }
