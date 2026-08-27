@@ -848,7 +848,7 @@ export class MeetingService {
       invitationUrl: `${this.config.get('INVITATION_BASE_URL', { infer: true })}/${meeting.accessToken}`,
       name: meeting.name,
       date: meeting.date,
-      time: meeting.time,
+      time: this.normalizeMeetingTime(meeting.time),
       courseImageUrl: meeting.courseImageKey
         ? this.mediaService.getPublicUrl(meeting.courseImageKey)
         : null,
@@ -954,7 +954,7 @@ export class MeetingService {
       invitationUrl: `${this.config.get('INVITATION_BASE_URL', { infer: true })}/${meeting.accessToken}`,
       name: meeting.name,
       date: meeting.date,
-      time: meeting.time,
+      time: this.normalizeMeetingTime(meeting.time),
       locationName: meeting.meetingLocation!.displayName,
     }
   }
@@ -1241,36 +1241,51 @@ export class MeetingService {
     }
   }
 
-  async updatePlacePreference(
+  updatePlacePreference(
     meetingId: string,
     recommendationId: string,
     accessToken: string,
     preference: PreferenceType | null,
   ): Promise<PlacePreferenceResponseDto> {
-    const participant = await this.meetingAccessService.findParticipant(
-      meetingId,
-      accessToken,
-    )
-    participant.meeting.assertStatus(
-      PLACE_PREFERENCE_EDITABLE_STATUSES,
-      MeetingErrorCode.placePreferenceNotEditable,
-    )
-
-    const recommendationExists = await this.recommendationRepository.exists({
-      where: { id: recommendationId, meeting: { id: meetingId } },
-    })
-    if (!recommendationExists) {
-      throw new MeetingException(MeetingErrorCode.recommendationNotFound)
-    }
-
-    const { likeCount, dislikeCount } =
-      await this.voteRepository.applyPreference(
-        recommendationId,
-        participant.id,
-        preference,
+    return this.dataSource.transaction(async (manager) => {
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
+      const meeting = await manager
+        .getRepository(Meeting)
+        .createQueryBuilder('meeting')
+        .where('meeting.id = :meetingId', { meetingId })
+        .setLock('pessimistic_write')
+        .getOne()
+      if (!meeting) {
+        throw new MeetingException(MeetingErrorCode.notFound)
+      }
+      meeting.assertStatus(
+        PLACE_PREFERENCE_EDITABLE_STATUSES,
+        MeetingErrorCode.placePreferenceNotEditable,
       )
 
-    return { likeCount, dislikeCount, myPreference: preference }
+      const recommendationExists = await manager
+        .getRepository(MeetingPlaceRecommendation)
+        .exists({
+          where: { id: recommendationId, meeting: { id: meetingId } },
+        })
+      if (!recommendationExists) {
+        throw new MeetingException(MeetingErrorCode.recommendationNotFound)
+      }
+
+      const { likeCount, dislikeCount } =
+        await this.voteRepository.applyPreference(
+          manager,
+          recommendationId,
+          participant.id,
+          preference,
+        )
+
+      return { likeCount, dislikeCount, myPreference: preference }
+    })
   }
 
   async getSimilarPlaces(

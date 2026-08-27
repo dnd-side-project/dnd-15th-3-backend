@@ -424,7 +424,7 @@ describe('MeetingService', () => {
       accessToken: 'ABC234',
       name: '성수 모임',
       date: '2026-08-23',
-      time: '12:00',
+      time: '12:00:00',
       meetingLocation: {
         id: 'location-1',
         displayName: '서울특별시 강남구',
@@ -481,7 +481,7 @@ describe('MeetingService', () => {
       accessToken: 'ABC234',
       name: '성수 모임',
       date: '2026-08-23',
-      time: '12:00',
+      time: '12:00:00',
       meetingType,
       meetingLocation: location,
       courseVersion: 1,
@@ -577,6 +577,7 @@ describe('MeetingService', () => {
     }
     await expect(service.joinMeeting(joinRequest)).resolves.toMatchObject({
       participantAccessToken: 'guest-token',
+      time: '12:00',
       courseImageUrl: 'https://media.example/o/media/course.png',
       role: 'MEMBER',
       isHost: false,
@@ -1033,7 +1034,7 @@ describe('MeetingService', () => {
       accessToken: 'ABC234',
       name: '성수 모임',
       date: '2026-08-23',
-      time: '12:00',
+      time: '12:00:00',
       meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
       meetingLocation: {
         id: 'location-1',
@@ -1086,7 +1087,7 @@ describe('MeetingService', () => {
       accessToken: 'ABC234',
       name: '성수 모임',
       date: '2026-08-23',
-      time: '12:00',
+      time: '12:00:00',
       meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
       meetingLocation: {
         id: 'location-1',
@@ -1128,6 +1129,7 @@ describe('MeetingService', () => {
 
     const result = await service.getMeetingDetail('meeting-1', 'host-token')
 
+    expect(result.time).toBe('12:00')
     expect(result.selectedCourse).toEqual({
       id: 'candidate-1',
       recommendationIds: ['recommendation-1', 'recommendation-2'],
@@ -1444,13 +1446,53 @@ describe('MeetingService', () => {
   })
 
   describe('updatePlacePreference', () => {
+    function setupPlacePreferenceUpdate(
+      status: MeetingStatus,
+      recommendationExists = true,
+    ) {
+      const context = createMeetingService()
+      const meeting = createMeetingWithStatus(status)
+      meeting.id = '1'
+      const participant = { id: 'participant-1', meeting }
+      context.meetingAccessService.findParticipant.mockResolvedValue(
+        participant,
+      )
+
+      const meetingQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(meeting),
+      }
+      const transactionRecommendationRepository = {
+        exists: jest.fn().mockResolvedValue(recommendationExists),
+      }
+      const manager = {
+        getRepository: jest.fn((entity: unknown) =>
+          entity === Meeting
+            ? { createQueryBuilder: jest.fn(() => meetingQueryBuilder) }
+            : transactionRecommendationRepository,
+        ),
+      }
+      context.dataSource.transaction.mockImplementation(async (callback) =>
+        callback(manager),
+      )
+
+      return {
+        ...context,
+        manager,
+        meetingQueryBuilder,
+        transactionRecommendationRepository,
+      }
+    }
+
     it('참여자 검증에 실패하면 DB 조회 없이 그대로 전파한다', async () => {
       const {
         service,
         meetingAccessService,
-        recommendationRepository,
         voteRepository,
-      } = createMeetingService()
+        meetingQueryBuilder,
+        transactionRecommendationRepository,
+      } = setupPlacePreferenceUpdate(MeetingStatus.RecommendationCollecting)
       meetingAccessService.findParticipant.mockRejectedValue(
         new CommonException(CommonErrorCode.authenticationFailed),
       )
@@ -1463,23 +1505,20 @@ describe('MeetingService', () => {
       )
 
       await expect(promise).rejects.toBeInstanceOf(CommonException)
-      expect(recommendationRepository.exists).not.toHaveBeenCalled()
+      expect(meetingQueryBuilder.getOne).not.toHaveBeenCalled()
+      expect(transactionRecommendationRepository.exists).not.toHaveBeenCalled()
       expect(voteRepository.applyPreference).not.toHaveBeenCalled()
     })
 
     it.each([MeetingStatus.CourseGenerating, MeetingStatus.CourseConfirmed])(
-      '%s 상태에서는 DB 조회 없이 409를 던진다',
+      '%s 상태에서는 잠금 후 409를 던진다',
       async (status) => {
         const {
           service,
-          meetingAccessService,
-          recommendationRepository,
           voteRepository,
-        } = createMeetingService()
-        meetingAccessService.findParticipant.mockResolvedValue({
-          id: 'participant-1',
-          meeting: createMeetingWithStatus(status),
-        })
+          meetingQueryBuilder,
+          transactionRecommendationRepository,
+        } = setupPlacePreferenceUpdate(status)
 
         const promise = service.updatePlacePreference(
           '1',
@@ -1489,25 +1528,22 @@ describe('MeetingService', () => {
         )
 
         await expect(promise).rejects.toBeInstanceOf(MeetingException)
-        expect(recommendationRepository.exists).not.toHaveBeenCalled()
+        expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+          'pessimistic_write',
+        )
+        expect(
+          transactionRecommendationRepository.exists,
+        ).not.toHaveBeenCalled()
         expect(voteRepository.applyPreference).not.toHaveBeenCalled()
       },
     )
 
     it('추천 장소가 해당 모임 소속이 아니면 404를 던진다', async () => {
-      const {
-        service,
-        meetingAccessService,
-        recommendationRepository,
-        voteRepository,
-      } = createMeetingService()
-      meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'participant-1',
-        meeting: createMeetingWithStatus(
+      const { service, voteRepository, transactionRecommendationRepository } =
+        setupPlacePreferenceUpdate(
           MeetingStatus.RecommendationCollecting,
-        ),
-      })
-      recommendationRepository.exists.mockResolvedValue(false)
+          false,
+        )
 
       const promise = service.updatePlacePreference(
         '1',
@@ -1517,26 +1553,15 @@ describe('MeetingService', () => {
       )
 
       await expect(promise).rejects.toBeInstanceOf(MeetingException)
-      expect(recommendationRepository.exists).toHaveBeenCalledWith({
+      expect(transactionRecommendationRepository.exists).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
       })
       expect(voteRepository.applyPreference).not.toHaveBeenCalled()
     })
 
     it('검증을 통과하면 voteRepository에 위임하고 결과를 응답 형태로 반환한다', async () => {
-      const {
-        service,
-        meetingAccessService,
-        recommendationRepository,
-        voteRepository,
-      } = createMeetingService()
-      meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'participant-1',
-        meeting: createMeetingWithStatus(
-          MeetingStatus.RecommendationCollecting,
-        ),
-      })
-      recommendationRepository.exists.mockResolvedValue(true)
+      const { service, voteRepository, manager, meetingQueryBuilder } =
+        setupPlacePreferenceUpdate(MeetingStatus.RecommendationCollecting)
       voteRepository.applyPreference.mockResolvedValue({
         likeCount: 3,
         dislikeCount: 1,
@@ -1550,6 +1575,7 @@ describe('MeetingService', () => {
       )
 
       expect(voteRepository.applyPreference).toHaveBeenCalledWith(
+        manager,
         '2',
         'participant-1',
         PreferenceType.Like,
@@ -1559,20 +1585,15 @@ describe('MeetingService', () => {
         dislikeCount: 1,
         myPreference: PreferenceType.Like,
       })
+      expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+      )
     })
 
     it('preference가 null이어도 그대로 voteRepository에 위임한다', async () => {
-      const {
-        service,
-        meetingAccessService,
-        recommendationRepository,
-        voteRepository,
-      } = createMeetingService()
-      meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'participant-1',
-        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
-      })
-      recommendationRepository.exists.mockResolvedValue(true)
+      const { service, voteRepository, manager } = setupPlacePreferenceUpdate(
+        MeetingStatus.CourseGenerated,
+      )
       voteRepository.applyPreference.mockResolvedValue({
         likeCount: 0,
         dislikeCount: 0,
@@ -1586,6 +1607,7 @@ describe('MeetingService', () => {
       )
 
       expect(voteRepository.applyPreference).toHaveBeenCalledWith(
+        manager,
         '2',
         'participant-1',
         null,
