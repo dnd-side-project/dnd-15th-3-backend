@@ -15,11 +15,14 @@ import {
   CORE_ENTITIES_GLOB,
   CORE_MIGRATIONS_GLOB,
   createDatabaseOptions,
+  STATISTICS_ENTITIES_GLOB,
+  STATISTICS_MIGRATIONS_GLOB,
 } from './database/database.options'
 import { HealthModule } from './health/health.module'
 import { MediaModule } from './media/media.module'
 import { MeetingModule } from './meeting/meeting.module'
 import { PlaceModule } from './place/place.module'
+import { STATISTICS_DATABASE_CONNECTION } from './statistics/statistics.constants'
 
 if (existsSync('.env')) {
   loadEnvFile('.env')
@@ -47,10 +50,41 @@ export function createTypeOrmOptions(
   ) as TypeOrmModuleOptions
 }
 
+export function createStatisticsTypeOrmOptions(
+  config: ConfigService<Env, true>,
+): TypeOrmModuleOptions {
+  const options = createDatabaseOptions(
+    {
+      host: config.get('STATS_DB_HOST', { infer: true }),
+      port: config.get('STATS_DB_PORT', { infer: true }),
+      username: config.get('STATS_DB_USERNAME', { infer: true }),
+      password: config.get('STATS_DB_PASSWORD', { infer: true }),
+      database: config.get('STATS_DB_DATABASE', { infer: true }),
+      ssl: config.get('STATS_DB_SSL', { infer: true }),
+      sslCa: config.get('STATS_DB_SSL_CA', { infer: true }),
+      synchronize: config.get('STATS_DB_SYNCHRONIZE', { infer: true }),
+    },
+    __dirname,
+    {
+      entitiesGlob: STATISTICS_ENTITIES_GLOB,
+      migrationsGlob: STATISTICS_MIGRATIONS_GLOB,
+    },
+  )
+  return {
+    ...options,
+    name: STATISTICS_DATABASE_CONNECTION,
+  } as TypeOrmModuleOptions
+}
+
 const infrastructureModules = [
   TypeOrmModule.forRootAsync({
     inject: [ConfigService],
     useFactory: createTypeOrmOptions,
+  }),
+  TypeOrmModule.forRootAsync({
+    name: STATISTICS_DATABASE_CONNECTION,
+    inject: [ConfigService],
+    useFactory: createStatisticsTypeOrmOptions,
   }),
   MediaModule,
   HealthModule,

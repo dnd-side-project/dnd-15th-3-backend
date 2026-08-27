@@ -1,0 +1,77 @@
+{
+  "startNodeId": "start",
+  "meetingType": "BUSINESS",
+  "isWeekend": false,
+  "qna": [],
+  "visitOrder": ["restaurant", "restaurant", "cafe", "cafe", "activity"],
+  "places": [
+    {
+      "id": "1",
+      "name": "몽탄",
+      "category": "restaurant",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "새마을식당",
+      "category": "restaurant",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "대림창고",
+      "category": "cafe",
+      "score": 0.5,
+      "tags": []
+    },
+    {
+      "id": "4",
+      "name": "센터커피",
+      "category": "cafe",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "라운지엑스 볼링장",
+      "category": "activity",
+      "score": 4.0,
+      "tags": []
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 5,
+        "2": 5
+      },
+      "1": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5
+      },
+      "2": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5
+      },
+      "3": {
+        "3": 5,
+        "4": 5,
+        "5": 5
+      },
+      "4": {
+        "3": 5,
+        "4": 5,
+        "5": 5
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "startNodeId": "start",
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "qna": [],
+  "visitOrder": ["restaurant"],
+  "places": [
+    {
+      "id": "1",
+      "name": "몽탄",
+      "category": "restaurant",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "새마을식당",
+      "category": "restaurant",
+      "score": 2.5,
+      "tags": []
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 5,
+        "2": 5
+      }
+    }
+  }
+}

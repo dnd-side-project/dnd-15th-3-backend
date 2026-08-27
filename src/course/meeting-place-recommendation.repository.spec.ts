@@ -25,6 +25,33 @@ function createRepository() {
 }
 
 describe('MeetingPlaceRecommendationRepository', () => {
+  describe('findByMeeting', () => {
+    it('해당 모임의 추천 장소를 생성 순서대로 조회한다', async () => {
+      const { repository, queryBuilder } = createRepository()
+
+      await repository.findByMeeting('1')
+
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'recommendation.meeting_id = :meetingId',
+        { meetingId: '1' },
+      )
+      expect(queryBuilder.orderBy).toHaveBeenCalledWith(
+        'recommendation.createdAt',
+        'ASC',
+      )
+    })
+
+    it('조회 결과를 그대로 반환한다', async () => {
+      const { repository, queryBuilder } = createRepository()
+      const recommendations = [{ id: '1' }]
+      queryBuilder.getMany.mockResolvedValue(recommendations)
+
+      await expect(repository.findByMeeting('1')).resolves.toEqual(
+        recommendations,
+      )
+    })
+  })
+
   describe('findExcludedFromCourse', () => {
     it('코스 후보에 없는 추천만 조회하도록 안티조인 조건을 건다', async () => {
       const { repository, queryBuilder } = createRepository()

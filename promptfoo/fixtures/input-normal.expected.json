@@ -1,0 +1,79 @@
+{
+  "routes": [
+    {
+      "routeId": 1,
+      "places": [
+        {
+          "placeId": "1",
+          "order": 1
+        },
+        {
+          "placeId": "4",
+          "order": 2
+        },
+        {
+          "placeId": "8",
+          "order": 3
+        },
+        {
+          "placeId": "7",
+          "order": 4
+        },
+        {
+          "placeId": "10",
+          "order": 5
+        }
+      ]
+    },
+    {
+      "routeId": 2,
+      "places": [
+        {
+          "placeId": "2",
+          "order": 1
+        },
+        {
+          "placeId": "3",
+          "order": 2
+        },
+        {
+          "placeId": "5",
+          "order": 3
+        },
+        {
+          "placeId": "6",
+          "order": 4
+        },
+        {
+          "placeId": "9",
+          "order": 5
+        }
+      ]
+    },
+    {
+      "routeId": 3,
+      "places": [
+        {
+          "placeId": "1",
+          "order": 1
+        },
+        {
+          "placeId": "4",
+          "order": 2
+        },
+        {
+          "placeId": "5",
+          "order": 3
+        },
+        {
+          "placeId": "6",
+          "order": 4
+        },
+        {
+          "placeId": "9",
+          "order": 5
+        }
+      ]
+    }
+  ]
+}

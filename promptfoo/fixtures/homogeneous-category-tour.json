@@ -1,0 +1,106 @@
+{
+  "startNodeId": "start",
+  "meetingType": "DATING_HOBBY",
+  "isWeekend": false,
+  "qna": [
+    {
+      "question": "이번 모임에서 가장 중요하게 생각하는 목적이 무엇인가요?",
+      "answer": "취향을 알아가기"
+    },
+    {
+      "question": "어떤 분위기의 모임을 원하시나요?",
+      "answer": "편안하고 여유로운 분위기"
+    },
+    {
+      "question": "카페에 오래 머무는 편인가요?",
+      "answer": "네, 대화하며 오래 머무는 편이에요"
+    }
+  ],
+  "visitOrder": ["cafe", "cafe", "cafe"],
+  "places": [
+    {
+      "id": "1",
+      "name": "대림창고",
+      "category": "cafe",
+      "score": 0.5,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "센터커피",
+      "category": "cafe",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "어니언 성수",
+      "category": "cafe",
+      "score": 5.0,
+      "tags": ["HIGH_PREFERENCE"]
+    },
+    {
+      "id": "4",
+      "name": "카페 파벤",
+      "category": "cafe",
+      "score": 5.0,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "5",
+      "name": "리사이클링 커피",
+      "category": "cafe",
+      "score": 3.0,
+      "tags": []
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5,
+        "5": 5
+      },
+      "1": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5,
+        "5": 5
+      },
+      "2": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5,
+        "5": 5
+      },
+      "3": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5,
+        "5": 5
+      },
+      "4": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5,
+        "5": 5
+      },
+      "5": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5,
+        "5": 5
+      }
+    }
+  }
+}

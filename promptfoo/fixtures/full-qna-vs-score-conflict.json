@@ -1,0 +1,91 @@
+{
+  "startNodeId": "start",
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "qna": [
+    {
+      "question": "이번 모임에서 가장 중요하게 생각하는 목적이 무엇인가요?",
+      "answer": "새로운 곳을 경험하기"
+    },
+    {
+      "question": "어떤 분위기의 모임을 원하시나요?",
+      "answer": "조용하고 차분한 분위기"
+    },
+    {
+      "question": "이번 모임 멤버들은 얼마나 자주 만나는 편인가요?",
+      "answer": "거의 매주 만나는 사이예요"
+    }
+  ],
+  "visitOrder": ["restaurant", "cafe", "bar"],
+  "places": [
+    {
+      "id": "1",
+      "name": "몽탄",
+      "category": "restaurant",
+      "score": 10.0,
+      "tags": ["CATEGORY_POPULAR", "FREQUENTLY_SELECTED"]
+    },
+    {
+      "id": "2",
+      "name": "새마을식당",
+      "category": "restaurant",
+      "score": 0.1,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "3",
+      "name": "어니언 성수",
+      "category": "cafe",
+      "score": 3.0,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "4",
+      "name": "대림창고",
+      "category": "cafe",
+      "score": 1.0,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "나누리 잡화점",
+      "category": "bar",
+      "score": 2.0,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "6",
+      "name": "텐바",
+      "category": "bar",
+      "score": 4.0,
+      "tags": ["CATEGORY_POPULAR"]
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 15,
+        "2": 10
+      },
+      "1": {
+        "3": 100,
+        "4": 10
+      },
+      "2": {
+        "3": 10,
+        "4": 100
+      },
+      "3": {
+        "5": 10,
+        "6": 100
+      },
+      "4": {
+        "5": 10,
+        "6": 100
+      }
+    }
+  }
+}

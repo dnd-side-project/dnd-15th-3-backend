@@ -1,4 +1,10 @@
 allowBuilds:
+  '@playwright/browser-chromium': true
   '@scarf/scarf': false
+  '@swc/core': true
+  esbuild: true
   lefthook: true
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: true
   unrs-resolver: true

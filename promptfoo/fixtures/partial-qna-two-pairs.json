@@ -1,0 +1,87 @@
+{
+  "startNodeId": "start",
+  "meetingType": "STUDY",
+  "isWeekend": false,
+  "qna": [
+    {
+      "question": "이번 모임 멤버들은 몇 명인가요?",
+      "answer": "4명이에요"
+    },
+    {
+      "question": "예산은 어느 정도로 생각하시나요?",
+      "answer": "1인당 3만원 내외"
+    }
+  ],
+  "visitOrder": ["restaurant", "cafe", "activity"],
+  "places": [
+    {
+      "id": "1",
+      "name": "몽탄",
+      "category": "restaurant",
+      "score": 2.0,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "새마을식당",
+      "category": "restaurant",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "대림창고",
+      "category": "cafe",
+      "score": 0.5,
+      "tags": []
+    },
+    {
+      "id": "4",
+      "name": "센터커피",
+      "category": "cafe",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "라운지엑스 볼링장",
+      "category": "activity",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "6",
+      "name": "메가박스 성수",
+      "category": "activity",
+      "score": 1.0,
+      "tags": []
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 5,
+        "2": 5
+      },
+      "1": {
+        "3": 5,
+        "4": 5
+      },
+      "2": {
+        "3": 5,
+        "4": 5
+      },
+      "3": {
+        "5": 5,
+        "6": 5
+      },
+      "4": {
+        "5": 5,
+        "6": 5
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@ import {
   QuestionnaireOptionCode,
 } from 'src/questionnaire/questionnaire.constants'
 import { CourseGenerationService } from './course-generation.service'
+import { CourseGenerationInputSnapshotBuilder } from './course-generation-input-snapshot.builder'
 import { CourseCategoryStep } from './entities/course-category-step.entity'
 import { CourseGenerationQuestionnaireAnswer } from './entities/course-generation-questionnaire-answer.entity'
 import { CourseGenerationRun } from './entities/course-generation-run.entity'
@@ -19,6 +20,7 @@ import { CourseGenerationCustomizationType } from './enums/course-generation-cus
 import { CourseGenerationRunStatus } from './enums/course-generation-run-status.enum'
 
 function createService() {
+  const meetingAccessService = { findParticipant: jest.fn() }
   const meetingRepository = {
     exists: jest.fn(),
     save: jest.fn().mockImplementation((value) => value),
@@ -63,19 +65,23 @@ function createService() {
   const processor = {
     processRun: jest.fn().mockResolvedValue(MeetingStatus.CourseGenerated),
   }
-  const meetingAccessService = { findParticipant: jest.fn() }
-  const service = new CourseGenerationService(
-    dataSource as never,
+  const snapshotBuilder = new CourseGenerationInputSnapshotBuilder(
     courseRepository as never,
     voteRepository as never,
     questionnaireService as never,
-    processor as never,
+  )
+  const service = new CourseGenerationService(
+    dataSource as never,
+    courseRepository as never,
     meetingAccessService as never,
+    snapshotBuilder,
+    processor as never,
   )
 
   return {
     service,
     manager,
+    meetingAccessService,
     meetingRepository,
     categoryStepRepository,
     recommendationRepository,
@@ -85,7 +91,6 @@ function createService() {
     voteRepository,
     questionnaireService,
     processor,
-    meetingAccessService,
   }
 }
 

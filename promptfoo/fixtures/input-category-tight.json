@@ -1,0 +1,68 @@
+{
+  "startNodeId": "start",
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "visitOrder": ["restaurant", "cafe", "activity", "activity", "bar"],
+  "places": [
+    {
+      "id": "1",
+      "name": "진옥화할매원조닭한마리",
+      "category": "restaurant",
+      "score": 6.0,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "카페 파벤",
+      "category": "cafe",
+      "score": 5.0,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "라운지엑스 볼링장",
+      "category": "activity",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "4",
+      "name": "메가박스 성수",
+      "category": "activity",
+      "score": 1.0,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "미도인",
+      "category": "bar",
+      "score": 5.5,
+      "tags": []
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 1
+      },
+      "1": {
+        "2": 1
+      },
+      "2": {
+        "3": 1,
+        "4": 1
+      },
+      "3": {
+        "4": 1,
+        "5": 1
+      },
+      "4": {
+        "3": 1,
+        "5": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "startNodeId": "start",
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "qna": [],
+  "visitOrder": ["restaurant", "cafe", "bar"],
+  "places": [
+    {
+      "id": "1",
+      "name": "몽탄",
+      "category": "restaurant",
+      "score": 10.0,
+      "tags": ["CATEGORY_POPULAR", "FREQUENTLY_SELECTED"]
+    },
+    {
+      "id": "2",
+      "name": "새마을식당",
+      "category": "restaurant",
+      "score": 0.1,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "3",
+      "name": "어니언 성수",
+      "category": "cafe",
+      "score": 3.0,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "4",
+      "name": "대림창고",
+      "category": "cafe",
+      "score": 1.0,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "나누리 잡화점",
+      "category": "bar",
+      "score": 2.0,
+      "tags": ["SAFE_CHOICE"]
+    },
+    {
+      "id": "6",
+      "name": "텐바",
+      "category": "bar",
+      "score": 4.0,
+      "tags": ["CATEGORY_POPULAR"]
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 15,
+        "2": 10
+      },
+      "1": {
+        "3": 100,
+        "4": 10
+      },
+      "2": {
+        "3": 10,
+        "4": 100
+      },
+      "3": {
+        "5": 10,
+        "6": 100
+      },
+      "4": {
+        "5": 10,
+        "6": 100
+      }
+    }
+  }
+}

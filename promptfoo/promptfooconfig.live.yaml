@@ -1,0 +1,257 @@
+description: "코스 추천 프롬프트 라이브 평가 (OpenAI gpt-4o-mini + NVIDIA NIM, API 키 필요)"
+
+prompts:
+  - file://prompts/course-generator-v1.txt
+
+providers:
+  - id: openai:chat:gpt-4o-mini
+    config:
+      apiKeyEnvar: OPENAI_API_KEY
+      max_completion_tokens: 2048
+      response_format:
+        type: json_object
+  - id: openai:chat:nvidia/nemotron-3-ultra-550b-a55b
+    config:
+      apiBaseUrl: https://integrate.api.nvidia.com/v1
+      apiKeyEnvar: NIM_API_KEY
+      temperature: 0.2
+      response_format:
+        type: json_object
+      passthrough:
+        chat_template_kwargs:
+          enable_thinking: false
+
+extensions:
+  - file://extensions/prepare-course-input.cjs:beforeEach
+
+defaultTest:
+  assert:
+    # 1) 유효한 JSON인지
+    - type: is-json
+
+    # 2) 입력은 서버가 계산한 거리 행렬과 점수만 사용해야 함
+    - type: javascript
+      value: file://assertions/input-contract.js
+
+    # 3) 서버가 생성한 유효 코스 후보와 거리·점수 검증
+    - type: javascript
+      value: file://assertions/route-candidates-contract.js
+
+    # 4) 코스 수는 1~3개
+    - type: javascript
+      value: file://assertions/routes-count.js
+
+    # 5) 환각 방지: placeId가 후보 목록 안의 id에만 존재해야 함
+    - type: javascript
+      value: file://assertions/place-id-valid.js
+
+    # 6) 방문 순서: places 개수와 카테고리 시퀀스가 visitOrder를 정확히 따라야 함
+    - type: javascript
+      value: file://assertions/visit-order.js
+
+    # 7) 한 코스 내에 중복 placeId가 없어야 함 (카테고리 반복 구간 포함)
+    - type: javascript
+      value: file://assertions/no-duplicate-place-id.js
+
+    # 8) 코스 간 차별성: 동일한 장소 조합을 중복 출력하지 않아야 함
+    - type: javascript
+      value: file://assertions/course-differentiation.js
+
+    # 9) 필드 제약: places 항목에는 placeId, order, category 외 필드가 없어야 함
+    - type: javascript
+      value: file://assertions/field-constraints.js
+
+    # 10) order는 각 코스 안에서 1부터 순차적이어야 함
+    - type: javascript
+      value: file://assertions/order-sequential.js
+
+    # 11) routeId는 1부터 순차적이어야 함
+    - type: javascript
+      value: file://assertions/route-id-sequential.js
+
+    # 12) 서버가 계산한 routeCandidates 전체 목록 안에 있는 조합이어야 함
+    - type: javascript
+      value: file://assertions/route-candidate-membership.js
+
+tests:
+  # [테스트 케이스 1] 기본 정상 케이스: 10개 장소, 5단계 코스
+  - description: "기본 정상 케이스"
+    vars:
+      inputJson: file://fixtures/input-normal.json
+      expectedOutput: file://fixtures/input-normal.expected.json
+
+  # [테스트 케이스 2] 카테고리 촉박 케이스: 액티비티 후보가 정확히 2개뿐인 상황
+  - description: "카테고리 후보 부족 (액티비티 정확히 2개)"
+    vars:
+      inputJson: file://fixtures/input-category-tight.json
+      expectedOutput: file://fixtures/input-category-tight.expected.json
+
+  # [테스트 케이스 3] 점수 vs 거리 충돌: 멀지만 score 10.0 vs 가깝지만 score 0.1
+  - description: "선호도와 동선이 극단적으로 충돌하는 케이스"
+    vars:
+      inputJson: file://fixtures/input-score-distance-conflict.json
+      expectedOutput: file://fixtures/input-score-distance-conflict.expected.json
+
+  # [테스트 케이스 4] 긴 동선 케이스: 방문 순서가 7단계, 카테고리 반복 포함
+  - description: "긴 동선 (7단계, 카테고리 반복)"
+    vars:
+      inputJson: file://fixtures/input-long-visit-order.json
+      expectedOutput: file://fixtures/input-long-visit-order.expected.json
+
+  # --- 아래는 qna·tags 기반 판단 검증용 (정답이 없는 판단 영역이라 expectedOutput 없음) ---
+
+  # [테스트 케이스 5] qna 없음, 태그 없음: 순수 베이스라인
+  - description: "qna 없음 · 태그 없음 (베이스라인)"
+    vars:
+      inputJson: file://fixtures/no-qna-no-tags.json
+
+  # [테스트 케이스 6] qna 없음, 태그 혼합(0/1/2개+): 태그만으로 판단하는지
+  - description: "qna 없음 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/no-qna-mixed-tags.json
+
+  # [테스트 케이스 7] qna 3개, 태그 없음: qna만으로 판단하는지
+  - description: "qna 3개 · 태그 없음"
+    vars:
+      inputJson: file://fixtures/full-qna-no-tags.json
+
+  # [테스트 케이스 8] qna 3개, 태그 혼합: 가장 일반적인 실전 조합
+  - description: "qna 3개 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/full-qna-mixed-tags.json
+
+  # [테스트 케이스 9] 후보 부족 상황 + 태그 혼합 (qna 없음)
+  - description: "후보 부족 · qna 없음 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/no-qna-mixed-tags-tight.json
+
+  # [테스트 케이스 10] 후보 부족 상황 + qna 3개 + 태그 혼합
+  - description: "후보 부족 · qna 3개 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/full-qna-mixed-tags-tight.json
+
+  # [테스트 케이스 11] 핵심: 점수 1위 후보에 부정적 신호(CATEGORY_POPULAR·FREQUENTLY_SELECTED) 태그,
+  # 점수 낮은 후보에 SAFE_CHOICE 태그 + "조용한 분위기" qna → qna·태그가 점수를 이겨야 하는 케이스
+  - description: "qna·태그 vs 점수 충돌 (qna 있음)"
+    vars:
+      inputJson: file://fixtures/full-qna-vs-score-conflict.json
+
+  # [테스트 케이스 12] 위와 동일한 충돌 구조이지만 qna 없이 태그만으로 판단
+  - description: "qna·태그 vs 점수 충돌 (qna 없음)"
+    vars:
+      inputJson: file://fixtures/no-qna-vs-score-conflict.json
+
+  # [테스트 케이스 13] 긴 동선 + isWeekend:true + qna 3개 + 태그 혼합 (최대 신호)
+  - description: "긴 동선 · 주말 · qna 3개 · 태그 혼합"
+    vars:
+      inputJson: file://fixtures/full-qna-weekend-mixed-tags.json
+
+  # [테스트 케이스 14] 긴 동선 + isWeekend:true만 단독 신호 (qna·태그 없음)
+  - description: "긴 동선 · 주말 신호만 단독"
+    vars:
+      inputJson: file://fixtures/no-qna-weekend-no-tags.json
+
+  # --- 아래는 카테고리 반복(같은 카테고리가 visitOrder에 여러 번 등장)으로 인한
+  # 중복 장소 구성 후보를 서버가 미리 걸러내는지 검증하는 케이스 ---
+
+  # [테스트 케이스 15] 카테고리 3연속 중복(액티비티 3곳, 정확히 3곳뿐) - 순수 구조 테스트
+  - description: "카테고리 3연속 중복 · tight · 신호 없음"
+    vars:
+      inputJson: file://fixtures/dup-triple-tight.json
+
+  # [테스트 케이스 16] 위와 동일한 구조 + 식당·카페는 진짜 선택지(2곳씩) + qna
+  - description: "카테고리 3연속 중복 · tight · qna 있음"
+    vars:
+      inputJson: file://fixtures/dup-triple-tight-with-qna.json
+
+  # [테스트 케이스 17] 서로 다른 두 카테고리가 동시에 tight 중복(식당 2 + 카페 2)
+  - description: "두 카테고리 동시 tight 중복 · 신호 없음"
+    vars:
+      inputJson: file://fixtures/dup-double-segments-tight.json
+
+  # [테스트 케이스 18] 위 구조 + 바(단일 슬롯, 진짜 선택지) + 태그
+  - description: "두 카테고리 동시 tight 중복 · 태그 있음"
+    vars:
+      inputJson: file://fixtures/dup-double-segments-tight-with-tags.json
+
+  # [테스트 케이스 19] 비인접 위치의 카테고리 중복(카페가 1번째·4번째) + qna
+  - description: "비인접 위치 카테고리 중복 · qna 있음"
+    vars:
+      inputJson: file://fixtures/dup-nonadjacent.json
+
+  # [테스트 케이스 20] 시작 직후(맨 앞)에서 카테고리 중복 + 태그
+  - description: "시작 직후 카테고리 중복 · 태그 있음"
+    vars:
+      inputJson: file://fixtures/dup-at-start.json
+
+  # [테스트 케이스 21] 느슨한 대규모 중복 후보(액티비티 4곳 중 2곳 선택) - 조합 수 스케일 테스트
+  - description: "대규모 중복 후보(4곳 중 2곳) · 신호 없음"
+    vars:
+      inputJson: file://fixtures/dup-loose-many-candidates.json
+
+  # [테스트 케이스 22] 위와 동일한 대규모 후보 + qna·태그가 점수와 충돌
+  - description: "대규모 중복 후보(4곳 중 2곳) · qna·태그 vs 점수 충돌"
+    vars:
+      inputJson: file://fixtures/dup-loose-many-with-qna-conflict.json
+
+  # [테스트 케이스 23] MAX_COURSE_STEPS(6단계) 경계 + 두 카테고리 동시 tight 중복 + 최대 신호
+  - description: "6단계 경계 · 두 카테고리 동시 tight 중복 · 최대 신호"
+    vars:
+      inputJson: file://fixtures/dup-max-length-boundary.json
+
+  # [테스트 케이스 24] 6단계 경계 + 서로 다른 배수(카페 3중복 + 액티비티 2중복) 동시 발생
+  - description: "6단계 경계 · 서로 다른 배수의 중복 동시 발생"
+    vars:
+      inputJson: file://fixtures/dup-multi-multiplicity.json
+
+  # --- 아래는 중복 조합 이슈와 무관하게, 시스템 전반의 다양한 경계·구조를 검증하는 케이스 ---
+
+  # [테스트 케이스 25] 지금까지 한 번도 안 쓰인 카테고리(walk/shopping/culture) 포함, 6개 전부 다른 카테고리
+  - description: "미사용 카테고리(walk·shopping·culture) 포함 · 전부 다른 카테고리"
+    vars:
+      inputJson: file://fixtures/all-categories-mix.json
+
+  # [테스트 케이스 26] 가장 작은 유효 입력: visitOrder 길이 1 (단일 장소 코스)
+  - description: "최소 입력 · 단일 장소 코스"
+    vars:
+      inputJson: file://fixtures/single-stop-minimal.json
+
+  # [테스트 케이스 27] 카테고리 하나로만 이루어진 "카페 투어" (5곳 중 3곳)
+  - description: "단일 카테고리로만 구성된 코스 · qna 있음"
+    vars:
+      inputJson: file://fixtures/homogeneous-category-tour.json
+
+  # [테스트 케이스 28] 한 카테고리(액티비티)에 후보 8개가 몰린 넓은 단일 슬롯 선택
+  - description: "단일 슬롯에 후보 8개 · 넓은 선택지"
+    vars:
+      inputJson: file://fixtures/wide-single-category-branch.json
+
+  # [테스트 케이스 29] 모든 후보 점수가 동일 - totalDistanceMeters 타이브레이크만으로 판단
+  - description: "점수 전부 동일 · 거리 타이브레이크만"
+    vars:
+      inputJson: file://fixtures/pure-distance-tiebreak.json
+
+  # [테스트 케이스 30] isWeekend:true인데 WEEKDAY_PREFERRED 태그가 붙은 모순 신호
+  - description: "주말 컨텍스트 vs WEEKDAY_PREFERRED 태그 모순"
+    vars:
+      inputJson: file://fixtures/weekend-tag-contradiction.json
+
+  # [테스트 케이스 31] qna가 정확히 2쌍만 있는 경계 케이스 (관례상 0 또는 3이지만 스키마는 max(3)만 요구)
+  - description: "qna 2쌍(0 또는 3이 아닌 경계값)"
+    vars:
+      inputJson: file://fixtures/partial-qna-two-pairs.json
+
+  # [테스트 케이스 32] 극단적인 점수 이상치(매우 큰 값·매우 작은 값)가 섞인 케이스
+  - description: "점수 이상치(매우 크거나 매우 작은 값) 포함"
+    vars:
+      inputJson: file://fixtures/extreme-score-spread.json
+
+  # [테스트 케이스 33] 6단계 경계 + 서로 다른 6개 카테고리 + 대규모 후보(약 18곳) + 최대 신호
+  - description: "실전 규모 통합 테스트 · 6개 카테고리 · 대규모 후보 · 최대 신호"
+    vars:
+      inputJson: file://fixtures/max-candidates-kitchen-sink.json
+
+  # [테스트 케이스 34] 유효한 조합이 정확히 2개만 존재 (1개도 3개 이상도 아닌 경계)
+  - description: "유효 조합이 정확히 2개인 경계"
+    vars:
+      inputJson: file://fixtures/exactly-two-valid-routes.json

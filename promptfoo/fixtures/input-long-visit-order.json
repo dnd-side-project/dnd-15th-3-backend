@@ -1,0 +1,158 @@
+{
+  "startNodeId": "start",
+  "meetingType": "SOCIAL",
+  "isWeekend": false,
+  "visitOrder": [
+    "restaurant",
+    "cafe",
+    "activity",
+    "bar",
+    "cafe",
+    "restaurant",
+    "bar"
+  ],
+  "places": [
+    {
+      "id": "1",
+      "name": "몽탄",
+      "category": "restaurant",
+      "score": 6.0,
+      "tags": []
+    },
+    {
+      "id": "2",
+      "name": "어니언 성수",
+      "category": "cafe",
+      "score": 3.5,
+      "tags": []
+    },
+    {
+      "id": "3",
+      "name": "서울이스케이프룸",
+      "category": "activity",
+      "score": 4.5,
+      "tags": []
+    },
+    {
+      "id": "4",
+      "name": "나누리 잡화점",
+      "category": "bar",
+      "score": 5.5,
+      "tags": []
+    },
+    {
+      "id": "5",
+      "name": "대림창고",
+      "category": "cafe",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "6",
+      "name": "새마을식당",
+      "category": "restaurant",
+      "score": 2.5,
+      "tags": []
+    },
+    {
+      "id": "7",
+      "name": "코드이스케이프",
+      "category": "activity",
+      "score": 3.0,
+      "tags": []
+    },
+    {
+      "id": "8",
+      "name": "텐바",
+      "category": "bar",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "9",
+      "name": "진옥화할매원조닭한마리",
+      "category": "restaurant",
+      "score": 4.0,
+      "tags": []
+    },
+    {
+      "id": "10",
+      "name": "센터커피",
+      "category": "cafe",
+      "score": 1.0,
+      "tags": []
+    }
+  ],
+  "distanceMatrix": {
+    "unit": "meter",
+    "metric": "walking_network_distance",
+    "directed": true,
+    "values": {
+      "start": {
+        "1": 1,
+        "6": 1,
+        "9": 1
+      },
+      "1": {
+        "2": 100,
+        "5": 100,
+        "10": 100,
+        "4": 100,
+        "8": 1
+      },
+      "6": {
+        "2": 100,
+        "5": 100,
+        "10": 1,
+        "4": 1,
+        "8": 100
+      },
+      "9": {
+        "2": 1,
+        "5": 100,
+        "10": 100,
+        "4": 100,
+        "8": 100
+      },
+      "2": {
+        "3": 1,
+        "7": 100,
+        "1": 100,
+        "6": 100,
+        "9": 1
+      },
+      "5": {
+        "3": 100,
+        "7": 100,
+        "1": 1,
+        "6": 100,
+        "9": 100
+      },
+      "10": {
+        "3": 100,
+        "7": 1,
+        "1": 100,
+        "6": 1,
+        "9": 100
+      },
+      "3": {
+        "4": 100,
+        "8": 1
+      },
+      "7": {
+        "4": 1,
+        "8": 100
+      },
+      "4": {
+        "2": 1,
+        "5": 1,
+        "10": 100
+      },
+      "8": {
+        "2": 100,
+        "5": 100,
+        "10": 2
+      }
+    }
+  }
+}

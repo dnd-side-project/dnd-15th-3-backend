@@ -1,4 +1,5 @@
 export const CORE_DATABASE_CONNECTION = 'core'
+export const STATISTICS_DATABASE_CONNECTION = 'statistics'
 
 export const STATISTICS_OUTBOX_POLL_INTERVAL_MS = 2_000
 export const STATISTICS_OUTBOX_STALE_AFTER_MS = 5 * 60 * 1000
