@@ -1107,6 +1107,68 @@ describe('MeetingService', () => {
     ])
   })
 
+  it('추천 장소 중 일부만 카카오 조회에 실패해도 나머지 추천만으로 목록을 반환한다', async () => {
+    const {
+      service,
+      dataSource,
+      meetingAccessService,
+      recommendationRepository,
+      placeLiveDataService,
+    } = createMeetingService()
+    const category = { id: 'category-1', slug: CategorySlug.Cafe }
+    const places = [
+      {
+        id: 'place-1',
+        name: '조회 성공 카페',
+        address: '주소 1',
+        latitude: 37.5,
+        longitude: 127,
+        category,
+      },
+      {
+        id: 'place-2',
+        name: '조회 실패 카페',
+        address: '주소 2',
+        latitude: 37.5001,
+        longitude: 127.0001,
+        category,
+      },
+    ]
+    const recommendations = places.map((place, index) => ({
+      id: `recommendation-${index + 1}`,
+      place,
+      recommendedBy: { id: `participant-${index + 1}` },
+    }))
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-viewer',
+    })
+    recommendationRepository.find.mockResolvedValue(recommendations)
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        latitude: 37.5,
+        longitude: 127,
+      }),
+    })
+    // place-2는 카카오 조회 실패를 흉내 내어 Map에서 아예 빠진 채로 반환됨
+    placeLiveDataService.resolvePlaces.mockResolvedValueOnce(
+      new Map([['place-1', places[0]]]),
+    )
+
+    const result = await service.getRecommendations(
+      'meeting-1',
+      'participant-token',
+    )
+
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'recommendation-1' }),
+    ])
+    expect(placeLiveDataService.resolvePlaces).toHaveBeenCalledWith(
+      [places[0], places[1]],
+      { latitude: 37.5, longitude: 127 },
+      { allowPartial: true },
+    )
+  })
+
   it('손상된 모임의 방장 정보를 노출하지 않고 공통 내부 오류로 처리한다', async () => {
     const {
       service,
@@ -1470,6 +1532,73 @@ describe('MeetingService', () => {
         relations: { place: { category: true } },
         order: { createdAt: 'ASC' },
       })
+    })
+
+    it('공유 장소 중 일부만 카카오 조회에 실패해도 나머지 핀만으로 반환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        meetingRepository,
+        recommendationRepository,
+        placeLiveDataService,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      const meetingWithLocation = new Meeting()
+      meetingWithLocation.meetingLocation = {
+        displayName: '강남역',
+        longitude: 127.0276,
+        latitude: 37.4979,
+      } as MeetingLocation
+      meetingRepository.findOne.mockResolvedValue(meetingWithLocation)
+      const resolvablePlace = {
+        id: 'place-1',
+        name: '성수 카페 모모',
+        longitude: 127.0557,
+        latitude: 37.5446,
+        category: { name: '카페', slug: CategorySlug.Cafe },
+      }
+      const unresolvablePlace = {
+        id: 'place-2',
+        name: '조회 실패 장소',
+        longitude: 127.06,
+        latitude: 37.55,
+        category: { name: '카페', slug: CategorySlug.Cafe },
+      }
+      recommendationRepository.find.mockResolvedValue([
+        { id: 'recommendation-1', place: resolvablePlace },
+        { id: 'recommendation-2', place: unresolvablePlace },
+      ])
+      // place-2는 카카오 조회 실패를 흉내 내어 Map에서 아예 빠진 채로 반환됨
+      placeLiveDataService.resolvePlaces.mockResolvedValueOnce(
+        new Map([['place-1', resolvablePlace]]),
+      )
+
+      await expect(service.getMapPins('1', 'token')).resolves.toEqual({
+        startPlace: {
+          name: '강남역',
+          longitude: 127.0276,
+          latitude: 37.4979,
+        },
+        sharedPlaces: [
+          {
+            placeId: 'place-1',
+            name: '성수 카페 모모',
+            category: '카페',
+            categorySlug: CategorySlug.Cafe,
+            longitude: 127.0557,
+            latitude: 37.5446,
+          },
+        ],
+      })
+      expect(placeLiveDataService.resolvePlaces).toHaveBeenCalledWith(
+        [resolvablePlace, unresolvablePlace],
+        expect.objectContaining({ latitude: 37.4979, longitude: 127.0276 }),
+        { allowPartial: true },
+      )
     })
 
     it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(

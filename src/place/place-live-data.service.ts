@@ -133,6 +133,7 @@ export class PlaceLiveDataService {
   async resolvePlaces(
     places: Place[],
     center: PlaceSearchCenter,
+    options?: { allowPartial?: boolean },
   ): Promise<Map<string, ResolvedPlace>> {
     const resolved = new Map<string, ResolvedPlace>()
     const kakaoByCategoryAndQuery = new Map<
@@ -197,7 +198,7 @@ export class PlaceLiveDataService {
       }),
     )
 
-    if (resolved.size !== places.length) {
+    if (!options?.allowPartial && resolved.size !== places.length) {
       throw new PlaceException(PlaceErrorCode.providerPlaceUnavailable)
     }
     return resolved

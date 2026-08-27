@@ -1141,19 +1141,29 @@ export class MeetingService {
       this.placeLiveDataService.resolvePlaces(
         recommendations.map((recommendation) => recommendation.place),
         location,
+        { allowPartial: true },
       ),
       this.voteRepository.getPreferenceSummaries(
         recommendations.map((recommendation) => recommendation.id),
         viewerId,
       ),
     ])
-    const resolvedPlaces = recommendations.map(
+    const resolvableRecommendations = recommendations.filter(
+      (recommendation) => {
+        if (resolved.has(recommendation.place.id)) return true
+        this.logger.warn(
+          `카카오 장소 조회에 실패해 해당 추천을 목록에서 제외합니다. recommendationId=${recommendation.id}`,
+        )
+        return false
+      },
+    )
+    const resolvedPlaces = resolvableRecommendations.map(
       (recommendation) => resolved.get(recommendation.place.id)!,
     )
     const previewPhotos =
       await this.placePhotoService.findPreviewPhotos(resolvedPlaces)
 
-    return recommendations.map((recommendation) =>
+    return resolvableRecommendations.map((recommendation) =>
       this.toRecommendationResponse(
         recommendation,
         resolved.get(recommendation.place.id)!,
@@ -1260,13 +1270,21 @@ export class MeetingService {
     const resolved = await this.placeLiveDataService.resolvePlaces(
       recommendations.map((recommendation) => recommendation.place),
       meetingWithLocation.meetingLocation,
+      { allowPartial: true },
     )
 
     return {
       startPlace: this.toStartPlacePin(meetingWithLocation.meetingLocation),
-      sharedPlaces: recommendations.map((recommendation) =>
-        this.toPlacePin(resolved.get(recommendation.place.id)!),
-      ),
+      sharedPlaces: recommendations.flatMap((recommendation) => {
+        const place = resolved.get(recommendation.place.id)
+        if (!place) {
+          this.logger.warn(
+            `카카오 장소 조회에 실패해 해당 추천을 지도 핀에서 제외합니다. recommendationId=${recommendation.id}`,
+          )
+          return []
+        }
+        return [this.toPlacePin(place)]
+      }),
     }
   }
 
