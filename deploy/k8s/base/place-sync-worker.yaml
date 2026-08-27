@@ -49,6 +49,29 @@ spec:
               value: "true"
             - name: METRICS_PORT
               value: "9464"
+            - name: STATS_DB_HOST
+              value: momo-statistics-postgres
+            - name: STATS_DB_PORT
+              value: "5432"
+            - name: STATS_DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: momo-statistics-postgres-auth
+                  key: POSTGRES_DB
+            - name: STATS_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: momo-statistics-postgres-auth
+                  key: POSTGRES_USER
+            - name: STATS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: momo-statistics-postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: STATS_DB_SSL
+              value: "false"
+            - name: STATS_DB_SYNCHRONIZE
+              value: "false"
           startupProbe:
             httpGet:
               path: /health/live
