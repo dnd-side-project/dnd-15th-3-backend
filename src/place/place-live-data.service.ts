@@ -58,6 +58,7 @@ export class PlaceLiveDataService {
     center: PlaceSearchCenter,
     categories: Category[],
     query?: string,
+    options?: { targetTotal?: number },
   ): Promise<LivePlaceSearchResult> {
     const lookupQuery = query?.trim() || undefined
     const supported = categories.filter((category) =>
@@ -80,6 +81,9 @@ export class PlaceLiveDataService {
           radiusMeters: PLACE_SYNC_RADIUS_METERS,
           categorySlug: category.slug as CategorySlug,
           ...(lookupQuery ? { query: lookupQuery } : {}),
+          ...(options?.targetTotal !== undefined
+            ? { targetTotal: options.targetTotal }
+            : {}),
         }),
       })),
     )
@@ -129,6 +133,7 @@ export class PlaceLiveDataService {
   async resolvePlaces(
     places: Place[],
     center: PlaceSearchCenter,
+    options?: { allowPartial?: boolean },
   ): Promise<Map<string, ResolvedPlace>> {
     const resolved = new Map<string, ResolvedPlace>()
     const kakaoByCategoryAndQuery = new Map<
@@ -193,7 +198,7 @@ export class PlaceLiveDataService {
       }),
     )
 
-    if (resolved.size !== places.length) {
+    if (!options?.allowPartial && resolved.size !== places.length) {
       throw new PlaceException(PlaceErrorCode.providerPlaceUnavailable)
     }
     return resolved

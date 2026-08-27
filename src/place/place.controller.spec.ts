@@ -60,7 +60,16 @@ describe('PlaceController', () => {
     ])
 
     type SchemaWithProperties = {
-      properties?: Record<string, { type?: string; nullable?: boolean }>
+      required?: string[]
+      properties?: Record<
+        string,
+        {
+          type?: string
+          format?: string
+          nullable?: boolean
+          deprecated?: boolean
+        }
+      >
     }
     const schema = document.components?.schemas?.PlaceSearchResultDto as
       | SchemaWithProperties
@@ -69,14 +78,85 @@ describe('PlaceController', () => {
       expect.arrayContaining(['placeId', 'category', 'name', 'address']),
     )
     expect(schema?.properties?.imageUrls?.type).toBe('array')
+    expect(schema?.properties?.imageUrls?.deprecated).toBe(true)
+    expect(schema?.properties?.photos?.type).toBe('array')
     expect(schema?.properties?.imageUrls?.nullable).not.toBe(true)
-    expect(schema?.properties).not.toHaveProperty('images')
-    expect(schema?.properties).not.toHaveProperty('previewImage')
+    expect(schema?.properties?.previewUrl).toMatchObject({
+      type: 'string',
+      format: 'uri',
+      nullable: true,
+      deprecated: true,
+    })
+    expect(schema?.properties?.previewPhoto?.nullable).toBe(true)
 
     const searchItemSchema = document.components?.schemas
       ?.PlaceSearchItemResponseDto as SchemaWithProperties | undefined
-    expect(searchItemSchema?.properties?.previewUrl?.nullable).toBe(true)
-    expect(searchItemSchema?.properties).not.toHaveProperty('previewImage')
+    expect(searchItemSchema?.properties?.previewUrl).toMatchObject({
+      type: 'string',
+      format: 'uri',
+      nullable: true,
+      deprecated: true,
+    })
+    expect(searchItemSchema?.properties?.previewPhoto?.nullable).toBe(true)
+
+    const photoSchema = document.components?.schemas?.PlacePhotoDto as
+      | SchemaWithProperties
+      | undefined
+    expect(Object.keys(photoSchema?.properties ?? {})).toEqual([
+      'id',
+      'url',
+      'width',
+      'height',
+      'source',
+      'attributions',
+      'googleMapsUri',
+      'flagContentUri',
+    ])
+    expect(photoSchema?.required).toEqual([
+      'id',
+      'url',
+      'width',
+      'height',
+      'source',
+      'attributions',
+      'googleMapsUri',
+      'flagContentUri',
+    ])
+    expect(photoSchema?.properties?.url).toMatchObject({
+      type: 'string',
+      format: 'uri',
+    })
+    expect(photoSchema?.properties?.width).toMatchObject({
+      type: 'number',
+      nullable: true,
+    })
+    expect(photoSchema?.properties?.height).toMatchObject({
+      type: 'number',
+      nullable: true,
+    })
+    expect(photoSchema?.properties?.googleMapsUri).toMatchObject({
+      type: 'string',
+      format: 'uri',
+      nullable: true,
+    })
+    expect(photoSchema?.properties?.flagContentUri).toMatchObject({
+      type: 'string',
+      format: 'uri',
+      nullable: true,
+    })
+
+    const attributionSchema = document.components?.schemas
+      ?.PlacePhotoAttributionDto as SchemaWithProperties | undefined
+    expect(attributionSchema?.properties?.uri).toMatchObject({
+      type: 'string',
+      format: 'uri',
+      nullable: true,
+    })
+    expect(attributionSchema?.properties?.photoUri).toMatchObject({
+      type: 'string',
+      format: 'uri',
+      nullable: true,
+    })
 
     await app.close()
   })

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
-import { Repository } from 'typeorm'
+import { type EntityManager, Repository } from 'typeorm'
 import { Meeting } from '../entities/meeting.entity'
 import { MeetingParticipant } from '../entities/meeting-participant.entity'
 import { MeetingException } from '../exception/meeting.exception'
@@ -21,9 +21,17 @@ export class MeetingAccessService {
   async findParticipant(
     meetingId: string,
     accessToken: string,
+    manager?: EntityManager,
   ): Promise<MeetingParticipant> {
     assertAccessToken(accessToken)
-    const participant = await this.participantRepository.findOne({
+    const participantRepository = manager
+      ? manager.getRepository(MeetingParticipant)
+      : this.participantRepository
+    const meetingRepository = manager
+      ? manager.getRepository(Meeting)
+      : this.meetingRepository
+
+    const participant = await participantRepository.findOne({
       where: {
         meeting: { id: meetingId },
         accessToken: accessToken.trim(),
@@ -31,7 +39,7 @@ export class MeetingAccessService {
       relations: { user: true, meeting: true },
     })
     if (!participant) {
-      const meetingExists = await this.meetingRepository.exists({
+      const meetingExists = await meetingRepository.exists({
         where: { id: meetingId },
       })
       if (!meetingExists) {

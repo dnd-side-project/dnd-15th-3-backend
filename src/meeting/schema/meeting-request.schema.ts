@@ -11,6 +11,12 @@ const categorySlugSchema = enumValues(Object.values(CategorySlug))
 const meetingTypeCodeSchema = enumValues(Object.values(MeetingTypeCode))
 const profileAvatarIdSchema = enumValues(Object.values(ProfileAvatarId))
 
+const meetingNameSchema = z
+  .string()
+  .trim()
+  .min(1, '모임 이름을 입력해주세요.')
+  .max(10, '모임 이름은 10자 이하이어야 합니다.')
+
 const dateSchema = z
   .string()
   .trim()
@@ -24,6 +30,15 @@ const dateSchema = z
       date.getUTCDate() === day
     )
   }, '존재하지 않는 날짜입니다.')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number)
+    const inputDate = new Date(Date.UTC(year, month - 1, day))
+    const now = new Date()
+    const today = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    )
+    return inputDate >= today
+  }, '오늘 이전 날짜로는 모임 날짜를 설정할 수 없습니다.')
 
 const timeSchema = z
   .string()
@@ -82,19 +97,24 @@ const invitationCodeSchema = z
   .toUpperCase()
   .regex(/^[A-Z0-9]{6}$/, '초대 코드는 6자리 영문 대문자·숫자여야 합니다.')
 
-export const createMeetingRequestSchema = z.object({
+const meetingDetailsSchema = z.object({
   meetingTypeCode: meetingTypeCodeSchema,
-  name: z
-    .string()
-    .trim()
-    .min(1, '모임 이름을 입력해주세요.')
-    .max(10, '모임 이름은 10자 이하이어야 합니다.'),
+  name: meetingNameSchema,
   date: dateSchema,
   time: timeSchema,
+})
+
+export const createMeetingRequestSchema = meetingDetailsSchema.extend({
   firstMeetingLocation: meetingLocationSchema,
   categorySlugs: requiredCourseSlugsSchema,
   host: participantProfileSchema,
 })
+
+export const updateMeetingDetailsRequestSchema = meetingDetailsSchema
+  .partial()
+  .refine((request) => Object.keys(request).length > 0, {
+    message: '수정할 모임 정보를 하나 이상 입력해주세요.',
+  })
 
 export const invitationPreviewRequestSchema = z.object({
   invitationCode: invitationCodeSchema,
@@ -112,6 +132,9 @@ export const updateCoursePlanRequestSchema = z.object({
 export type ParticipantProfileInput = z.infer<typeof participantProfileSchema>
 export type MeetingLocationInput = z.infer<typeof meetingLocationSchema>
 export type CreateMeetingRequest = z.infer<typeof createMeetingRequestSchema>
+export type UpdateMeetingDetailsRequest = z.infer<
+  typeof updateMeetingDetailsRequestSchema
+>
 export type InvitationPreviewRequest = z.infer<
   typeof invitationPreviewRequestSchema
 >

@@ -5,11 +5,15 @@ import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import type { Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
+import { CourseCandidatePlace } from 'src/course/entities/course-candidate-place.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
+import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
 import type { MeetingPlaceRecommendationVoteRepository } from 'src/course/meeting-place-recommendation-vote.repository'
+import { Place } from 'src/place/entities/place.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
+import * as placeRepositoryModule from 'src/place/place.repository'
 import { User } from 'src/user/entities/user.entity'
 import { ProfileAvatarId } from 'src/user/enums/profile-avatar-id.enum'
 import { In, type Repository } from 'typeorm'
@@ -95,8 +99,12 @@ function createMeetingService() {
   const courseCandidateRepository = {
     findOne: jest.fn(),
   }
+  const courseCandidatePlaceRepository = {
+    find: jest.fn(),
+  }
   const voteRepository = {
     applyPreference: jest.fn(),
+    getPreferenceSummaries: jest.fn().mockResolvedValue(new Map()),
   }
   const meetingAccessService = {
     findParticipant: jest.fn(),
@@ -104,8 +112,8 @@ function createMeetingService() {
   const placeSearchRepository = {
     findSimilar: jest.fn(),
   }
-  const placeImageService = {
-    getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
+  const placePhotoService = {
+    findPreviewPhotos: jest.fn().mockResolvedValue(new Map()),
   }
   const placeLiveDataService = {
     resolvePlace: jest.fn().mockImplementation((place) =>
@@ -139,6 +147,9 @@ function createMeetingService() {
     ),
     searchKakao: jest.fn(),
   }
+  const questionnaireService = {
+    restartAfterMeetingInputChange: jest.fn().mockResolvedValue(undefined),
+  }
 
   const service = new MeetingService(
     config as unknown as ConfigService<Env, true>,
@@ -149,11 +160,13 @@ function createMeetingService() {
     recommendationRepository as never,
     meetingRepository as unknown as Repository<Meeting>,
     courseCandidateRepository as unknown as Repository<CourseCandidate>,
+    courseCandidatePlaceRepository as unknown as Repository<CourseCandidatePlace>,
     voteRepository as unknown as MeetingPlaceRecommendationVoteRepository,
     meetingAccessService as unknown as MeetingAccessService,
     placeSearchRepository as never,
-    placeImageService as never,
+    placePhotoService as never,
     placeLiveDataService as never,
+    questionnaireService as never,
   )
 
   return {
@@ -167,15 +180,245 @@ function createMeetingService() {
     dataSource,
     meetingRepository,
     courseCandidateRepository,
+    courseCandidatePlaceRepository,
     voteRepository,
     meetingAccessService,
     placeSearchRepository,
-    placeImageService,
+    placePhotoService,
     placeLiveDataService,
+    questionnaireService,
+  }
+}
+
+function setupMeetingDetailsUpdate() {
+  const context = createMeetingService()
+  const currentMeetingType = Object.assign(new MeetingType(), {
+    id: 'type-1',
+    code: MeetingTypeCode.Social,
+    name: '친목',
+  })
+  const nextMeetingType = Object.assign(new MeetingType(), {
+    id: 'type-2',
+    code: MeetingTypeCode.DatingHobby,
+    name: '데이트·취미',
+  })
+  const meeting = Object.assign(new Meeting(), {
+    id: 'meeting-1',
+    status: MeetingStatus.RecommendationCollecting,
+    name: '기존 모임',
+    date: '2026-08-23',
+    time: '12:00:00',
+    meetingType: currentMeetingType,
+  })
+  const participant = Object.assign(new MeetingParticipant(), {
+    id: 'participant-1',
+    role: ParticipantRole.Host,
+  })
+  context.meetingAccessService.findParticipant.mockResolvedValue(participant)
+
+  const meetingQueryBuilder = {
+    innerJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    setLock: jest.fn().mockReturnThis(),
+    getOne: jest.fn().mockResolvedValue(meeting),
+  }
+  const transactionMeetingRepository = {
+    createQueryBuilder: jest.fn().mockReturnValue(meetingQueryBuilder),
+    save: jest.fn(async (value) => value),
+  }
+  const meetingTypeRepository = {
+    findOne: jest
+      .fn()
+      .mockImplementation(({ where: { code } }) =>
+        Promise.resolve(
+          code === MeetingTypeCode.Social
+            ? currentMeetingType
+            : nextMeetingType,
+        ),
+      ),
+  }
+  const manager = {
+    getRepository: jest.fn((entity: unknown) => {
+      if (entity === Meeting) return transactionMeetingRepository
+      if (entity === MeetingType) return meetingTypeRepository
+      throw new Error('unexpected repository')
+    }),
+  }
+  context.dataSource.transaction.mockImplementation(async (callback) =>
+    callback(manager),
+  )
+
+  return {
+    ...context,
+    currentMeetingType,
+    nextMeetingType,
+    meeting,
+    participant,
+    meetingQueryBuilder,
+    transactionMeetingRepository,
+    meetingTypeRepository,
+    manager,
   }
 }
 
 describe('MeetingService', () => {
+  describe('updateMeetingDetails', () => {
+    it('모임 기본 정보 전체를 잠금 트랜잭션에서 변경하고 질문지를 재생성한다', async () => {
+      const {
+        service,
+        dataSource,
+        meeting,
+        meetingQueryBuilder,
+        transactionMeetingRepository,
+        questionnaireService,
+        manager,
+        nextMeetingType,
+      } = setupMeetingDetailsUpdate()
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          meetingTypeCode: MeetingTypeCode.DatingHobby,
+          name: '저녁 모임',
+          date: '2026-09-10',
+          time: '18:30',
+        }),
+      ).resolves.toEqual({
+        meetingId: 'meeting-1',
+        name: '저녁 모임',
+        date: '2026-09-10',
+        time: '18:30',
+        meetingTypeCode: MeetingTypeCode.DatingHobby,
+        meetingType: {
+          id: 'type-2',
+          code: MeetingTypeCode.DatingHobby,
+          name: '데이트·취미',
+        },
+      })
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1)
+      expect(meetingQueryBuilder.innerJoinAndSelect).toHaveBeenCalledWith(
+        'meeting.meetingType',
+        'meetingType',
+      )
+      expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+        undefined,
+        ['meeting'],
+      )
+      expect(transactionMeetingRepository.save).toHaveBeenCalledWith(meeting)
+      expect(meeting.meetingType).toBe(nextMeetingType)
+      expect(
+        questionnaireService.restartAfterMeetingInputChange,
+      ).toHaveBeenCalledWith(manager, 'meeting-1')
+    })
+
+    it.each([
+      ['name', { name: '저녁 모임' }],
+      ['date', { date: '2026-09-10' }],
+      ['time', { time: '18:30' }],
+      ['meetingTypeCode', { meetingTypeCode: MeetingTypeCode.DatingHobby }],
+    ])('%s 필드만 부분 수정할 수 있다', async (_, input) => {
+      const { service, transactionMeetingRepository, questionnaireService } =
+        setupMeetingDetailsUpdate()
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', input),
+      ).resolves.toMatchObject(input)
+      expect(transactionMeetingRepository.save).toHaveBeenCalledTimes(1)
+      expect(
+        questionnaireService.restartAfterMeetingInputChange,
+      ).toHaveBeenCalledTimes(1)
+    })
+
+    it('공개 시간과 DB 시간이 같으면 no-op으로 처리하고 질문지를 유지한다', async () => {
+      const { service, transactionMeetingRepository, questionnaireService } =
+        setupMeetingDetailsUpdate()
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          meetingTypeCode: MeetingTypeCode.Social,
+          name: '기존 모임',
+          date: '2026-08-23',
+          time: '12:00',
+        }),
+      ).resolves.toMatchObject({ time: '12:00' })
+
+      expect(transactionMeetingRepository.save).not.toHaveBeenCalled()
+      expect(
+        questionnaireService.restartAfterMeetingInputChange,
+      ).not.toHaveBeenCalled()
+    })
+
+    it('빈 accessToken은 트랜잭션 전에 거부한다', () => {
+      const { service, dataSource } = setupMeetingDetailsUpdate()
+
+      expect(() =>
+        service.updateMeetingDetails('meeting-1', '', { name: '저녁 모임' }),
+      ).toThrow(
+        expect.objectContaining({
+          errorCode: CommonErrorCode.authenticationFailed,
+        }),
+      )
+      expect(dataSource.transaction).not.toHaveBeenCalled()
+    })
+
+    it('일반 참여자의 수정 요청을 거부한다', async () => {
+      const { service, meetingAccessService } = setupMeetingDetailsUpdate()
+      meetingAccessService.findParticipant.mockResolvedValue(
+        Object.assign(new MeetingParticipant(), {
+          role: ParticipantRole.Member,
+        }),
+      )
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'member-token', {
+          name: '저녁 모임',
+        }),
+      ).rejects.toMatchObject({ errorCode: MeetingErrorCode.hostOnly })
+    })
+
+    it('없는 모임의 수정 요청을 거부한다', async () => {
+      const { service, meetingQueryBuilder } = setupMeetingDetailsUpdate()
+      meetingQueryBuilder.getOne.mockResolvedValue(null)
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          name: '저녁 모임',
+        }),
+      ).rejects.toMatchObject({ errorCode: MeetingErrorCode.notFound })
+    })
+
+    it('없는 모임 유형으로 변경할 수 없다', async () => {
+      const { service, meetingTypeRepository } = setupMeetingDetailsUpdate()
+      meetingTypeRepository.findOne.mockResolvedValue(null)
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          meetingTypeCode: MeetingTypeCode.DatingHobby,
+        }),
+      ).rejects.toMatchObject({
+        errorCode: MeetingErrorCode.meetingTypeNotFound,
+      })
+    })
+
+    it.each(
+      Object.values(MeetingStatus).filter(
+        (status) => status !== MeetingStatus.RecommendationCollecting,
+      ),
+    )('%s 상태에서는 모임 기본 정보를 수정할 수 없다', async (status) => {
+      const { service, meeting } = setupMeetingDetailsUpdate()
+      meeting.status = status
+
+      await expect(
+        service.updateMeetingDetails('meeting-1', 'host-token', {
+          name: '저녁 모임',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: MeetingErrorCode.meetingDetailsNotEditable,
+      })
+    })
+  })
+
   it('초대 코드 미리보기는 참여자 토큰을 발급하지 않고 모임 요약을 반환한다', async () => {
     const { service, dataSource } = createMeetingService()
     const meeting = {
@@ -183,7 +426,7 @@ describe('MeetingService', () => {
       accessToken: 'ABC234',
       name: '성수 모임',
       date: '2026-08-23',
-      time: '12:00',
+      time: '12:00:00',
       meetingLocation: {
         id: 'location-1',
         displayName: '서울특별시 강남구',
@@ -235,18 +478,19 @@ describe('MeetingService', () => {
       externalAddressId: null,
       syncVersion: 1,
     }
-    const meeting = {
+    const meeting = Object.assign(new Meeting(), {
       id: 'meeting-1',
       accessToken: 'ABC234',
       name: '성수 모임',
       date: '2026-08-23',
-      time: '12:00',
+      time: '12:00:00',
       meetingType,
       meetingLocation: location,
       courseVersion: 1,
       courseImageKey: 'media/course.png',
       courseImageUploadedAt: new Date('2026-08-17T12:00:00.000Z'),
-    }
+      status: MeetingStatus.RecommendationCollecting,
+    })
     const hostUser = {
       id: 'user-host',
       userKey: 'device-host',
@@ -335,6 +579,7 @@ describe('MeetingService', () => {
     }
     await expect(service.joinMeeting(joinRequest)).resolves.toMatchObject({
       participantAccessToken: 'guest-token',
+      time: '12:00',
       courseImageUrl: 'https://media.example/o/media/course.png',
       role: 'MEMBER',
       isHost: false,
@@ -343,24 +588,31 @@ describe('MeetingService', () => {
         { id: 'participant-host', role: 'HOST' },
         { id: 'participant-guest', role: 'MEMBER' },
       ],
+      categorySteps: [{ id: 'category-1', slug: CategorySlug.Cafe, order: 1 }],
     })
   })
 
   it('코스 계획은 참여자만 조회하고 방장만 version을 증가시켜 수정한다', async () => {
-    const { service, dataSource, participantRepository } =
+    const { service, dataSource, meetingAccessService, questionnaireService } =
       createMeetingService()
     const category = {
       id: 'category-1',
       slug: CategorySlug.Cafe,
       name: '카페',
     }
-    const meeting = { id: 'meeting-1', courseVersion: 1 }
-    const step = { id: 'step-1', meeting, category, order: 1 }
-    participantRepository.findOne.mockResolvedValue({
-      id: 'participant-1',
-      role: ParticipantRole.Host,
-      accessToken: 'host-token',
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      courseVersion: 1,
+      status: MeetingStatus.RecommendationCollecting,
     })
+    const step = { id: 'step-1', meeting, category, order: 1 }
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-1',
+        role: ParticipantRole.Host,
+        accessToken: 'host-token',
+      }),
+    )
     const meetingQueryBuilder = {
       where: jest.fn().mockReturnThis(),
       setLock: jest.fn().mockReturnThis(),
@@ -383,15 +635,6 @@ describe('MeetingService', () => {
       save: jest.fn().mockResolvedValue([step]),
     }
     const managerRepositories = new Map<unknown, unknown>([
-      [
-        MeetingParticipant,
-        {
-          findOne: jest.fn().mockResolvedValue({
-            id: 'participant-1',
-            role: ParticipantRole.Host,
-          }),
-        },
-      ],
       [Category, { find: jest.fn().mockResolvedValue([category]) }],
       [Meeting, meetingRepository],
       [CourseCategoryStep, stepRepository],
@@ -415,17 +658,36 @@ describe('MeetingService', () => {
       version: 2,
       categorySteps: [{ slug: CategorySlug.Cafe, order: 1 }],
     })
+    expect(meetingAccessService.findParticipant).toHaveBeenCalledWith(
+      'meeting-1',
+      'host-token',
+      manager,
+    )
     expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
       'pessimistic_write',
     )
     expect(deleteQueryBuilder.execute).toHaveBeenCalled()
+    expect(
+      questionnaireService.restartAfterMeetingInputChange,
+    ).toHaveBeenCalledWith(manager, 'meeting-1')
 
-    managerRepositories.set(MeetingParticipant, {
-      findOne: jest.fn().mockResolvedValue({
+    meeting.status = MeetingStatus.CourseGenerating
+    await expect(
+      service.updateCoursePlan('meeting-1', 'host-token', {
+        categorySlugs: [CategorySlug.Cafe],
+        version: 2,
+      }),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseInputNotEditable,
+    })
+    expect(deleteQueryBuilder.execute).toHaveBeenCalledTimes(1)
+
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
         id: 'participant-2',
         role: ParticipantRole.Member,
       }),
-    })
+    )
     await expect(
       service.updateCoursePlan('meeting-1', 'member-token', {
         categorySlugs: [CategorySlug.Cafe],
@@ -530,15 +792,25 @@ describe('MeetingService', () => {
         externalAddressId: 'kakao-address-1',
         syncVersion: 1,
       },
-      categorySteps: [{ id: 'step-1', slug: CategorySlug.Cafe }],
+      categorySteps: [{ id: 'category-1', slug: CategorySlug.Cafe }],
     })
     expect(dataSource.transaction).toHaveBeenCalledTimes(1)
     expect(placeSyncService.createJobs).not.toHaveBeenCalled()
   })
 
   it('기준 위치 변경 시 이전 작업을 무효화하고 새 수집 작업은 등록하지 않는다', async () => {
-    const { service, dataSource, placeSyncService } = createMeetingService()
-    const meeting = { id: 'meeting-1' }
+    const { service, dataSource, placeSyncService, meetingAccessService } =
+      createMeetingService()
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-1',
+        role: ParticipantRole.Host,
+      }),
+    )
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      status: MeetingStatus.RecommendationCollecting,
+    })
     const location = {
       id: 'location-1',
       meeting,
@@ -551,17 +823,11 @@ describe('MeetingService', () => {
       location: { type: 'Point', coordinates: [127, 37.5] },
     }
     const updatedLocation = { ...location, syncVersion: 2 }
-    const participantRepository = {
-      findOne: jest
-        .fn()
-        .mockResolvedValue({ id: 'participant-1', role: 'HOST' }),
-    }
     const locationRepository = {
       save: jest.fn().mockResolvedValue(updatedLocation),
       createQueryBuilder: jest.fn(),
     }
     const locationQueryBuilder = {
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       setLock: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue(location),
@@ -569,6 +835,14 @@ describe('MeetingService', () => {
     locationRepository.createQueryBuilder.mockImplementation(
       () => locationQueryBuilder,
     )
+    const meetingQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      setLock: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(meeting),
+    }
+    const meetingRepository = {
+      createQueryBuilder: jest.fn(() => meetingQueryBuilder),
+    }
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
@@ -582,7 +856,7 @@ describe('MeetingService', () => {
       find: jest.fn().mockResolvedValue([{ category }]),
     }
     const repositories = new Map<unknown, unknown>([
-      [MeetingParticipant, participantRepository],
+      [Meeting, meetingRepository],
       [MeetingLocation, locationRepository],
       [PlaceSyncJob, jobRepository],
       [CourseCategoryStep, stepRepository],
@@ -611,18 +885,40 @@ describe('MeetingService', () => {
     expect(locationQueryBuilder.setLock).toHaveBeenCalledWith(
       'pessimistic_write',
     )
+    expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+      'pessimistic_write',
+    )
     expect(placeSyncService.createJobs).not.toHaveBeenCalled()
+
+    meeting.status = MeetingStatus.CourseGenerating
+    await expect(
+      service.updateLocation('meeting-1', 'participant-token', {
+        displayName: '다음 위치',
+        address: '다음 주소',
+        latitude: 37.52,
+        longitude: 127.02,
+      }),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseInputNotEditable,
+    })
+    expect(locationQueryBuilder.getOne).toHaveBeenCalledTimes(1)
   })
 
   it('선택한 코스의 반경 내 장소만 중복 없이 추천한다', async () => {
     const {
       service,
       dataSource,
-      participantRepository,
-      placeRepository,
+      meetingAccessService,
       recommendationRepository,
+      placePhotoService,
+      placeLiveDataService,
+      questionnaireService,
     } = createMeetingService()
     const participant = { id: 'participant-1' }
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      status: MeetingStatus.RecommendationCollecting,
+    })
     const category = { id: 'category-1', slug: CategorySlug.Cafe }
     const place = {
       id: 'place-1',
@@ -633,21 +929,51 @@ describe('MeetingService', () => {
       category,
     }
     const location = { latitude: 37.5, longitude: 127 }
-    participantRepository.findOne.mockResolvedValue(participant)
-    placeRepository.findOne.mockResolvedValue(place)
+    const previewPhoto = {
+      id: 'google:place-1:1',
+      url: 'https://places.googleapis.com/photo/place-1',
+      width: 800,
+      height: 600,
+      source: 'GOOGLE',
+      attributions: [],
+      googleMapsUri: 'https://www.google.com/maps/place/photo-place-1',
+      flagContentUri: null,
+    }
+    meetingAccessService.findParticipant.mockResolvedValue(participant)
     recommendationRepository.findOne.mockResolvedValue(null)
     recommendationRepository.save.mockImplementation((value) =>
       Promise.resolve({ id: 'recommendation-1', ...value }),
     )
+    placePhotoService.findPreviewPhotos.mockResolvedValue(
+      new Map([['place-1', previewPhoto]]),
+    )
 
+    const meetingQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      setLock: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(meeting),
+    }
     const locationRepository = {
       findOne: jest.fn().mockResolvedValue(location),
     }
     const stepRepository = {
       findOne: jest.fn().mockResolvedValue({ id: 'step-1' }),
     }
-    dataSource.getRepository.mockImplementation((entity) =>
-      entity === MeetingLocation ? locationRepository : stepRepository,
+    const repositories = new Map<unknown, unknown>([
+      [
+        Meeting,
+        { createQueryBuilder: jest.fn().mockReturnValue(meetingQueryBuilder) },
+      ],
+      [MeetingLocation, locationRepository],
+      [Place, { findOne: jest.fn().mockResolvedValue(place) }],
+      [CourseCategoryStep, stepRepository],
+      [MeetingPlaceRecommendation, recommendationRepository],
+    ])
+    const manager = {
+      getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
+    }
+    dataSource.transaction.mockImplementation(async (callback) =>
+      callback(manager),
     )
 
     await expect(
@@ -657,7 +983,14 @@ describe('MeetingService', () => {
     ).resolves.toMatchObject({
       id: 'recommendation-1',
       place: { id: 'place-1' },
+      previewPhoto,
     })
+    expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'place-1', name: '카페' }),
+    ])
+    expect(
+      questionnaireService.restartAfterMeetingInputChange,
+    ).toHaveBeenCalledWith(manager, 'meeting-1')
 
     recommendationRepository.findOne.mockResolvedValue({ id: 'existing' })
     await expect(
@@ -667,6 +1000,173 @@ describe('MeetingService', () => {
     ).rejects.toMatchObject({
       errorCode: MeetingErrorCode.recommendationAlreadyExists,
     })
+
+    meeting.status = MeetingStatus.CourseGenerating
+    recommendationRepository.findOne.mockResolvedValue(null)
+    await expect(
+      service.addRecommendation('meeting-1', 'participant-token', {
+        placeId: 'place-1',
+      }),
+    ).rejects.toMatchObject({
+      errorCode: MeetingErrorCode.courseInputNotEditable,
+    })
+    expect(placeLiveDataService.resolvePlace).toHaveBeenCalledTimes(2)
+  })
+
+  it('추천 목록의 대표 사진을 장소별 반복 호출 없이 한 번에 조회한다', async () => {
+    const {
+      service,
+      dataSource,
+      meetingAccessService,
+      recommendationRepository,
+      voteRepository,
+      placePhotoService,
+    } = createMeetingService()
+    const category = { id: 'category-1', slug: CategorySlug.Cafe }
+    const places = [
+      {
+        id: 'place-1',
+        name: '첫 번째 카페',
+        address: '첫 번째 주소',
+        latitude: 37.5,
+        longitude: 127,
+        category,
+      },
+      {
+        id: 'place-2',
+        name: '두 번째 카페',
+        address: '두 번째 주소',
+        latitude: 37.5001,
+        longitude: 127.0001,
+        category,
+      },
+    ]
+    const recommendations = places.map((place, index) => ({
+      id: `recommendation-${index + 1}`,
+      place,
+      recommendedBy: { id: `participant-${index + 1}` },
+    }))
+    const previewPhoto = {
+      id: 'google:place-1:1',
+      url: 'https://places.googleapis.com/photo/place-1',
+      width: 800,
+      height: 600,
+      source: 'GOOGLE',
+      attributions: [],
+      googleMapsUri: 'https://www.google.com/maps/place/photo-place-1',
+      flagContentUri: null,
+    }
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-viewer',
+    })
+    recommendationRepository.find.mockResolvedValue(recommendations)
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        latitude: 37.5,
+        longitude: 127,
+      }),
+    })
+    voteRepository.getPreferenceSummaries.mockResolvedValue(
+      new Map([
+        [
+          'recommendation-1',
+          {
+            likeCount: 2,
+            dislikeCount: 0,
+            myPreference: PreferenceType.Like,
+          },
+        ],
+      ]),
+    )
+    placePhotoService.findPreviewPhotos.mockResolvedValue(
+      new Map([['place-1', previewPhoto]]),
+    )
+
+    await expect(
+      service.getRecommendations('meeting-1', 'participant-token'),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: 'recommendation-1',
+        previewPhoto,
+        likeCount: 2,
+        dislikeCount: 0,
+        viewerPreference: PreferenceType.Like,
+      }),
+      expect.objectContaining({
+        id: 'recommendation-2',
+        previewPhoto: null,
+        likeCount: 0,
+        dislikeCount: 0,
+        viewerPreference: null,
+      }),
+    ])
+    expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledTimes(1)
+    expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'place-1', name: '첫 번째 카페' }),
+      expect.objectContaining({ id: 'place-2', name: '두 번째 카페' }),
+    ])
+  })
+
+  it('추천 장소 중 일부만 카카오 조회에 실패해도 나머지 추천만으로 목록을 반환한다', async () => {
+    const {
+      service,
+      dataSource,
+      meetingAccessService,
+      recommendationRepository,
+      placeLiveDataService,
+    } = createMeetingService()
+    const category = { id: 'category-1', slug: CategorySlug.Cafe }
+    const places = [
+      {
+        id: 'place-1',
+        name: '조회 성공 카페',
+        address: '주소 1',
+        latitude: 37.5,
+        longitude: 127,
+        category,
+      },
+      {
+        id: 'place-2',
+        name: '조회 실패 카페',
+        address: '주소 2',
+        latitude: 37.5001,
+        longitude: 127.0001,
+        category,
+      },
+    ]
+    const recommendations = places.map((place, index) => ({
+      id: `recommendation-${index + 1}`,
+      place,
+      recommendedBy: { id: `participant-${index + 1}` },
+    }))
+    meetingAccessService.findParticipant.mockResolvedValue({
+      id: 'participant-viewer',
+    })
+    recommendationRepository.find.mockResolvedValue(recommendations)
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({
+        latitude: 37.5,
+        longitude: 127,
+      }),
+    })
+    // place-2는 카카오 조회 실패를 흉내 내어 Map에서 아예 빠진 채로 반환됨
+    placeLiveDataService.resolvePlaces.mockResolvedValueOnce(
+      new Map([['place-1', places[0]]]),
+    )
+
+    const result = await service.getRecommendations(
+      'meeting-1',
+      'participant-token',
+    )
+
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'recommendation-1' }),
+    ])
+    expect(placeLiveDataService.resolvePlaces).toHaveBeenCalledWith(
+      [places[0], places[1]],
+      { latitude: 37.5, longitude: 127 },
+      { allowPartial: true },
+    )
   })
 
   it('손상된 모임의 방장 정보를 노출하지 않고 공통 내부 오류로 처리한다', async () => {
@@ -681,7 +1181,7 @@ describe('MeetingService', () => {
       accessToken: 'ABC234',
       name: '성수 모임',
       date: '2026-08-23',
-      time: '12:00',
+      time: '12:00:00',
       meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
       meetingLocation: {
         id: 'location-1',
@@ -717,6 +1217,133 @@ describe('MeetingService', () => {
     ).rejects.toMatchObject({
       errorCode: CommonErrorCode.internalServerError,
     })
+  })
+
+  it('코스가 확정된 모임은 상세 조회에 selectedCourse를 채운다', async () => {
+    const {
+      service,
+      dataSource,
+      participantRepository,
+      recommendationRepository,
+      meetingAccessService,
+      courseCandidateRepository,
+      courseCandidatePlaceRepository,
+    } = createMeetingService()
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      accessToken: 'ABC234',
+      name: '성수 모임',
+      date: '2026-08-23',
+      time: '12:00:00',
+      meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
+      meetingLocation: {
+        id: 'location-1',
+        displayName: '강남역',
+        address: '서울 강남구',
+        latitude: 37.5,
+        longitude: 127,
+        externalAddressId: null,
+        syncVersion: 1,
+      },
+      courseImageKey: null,
+      status: MeetingStatus.CourseConfirmed,
+    })
+    const host = {
+      id: 'participant-host',
+      role: ParticipantRole.Host,
+      nickname: '방장',
+      accessToken: 'host-token',
+      profileAvatarId: ProfileAvatarId.MomoBlue,
+      user: { id: 'user-host', userKey: 'device-host' },
+    }
+    meetingAccessService.findParticipant.mockResolvedValue(host)
+    participantRepository.find.mockResolvedValue([host])
+    recommendationRepository.find.mockResolvedValue([])
+    dataSource.getRepository.mockImplementation((entity) => {
+      if (entity === Meeting) {
+        return { findOne: jest.fn().mockResolvedValue(meeting) }
+      }
+      if (entity === CourseCategoryStep) {
+        return { find: jest.fn().mockResolvedValue([]) }
+      }
+      return undefined
+    })
+    courseCandidateRepository.findOne.mockResolvedValue({ id: 'candidate-1' })
+    courseCandidatePlaceRepository.find.mockResolvedValue([
+      { order: 1, meetingPlaceRecommendation: { id: 'recommendation-1' } },
+      { order: 2, meetingPlaceRecommendation: { id: 'recommendation-2' } },
+    ])
+
+    const result = await service.getMeetingDetail('meeting-1', 'host-token')
+
+    expect(result.time).toBe('12:00')
+    expect(result.selectedCourse).toEqual({
+      id: 'candidate-1',
+      recommendationIds: ['recommendation-1', 'recommendation-2'],
+    })
+    expect(courseCandidateRepository.findOne).toHaveBeenCalledWith({
+      where: { meeting: { id: 'meeting-1' }, isSelected: true },
+    })
+    expect(courseCandidatePlaceRepository.find).toHaveBeenCalledWith({
+      where: { courseCandidate: { id: 'candidate-1' } },
+      relations: { meetingPlaceRecommendation: true },
+      order: { order: 'ASC' },
+    })
+  })
+
+  it('코스가 확정되지 않은 모임은 상세 조회에서 selectedCourse가 null이고 후보를 조회하지 않는다', async () => {
+    const {
+      service,
+      dataSource,
+      participantRepository,
+      recommendationRepository,
+      meetingAccessService,
+      courseCandidateRepository,
+    } = createMeetingService()
+    const meeting = Object.assign(new Meeting(), {
+      id: 'meeting-1',
+      accessToken: 'ABC234',
+      name: '성수 모임',
+      date: '2026-08-23',
+      time: '12:00',
+      meetingType: { id: 'type-1', code: MeetingTypeCode.Social, name: '친목' },
+      meetingLocation: {
+        id: 'location-1',
+        displayName: '강남역',
+        address: '서울 강남구',
+        latitude: 37.5,
+        longitude: 127,
+        externalAddressId: null,
+        syncVersion: 1,
+      },
+      courseImageKey: null,
+      status: MeetingStatus.CourseGenerated,
+    })
+    const host = {
+      id: 'participant-host',
+      role: ParticipantRole.Host,
+      nickname: '방장',
+      accessToken: 'host-token',
+      profileAvatarId: ProfileAvatarId.MomoBlue,
+      user: { id: 'user-host', userKey: 'device-host' },
+    }
+    meetingAccessService.findParticipant.mockResolvedValue(host)
+    participantRepository.find.mockResolvedValue([host])
+    recommendationRepository.find.mockResolvedValue([])
+    dataSource.getRepository.mockImplementation((entity) => {
+      if (entity === Meeting) {
+        return { findOne: jest.fn().mockResolvedValue(meeting) }
+      }
+      if (entity === CourseCategoryStep) {
+        return { find: jest.fn().mockResolvedValue([]) }
+      }
+      return undefined
+    })
+
+    const result = await service.getMeetingDetail('meeting-1', 'host-token')
+
+    expect(result.selectedCourse).toBeNull()
+    expect(courseCandidateRepository.findOne).not.toHaveBeenCalled()
   })
 
   it('사용자 upsert 뒤 조회가 실패하면 공통 내부 오류로 처리한다', async () => {
@@ -907,6 +1534,73 @@ describe('MeetingService', () => {
       })
     })
 
+    it('공유 장소 중 일부만 카카오 조회에 실패해도 나머지 핀만으로 반환한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        meetingRepository,
+        recommendationRepository,
+        placeLiveDataService,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      const meetingWithLocation = new Meeting()
+      meetingWithLocation.meetingLocation = {
+        displayName: '강남역',
+        longitude: 127.0276,
+        latitude: 37.4979,
+      } as MeetingLocation
+      meetingRepository.findOne.mockResolvedValue(meetingWithLocation)
+      const resolvablePlace = {
+        id: 'place-1',
+        name: '성수 카페 모모',
+        longitude: 127.0557,
+        latitude: 37.5446,
+        category: { name: '카페', slug: CategorySlug.Cafe },
+      }
+      const unresolvablePlace = {
+        id: 'place-2',
+        name: '조회 실패 장소',
+        longitude: 127.06,
+        latitude: 37.55,
+        category: { name: '카페', slug: CategorySlug.Cafe },
+      }
+      recommendationRepository.find.mockResolvedValue([
+        { id: 'recommendation-1', place: resolvablePlace },
+        { id: 'recommendation-2', place: unresolvablePlace },
+      ])
+      // place-2는 카카오 조회 실패를 흉내 내어 Map에서 아예 빠진 채로 반환됨
+      placeLiveDataService.resolvePlaces.mockResolvedValueOnce(
+        new Map([['place-1', resolvablePlace]]),
+      )
+
+      await expect(service.getMapPins('1', 'token')).resolves.toEqual({
+        startPlace: {
+          name: '강남역',
+          longitude: 127.0276,
+          latitude: 37.4979,
+        },
+        sharedPlaces: [
+          {
+            placeId: 'place-1',
+            name: '성수 카페 모모',
+            category: '카페',
+            categorySlug: CategorySlug.Cafe,
+            longitude: 127.0557,
+            latitude: 37.5446,
+          },
+        ],
+      })
+      expect(placeLiveDataService.resolvePlaces).toHaveBeenCalledWith(
+        [resolvablePlace, unresolvablePlace],
+        expect.objectContaining({ latitude: 37.4979, longitude: 127.0276 }),
+        { allowPartial: true },
+      )
+    })
+
     it.each([MeetingStatus.CourseGenerated, MeetingStatus.CourseConfirmed])(
       '%s 상태에서는 DB 조회 없이 409를 던진다',
       async (status) => {
@@ -966,13 +1660,53 @@ describe('MeetingService', () => {
   })
 
   describe('updatePlacePreference', () => {
+    function setupPlacePreferenceUpdate(
+      status: MeetingStatus,
+      recommendationExists = true,
+    ) {
+      const context = createMeetingService()
+      const meeting = createMeetingWithStatus(status)
+      meeting.id = '1'
+      const participant = { id: 'participant-1', meeting }
+      context.meetingAccessService.findParticipant.mockResolvedValue(
+        participant,
+      )
+
+      const meetingQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(meeting),
+      }
+      const transactionRecommendationRepository = {
+        exists: jest.fn().mockResolvedValue(recommendationExists),
+      }
+      const manager = {
+        getRepository: jest.fn((entity: unknown) =>
+          entity === Meeting
+            ? { createQueryBuilder: jest.fn(() => meetingQueryBuilder) }
+            : transactionRecommendationRepository,
+        ),
+      }
+      context.dataSource.transaction.mockImplementation(async (callback) =>
+        callback(manager),
+      )
+
+      return {
+        ...context,
+        manager,
+        meetingQueryBuilder,
+        transactionRecommendationRepository,
+      }
+    }
+
     it('참여자 검증에 실패하면 DB 조회 없이 그대로 전파한다', async () => {
       const {
         service,
         meetingAccessService,
-        recommendationRepository,
         voteRepository,
-      } = createMeetingService()
+        meetingQueryBuilder,
+        transactionRecommendationRepository,
+      } = setupPlacePreferenceUpdate(MeetingStatus.RecommendationCollecting)
       meetingAccessService.findParticipant.mockRejectedValue(
         new CommonException(CommonErrorCode.authenticationFailed),
       )
@@ -985,23 +1719,20 @@ describe('MeetingService', () => {
       )
 
       await expect(promise).rejects.toBeInstanceOf(CommonException)
-      expect(recommendationRepository.exists).not.toHaveBeenCalled()
+      expect(meetingQueryBuilder.getOne).not.toHaveBeenCalled()
+      expect(transactionRecommendationRepository.exists).not.toHaveBeenCalled()
       expect(voteRepository.applyPreference).not.toHaveBeenCalled()
     })
 
     it.each([MeetingStatus.CourseGenerating, MeetingStatus.CourseConfirmed])(
-      '%s 상태에서는 DB 조회 없이 409를 던진다',
+      '%s 상태에서는 잠금 후 409를 던진다',
       async (status) => {
         const {
           service,
-          meetingAccessService,
-          recommendationRepository,
           voteRepository,
-        } = createMeetingService()
-        meetingAccessService.findParticipant.mockResolvedValue({
-          id: 'participant-1',
-          meeting: createMeetingWithStatus(status),
-        })
+          meetingQueryBuilder,
+          transactionRecommendationRepository,
+        } = setupPlacePreferenceUpdate(status)
 
         const promise = service.updatePlacePreference(
           '1',
@@ -1011,25 +1742,22 @@ describe('MeetingService', () => {
         )
 
         await expect(promise).rejects.toBeInstanceOf(MeetingException)
-        expect(recommendationRepository.exists).not.toHaveBeenCalled()
+        expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+          'pessimistic_write',
+        )
+        expect(
+          transactionRecommendationRepository.exists,
+        ).not.toHaveBeenCalled()
         expect(voteRepository.applyPreference).not.toHaveBeenCalled()
       },
     )
 
     it('추천 장소가 해당 모임 소속이 아니면 404를 던진다', async () => {
-      const {
-        service,
-        meetingAccessService,
-        recommendationRepository,
-        voteRepository,
-      } = createMeetingService()
-      meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'participant-1',
-        meeting: createMeetingWithStatus(
+      const { service, voteRepository, transactionRecommendationRepository } =
+        setupPlacePreferenceUpdate(
           MeetingStatus.RecommendationCollecting,
-        ),
-      })
-      recommendationRepository.exists.mockResolvedValue(false)
+          false,
+        )
 
       const promise = service.updatePlacePreference(
         '1',
@@ -1039,26 +1767,15 @@ describe('MeetingService', () => {
       )
 
       await expect(promise).rejects.toBeInstanceOf(MeetingException)
-      expect(recommendationRepository.exists).toHaveBeenCalledWith({
+      expect(transactionRecommendationRepository.exists).toHaveBeenCalledWith({
         where: { id: '2', meeting: { id: '1' } },
       })
       expect(voteRepository.applyPreference).not.toHaveBeenCalled()
     })
 
     it('검증을 통과하면 voteRepository에 위임하고 결과를 응답 형태로 반환한다', async () => {
-      const {
-        service,
-        meetingAccessService,
-        recommendationRepository,
-        voteRepository,
-      } = createMeetingService()
-      meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'participant-1',
-        meeting: createMeetingWithStatus(
-          MeetingStatus.RecommendationCollecting,
-        ),
-      })
-      recommendationRepository.exists.mockResolvedValue(true)
+      const { service, voteRepository, manager, meetingQueryBuilder } =
+        setupPlacePreferenceUpdate(MeetingStatus.RecommendationCollecting)
       voteRepository.applyPreference.mockResolvedValue({
         likeCount: 3,
         dislikeCount: 1,
@@ -1072,6 +1789,7 @@ describe('MeetingService', () => {
       )
 
       expect(voteRepository.applyPreference).toHaveBeenCalledWith(
+        manager,
         '2',
         'participant-1',
         PreferenceType.Like,
@@ -1081,20 +1799,15 @@ describe('MeetingService', () => {
         dislikeCount: 1,
         myPreference: PreferenceType.Like,
       })
+      expect(meetingQueryBuilder.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+      )
     })
 
     it('preference가 null이어도 그대로 voteRepository에 위임한다', async () => {
-      const {
-        service,
-        meetingAccessService,
-        recommendationRepository,
-        voteRepository,
-      } = createMeetingService()
-      meetingAccessService.findParticipant.mockResolvedValue({
-        id: 'participant-1',
-        meeting: createMeetingWithStatus(MeetingStatus.CourseGenerated),
-      })
-      recommendationRepository.exists.mockResolvedValue(true)
+      const { service, voteRepository, manager } = setupPlacePreferenceUpdate(
+        MeetingStatus.CourseGenerated,
+      )
       voteRepository.applyPreference.mockResolvedValue({
         likeCount: 0,
         dislikeCount: 0,
@@ -1108,6 +1821,7 @@ describe('MeetingService', () => {
       )
 
       expect(voteRepository.applyPreference).toHaveBeenCalledWith(
+        manager,
         '2',
         'participant-1',
         null,
@@ -1193,6 +1907,11 @@ describe('MeetingService', () => {
           latitude: 37.5447,
           longitude: 127.0558,
           previewUrl: null,
+          source: PlaceSource.Google,
+          providerPlaceId: 'google-11',
+          roadAddress: '서울 성동구 성수이로 2',
+          phone: null,
+          placeUrl: null,
         },
       ])
 
@@ -1208,6 +1927,8 @@ describe('MeetingService', () => {
           longitude: 127.0558,
           primaryImageUrl: null,
           previewUrl: null,
+          previewPhoto: null,
+          placeUrl: null,
         },
       ])
       expect(placeRepository.findOne).toHaveBeenCalledWith({
@@ -1298,12 +2019,13 @@ describe('MeetingService', () => {
       )
     })
 
-    it('무작위 추천이 부족하면 화면에 노출 중이던 장소로 채운다', async () => {
+    it('무작위 추천이 부족하면 화면에 노출 중이던 장소와 검증된 사진으로 채운다', async () => {
       const {
         service,
         meetingAccessService,
         placeRepository,
         placeSearchRepository,
+        placePhotoService,
       } = createMeetingService()
       meetingAccessService.findParticipant.mockResolvedValue({
         meeting: createMeetingWithStatus(
@@ -1324,9 +2046,26 @@ describe('MeetingService', () => {
           address: '서울 성동구 성수이로 3',
           latitude: 37.5448,
           longitude: 127.0559,
-          previewUrl: 'https://preview',
+          source: PlaceSource.Google,
+          providerPlaceId: 'google-3',
+          roadAddress: '서울 성동구 성수이로 3',
+          phone: null,
+          placeUrl: 'https://maps.google.com/place/3',
         },
       ])
+      const previewPhoto = {
+        id: 'google:3:1',
+        url: 'https://places.googleapis.com/photo/3',
+        width: 800,
+        height: 600,
+        source: 'GOOGLE',
+        attributions: [],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-3',
+        flagContentUri: null,
+      }
+      placePhotoService.findPreviewPhotos.mockResolvedValue(
+        new Map([['3', previewPhoto]]),
+      )
 
       await expect(
         service.getSimilarPlaces('1', '2', 'token', ['3', '4'], 2),
@@ -1338,8 +2077,10 @@ describe('MeetingService', () => {
           address: '서울 성동구 성수이로 3',
           latitude: 37.5448,
           longitude: 127.0559,
-          primaryImageUrl: null,
-          previewUrl: 'https://preview',
+          primaryImageUrl: previewPhoto.url,
+          previewUrl: previewPhoto.url,
+          previewPhoto,
+          placeUrl: 'https://maps.google.com/place/3',
         },
       ])
       expect(placeRepository.find).toHaveBeenCalledWith({
@@ -1350,25 +2091,177 @@ describe('MeetingService', () => {
           address: true,
           latitude: true,
           longitude: true,
-          previewUrl: true,
+          source: true,
+          providerPlaceId: true,
+          roadAddress: true,
+          phone: true,
+          placeUrl: true,
         },
       })
+    })
+
+    it('카카오 기준 장소는 실시간 검색 후보를 shuffle하여 추천한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        dataSource,
+        placeLiveDataService,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        source: PlaceSource.Kakao,
+        category: { id: '1' },
+        latitude: 37.544,
+        longitude: 127.055,
+      })
+      dataSource.getRepository.mockReturnValue({
+        findOne: jest
+          .fn()
+          .mockResolvedValue({ latitude: 37.544, longitude: 127.055 }),
+      })
+      placeLiveDataService.searchKakao.mockResolvedValue({
+        places: [
+          {
+            id: '11',
+            category: { id: '1' },
+            name: '성수 카페 A',
+            address: '서울 성동구 성수이로 11',
+            latitude: 37.5447,
+            longitude: 127.0558,
+            placeUrl: null,
+          },
+          {
+            id: '12',
+            category: { id: '1' },
+            name: '성수 카페 B',
+            address: '서울 성동구 성수이로 12',
+            latitude: 37.5448,
+            longitude: 127.0559,
+            placeUrl: null,
+          },
+        ],
+        isComplete: true,
+        unsupportedCategorySlugs: [],
+      })
+      const shuffleSpy = jest.spyOn(placeRepositoryModule, 'shuffle')
+
+      await service.getSimilarPlaces('1', '2', 'token', undefined, 5)
+
+      expect(shuffleSpy).toHaveBeenCalledWith([
+        expect.objectContaining({ id: '11' }),
+        expect.objectContaining({ id: '12' }),
+      ])
+      expect(placeLiveDataService.searchKakao).toHaveBeenCalledWith(
+        { latitude: 37.544, longitude: 127.055 },
+        [{ id: '1' }],
+        undefined,
+        { targetTotal: 250 },
+      )
+
+      shuffleSpy.mockRestore()
+    })
+
+    it('Kakao 유사 장소도 업체가 검증된 사진만 응답한다', async () => {
+      const {
+        service,
+        meetingAccessService,
+        placeRepository,
+        dataSource,
+        placeLiveDataService,
+        placePhotoService,
+      } = createMeetingService()
+      meetingAccessService.findParticipant.mockResolvedValue({
+        meeting: createMeetingWithStatus(
+          MeetingStatus.RecommendationCollecting,
+        ),
+      })
+      placeRepository.findOne.mockResolvedValue({
+        id: '2',
+        source: PlaceSource.Kakao,
+        category: { id: '1', name: '카페', slug: 'cafe' },
+      })
+      dataSource.getRepository.mockReturnValue({
+        findOne: jest
+          .fn()
+          .mockResolvedValue({ latitude: 37.5, longitude: 127 }),
+      })
+      const candidate = {
+        id: '11',
+        source: PlaceSource.Kakao,
+        providerPlaceId: 'kakao-11',
+        category: { id: '1', name: '카페', slug: 'cafe' },
+        name: '성수 카페 2',
+        address: '서울 성동구 성수동 2',
+        roadAddress: '서울 성동구 성수이로 2',
+        latitude: 37.5447,
+        longitude: 127.0558,
+        phone: null,
+        placeUrl: 'https://place.map.kakao.com/kakao-11',
+        previewUrl: null,
+        distanceMeters: 10,
+      }
+      placeLiveDataService.searchKakao.mockResolvedValue({
+        places: [candidate],
+        isComplete: true,
+        unsupportedCategorySlugs: [],
+      })
+      const previewPhoto = {
+        id: 'google:11:1',
+        url: 'https://places.googleapis.com/photo/11',
+        width: 800,
+        height: 600,
+        source: 'GOOGLE',
+        attributions: [],
+        googleMapsUri: 'https://www.google.com/maps/place/photo-11',
+        flagContentUri: null,
+      }
+      placePhotoService.findPreviewPhotos.mockResolvedValue(
+        new Map([['11', previewPhoto]]),
+      )
+
+      await expect(
+        service.getSimilarPlaces('1', '2', 'token', undefined, 5),
+      ).resolves.toEqual([
+        {
+          id: '11',
+          categoryId: '1',
+          name: '성수 카페 2',
+          address: '서울 성동구 성수동 2',
+          latitude: 37.5447,
+          longitude: 127.0558,
+          primaryImageUrl: previewPhoto.url,
+          previewUrl: previewPhoto.url,
+          previewPhoto,
+          placeUrl: 'https://place.map.kakao.com/kakao-11',
+        },
+      ])
+      expect(placePhotoService.findPreviewPhotos).toHaveBeenCalledWith([
+        candidate,
+      ])
     })
   })
 
   it('코스 확정 후 방장의 이미지를 원자적으로 등록한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
-    const meeting = {
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
+    const meeting = Object.assign(new Meeting(), {
       id: 'meeting-1',
       status: MeetingStatus.CourseConfirmed,
       courseImageKey: null,
       courseImageUploadedAt: null,
-    }
+    })
     const execute = jest.fn().mockResolvedValue({ affected: 1 })
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
@@ -1411,12 +2304,14 @@ describe('MeetingService', () => {
   })
 
   it('일반 모임원의 코스 이미지 등록을 거절한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
-      id: 'participant-member',
-      role: ParticipantRole.Member,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-member',
+        role: ParticipantRole.Member,
+      }),
+    )
 
     await expect(
       service.storeCourseImage('meeting-1', 'member-token', {
@@ -1429,9 +2324,11 @@ describe('MeetingService', () => {
   })
 
   it('모임원이 아니면 코스 이미지를 저장하지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue(null)
+    meetingAccessService.findParticipant.mockRejectedValue(
+      new CommonException(CommonErrorCode.authenticationFailed),
+    )
 
     await expect(
       service.storeCourseImage('meeting-1', 'invalid-token', {
@@ -1446,20 +2343,24 @@ describe('MeetingService', () => {
   })
 
   it('이미 등록된 코스 이미지는 새 파일로 덮어쓰지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
     dataSource.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({
-        id: 'meeting-1',
-        status: MeetingStatus.CourseConfirmed,
-        courseImageKey: 'media/winner.png',
-        courseImageUploadedAt: uploadedAt,
-      }),
+      findOne: jest.fn().mockResolvedValue(
+        Object.assign(new Meeting(), {
+          id: 'meeting-1',
+          status: MeetingStatus.CourseConfirmed,
+          courseImageKey: 'media/winner.png',
+          courseImageUploadedAt: uploadedAt,
+        }),
+      ),
     })
 
     await expect(
@@ -1475,18 +2376,22 @@ describe('MeetingService', () => {
   })
 
   it('코스 확정 전에는 코스 이미지를 저장하지 않는다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
-    dataSource.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({
-        id: 'meeting-1',
-        status: MeetingStatus.CourseGenerated,
-        courseImageKey: null,
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
       }),
+    )
+    dataSource.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue(
+        Object.assign(new Meeting(), {
+          id: 'meeting-1',
+          status: MeetingStatus.CourseGenerated,
+          courseImageKey: null,
+        }),
+      ),
     })
 
     await expect(
@@ -1501,24 +2406,26 @@ describe('MeetingService', () => {
   })
 
   it('동시 업로드 경쟁에서 지면 자산을 폐기하고 승자를 반환한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     const uploadedAt = new Date('2026-08-17T12:00:00.000Z')
-    const initial = {
+    const initial = Object.assign(new Meeting(), {
       id: 'meeting-1',
       status: MeetingStatus.CourseConfirmed,
       courseImageKey: null,
       courseImageUploadedAt: null,
-    }
-    const winner = {
+    })
+    const winner = Object.assign(new Meeting(), {
       ...initial,
       courseImageKey: 'media/winner.png',
       courseImageUploadedAt: uploadedAt,
-    }
+    })
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
@@ -1552,12 +2459,14 @@ describe('MeetingService', () => {
   })
 
   it('이미지 저장 후 모임 DB 갱신이 실패하면 자산을 보상 삭제한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
-      id: 'participant-host',
-      role: ParticipantRole.Host,
-    })
+    meetingAccessService.findParticipant.mockResolvedValue(
+      Object.assign(new MeetingParticipant(), {
+        id: 'participant-host',
+        role: ParticipantRole.Host,
+      }),
+    )
     const queryBuilder = {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
@@ -1566,11 +2475,13 @@ describe('MeetingService', () => {
       execute: jest.fn().mockRejectedValue(new Error('db unavailable')),
     }
     dataSource.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({
-        id: 'meeting-1',
-        status: MeetingStatus.CourseConfirmed,
-        courseImageKey: null,
-      }),
+      findOne: jest.fn().mockResolvedValue(
+        Object.assign(new Meeting(), {
+          id: 'meeting-1',
+          status: MeetingStatus.CourseConfirmed,
+          courseImageKey: null,
+        }),
+      ),
       createQueryBuilder: jest.fn(() => queryBuilder),
     })
     const asset = { objectKey: 'media/orphan.png' }
@@ -1589,9 +2500,9 @@ describe('MeetingService', () => {
   })
 
   it('모임원에게만 등록된 코스 이미지 다운로드를 제공한다', async () => {
-    const { service, dataSource, participantRepository, mediaService } =
+    const { service, dataSource, meetingAccessService, mediaService } =
       createMeetingService()
-    participantRepository.findOne.mockResolvedValue({
+    meetingAccessService.findParticipant.mockResolvedValue({
       id: 'participant-1',
     })
     dataSource.getRepository.mockReturnValue({

@@ -1,4 +1,7 @@
 import { CommonException } from 'src/common/exception/common.exception'
+import type { EntityManager } from 'typeorm'
+import { Meeting } from '../entities/meeting.entity'
+import { MeetingParticipant } from '../entities/meeting-participant.entity'
 import { MeetingException } from '../exception/meeting.exception'
 import { MeetingAccessService } from './meeting-access.service'
 
@@ -95,6 +98,60 @@ describe('MeetingAccessService', () => {
       await expect(service.findParticipant('1', 'token')).resolves.toBe(
         participant,
       )
+    })
+
+    it('manager가 주어지면 주입받은 리포지토리 대신 트랜잭션 스코프 리포지토리를 사용한다', async () => {
+      const { service, participantRepository, meetingRepository } =
+        createService()
+      const participant = { id: 'participant-1' }
+      const managerParticipantRepository = {
+        findOne: jest.fn().mockResolvedValue(participant),
+      }
+      const managerMeetingRepository = { exists: jest.fn() }
+      const managerRepositories = new Map<unknown, unknown>([
+        [MeetingParticipant, managerParticipantRepository],
+        [Meeting, managerMeetingRepository],
+      ])
+      const manager = {
+        getRepository: jest.fn((entity: unknown) =>
+          managerRepositories.get(entity),
+        ),
+      } as unknown as EntityManager
+
+      await expect(
+        service.findParticipant('1', 'token', manager),
+      ).resolves.toBe(participant)
+
+      expect(managerParticipantRepository.findOne).toHaveBeenCalledWith({
+        where: { meeting: { id: '1' }, accessToken: 'token' },
+        relations: { user: true, meeting: true },
+      })
+      expect(participantRepository.findOne).not.toHaveBeenCalled()
+      expect(meetingRepository.exists).not.toHaveBeenCalled()
+    })
+
+    it('manager가 주어져도 참여자를 못 찾고 모임도 없으면 404를 던진다', async () => {
+      const { service } = createService()
+      const managerParticipantRepository = {
+        findOne: jest.fn().mockResolvedValue(null),
+      }
+      const managerMeetingRepository = {
+        exists: jest.fn().mockResolvedValue(false),
+      }
+      const managerRepositories = new Map<unknown, unknown>([
+        [MeetingParticipant, managerParticipantRepository],
+        [Meeting, managerMeetingRepository],
+      ])
+      const manager = {
+        getRepository: jest.fn((entity: unknown) =>
+          managerRepositories.get(entity),
+        ),
+      } as unknown as EntityManager
+
+      const promise = service.findParticipant('999', 'token', manager)
+
+      await expect(promise).rejects.toBeInstanceOf(MeetingException)
+      await expect(promise).rejects.toThrow('해당 모임을 찾을 수 없습니다.')
     })
   })
 })

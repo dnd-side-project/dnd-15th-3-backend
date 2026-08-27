@@ -15,7 +15,8 @@ export class CourseDetailResponseDto {
   totalCount!: number
 
   @ApiProperty({
-    description: '코스를 구성하는 장소 경로',
+    description:
+      '코스를 구성하는 장소 경로. 각 항목의 previewPhoto를 대표 사진으로 사용합니다.',
     type: [CourseRouteStepDto],
   })
   route!: CourseRouteStepDto[]

@@ -109,53 +109,49 @@ export class MeetingPlaceRecommendationVoteRepository {
     )
   }
 
-  applyPreference(
+  async applyPreference(
+    manager: EntityManager,
     recommendationId: string,
     participantId: string,
     preference: PreferenceType | null,
   ): Promise<PreferenceCounts> {
-    return this.dataSource.transaction(async (manager) => {
-      const voteRepository = manager.getRepository(
-        MeetingPlaceRecommendationVote,
-      )
+    const voteRepository = manager.getRepository(MeetingPlaceRecommendationVote)
 
-      if (preference === null) {
-        await voteRepository.delete({
+    if (preference === null) {
+      await voteRepository.delete({
+        recommendation: { id: recommendationId },
+        participant: { id: participantId },
+      })
+    } else {
+      await voteRepository.upsert(
+        {
           recommendation: { id: recommendationId },
           participant: { id: participantId },
-        })
-      } else {
-        await voteRepository.upsert(
-          {
-            recommendation: { id: recommendationId },
-            participant: { id: participantId },
-            preference,
-            updatedAt: new Date(),
-          },
-          ['recommendation', 'participant'],
-        )
-      }
+          preference,
+          updatedAt: new Date(),
+        },
+        ['recommendation', 'participant'],
+      )
+    }
 
-      const rows = await voteRepository
-        .createQueryBuilder('vote')
-        .select('vote.preference', 'preference')
-        .addSelect('COUNT(*)', 'count')
-        .where('vote.recommendation = :recommendationId', {
-          recommendationId,
-        })
-        .groupBy('vote.preference')
-        .getRawMany<{ preference: PreferenceType; count: string }>()
+    const rows = await voteRepository
+      .createQueryBuilder('vote')
+      .select('vote.preference', 'preference')
+      .addSelect('COUNT(*)', 'count')
+      .where('vote.recommendation = :recommendationId', {
+        recommendationId,
+      })
+      .groupBy('vote.preference')
+      .getRawMany<{ preference: PreferenceType; count: string }>()
 
-      return {
-        likeCount: Number(
-          rows.find((row) => row.preference === PreferenceType.Like)?.count ??
-            0,
-        ),
-        dislikeCount: Number(
-          rows.find((row) => row.preference === PreferenceType.Dislike)
-            ?.count ?? 0,
-        ),
-      }
-    })
+    return {
+      likeCount: Number(
+        rows.find((row) => row.preference === PreferenceType.Like)?.count ?? 0,
+      ),
+      dislikeCount: Number(
+        rows.find((row) => row.preference === PreferenceType.Dislike)?.count ??
+          0,
+      ),
+    }
   }
 }

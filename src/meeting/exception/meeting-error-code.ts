@@ -145,6 +145,16 @@ export const MeetingErrorCode = {
     status: HttpStatus.CONFLICT,
     message: '현재 모임 상태에서는 코스를 생성할 수 없습니다.',
   },
+  meetingDetailsNotEditable: {
+    code: 'MEETING_DETAILS_NOT_EDITABLE',
+    status: HttpStatus.CONFLICT,
+    message: '코스 생성을 시작한 모임의 기본 정보는 수정할 수 없습니다.',
+  },
+  courseInputNotEditable: {
+    code: 'MEETING_COURSE_INPUT_NOT_EDITABLE',
+    status: HttpStatus.CONFLICT,
+    message: '코스 생성을 시작한 모임의 생성 입력은 수정할 수 없습니다.',
+  },
   mapPinsNotVisible: {
     code: 'MEETING_MAP_PINS_NOT_VISIBLE',
     status: HttpStatus.CONFLICT,

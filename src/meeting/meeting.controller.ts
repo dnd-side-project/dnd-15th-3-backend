@@ -23,6 +23,7 @@ import {
   ApiConflictResponse,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
@@ -34,6 +35,7 @@ import {
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
+  getSchemaPath,
 } from '@nestjs/swagger'
 import { SimilarPlaceResponseDto } from 'src/catalog/dto/similar-place-response.dto'
 import { MAX_COURSE_STEPS } from 'src/category/category.constants'
@@ -52,6 +54,7 @@ import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
 import { CreateMeetingDto } from './dto/create-meeting.dto'
 import { InvitationPreviewRequestDto } from './dto/invitation-preview-request.dto'
 import { JoinMeetingDto } from './dto/join-meeting.dto'
+import { MeetingDetailsResponseDto } from './dto/meeting-details-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import {
   MeetingLocationDto,
@@ -62,6 +65,7 @@ import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
 import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
 import { UpdateCoursePlanDto } from './dto/update-course-plan.dto'
+import { UpdateMeetingDetailsDto } from './dto/update-meeting-details.dto'
 import { UpdatePlacePreferenceRequestDto } from './dto/update-place-preference-request.dto'
 import { MeetingErrorCode } from './exception/meeting-error-code'
 import { type CourseImageFile, MeetingService } from './meeting.service'
@@ -71,6 +75,7 @@ import {
   joinMeetingRequestSchema,
   meetingLocationSchema,
   updateCoursePlanRequestSchema,
+  updateMeetingDetailsRequestSchema,
 } from './schema/meeting-request.schema'
 import { addRecommendationRequestSchema } from './schema/recommendation-request.schema'
 
@@ -110,6 +115,65 @@ export class MeetingController {
     return this.meetingService.createMeeting(parsed.data)
   }
 
+  @Patch(':meetingId')
+  @ApiOperation({
+    summary: '모임 기본 정보 변경',
+    description:
+      '방장이 코스 생성 전 모임 이름·날짜·시간·유형 중 하나 이상을 변경합니다.',
+  })
+  @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
+  @ApiQuery({
+    name: 'accessToken',
+    description: '방장의 참여자 전용 재접속 토큰',
+    example: 'host-session-token',
+    required: true,
+  })
+  @ApiOkResponse({
+    description: '모임 기본 정보 변경 성공',
+    type: MeetingDetailsResponseDto,
+  })
+  @ApiExtraModels(UpdateMeetingDetailsDto)
+  @ApiBody({
+    description: '이름·날짜·시간·모임 유형 중 하나 이상을 전달합니다.',
+    schema: {
+      allOf: [{ $ref: getSchemaPath(UpdateMeetingDetailsDto) }],
+      minProperties: 1,
+    },
+  })
+  @ApiErrorResponse(
+    CommonErrorCode.validationError,
+    '수정할 필드가 없거나 입력 형식이 올바르지 않음',
+  )
+  @ApiErrorResponse(
+    CommonErrorCode.authenticationFailed,
+    '참여자 토큰이 유효하지 않음',
+  )
+  @ApiErrorResponse(MeetingErrorCode.hostOnly, '방장 권한이 필요함')
+  @ApiErrorResponse(
+    [MeetingErrorCode.notFound, MeetingErrorCode.meetingTypeNotFound],
+    '모임 또는 모임 유형을 찾을 수 없음',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.meetingDetailsNotEditable,
+    '코스 생성을 시작한 상태여서 기본 정보를 변경할 수 없음',
+  )
+  updateMeetingDetails(
+    @Param('meetingId', BigIntStringPipe) meetingId: string,
+    @Query('accessToken') accessToken: string,
+    @Body() dto: UpdateMeetingDetailsDto,
+  ): Promise<MeetingDetailsResponseDto> {
+    const parsed = updateMeetingDetailsRequestSchema.safeParse(dto)
+    if (!parsed.success) {
+      throw createValidationException(parsed.error.issues)
+    }
+
+    return this.meetingService.updateMeetingDetails(
+      meetingId,
+      accessToken,
+      parsed.data,
+    )
+  }
+
   @Put(':meetingId/location')
   @ApiOperation({
     summary: '첫 만남 기준 위치 변경',
@@ -140,6 +204,10 @@ export class MeetingController {
     MeetingErrorCode.locationNotFound,
     '모임 기준 위치를 찾을 수 없음',
   )
+  @ApiErrorResponse(
+    MeetingErrorCode.courseInputNotEditable,
+    '코스 생성을 시작한 상태여서 기준 위치를 변경할 수 없음',
+  )
   updateLocation(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -161,7 +229,7 @@ export class MeetingController {
   @ApiOperation({
     summary: '장소를 모임 추천 목록에 추가',
     description:
-      'GET /places/search 응답의 items[].id를 placeId로 전달해 현재 모임의 추천 장소로 추가합니다. GET /places/first-meeting의 id는 사용할 수 없습니다.',
+      'GET /places/search 응답의 items[].id를 placeId로 전달해 현재 모임의 추천 장소로 추가합니다. GET /places/first-meeting의 id는 사용할 수 없습니다. 응답의 previewPhoto를 추천 장소 대표 사진으로 사용합니다.',
   })
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({
@@ -195,6 +263,10 @@ export class MeetingController {
     [MeetingErrorCode.locationNotFound, MeetingErrorCode.placeNotFound],
     '모임 기준 위치 또는 장소를 찾을 수 없음',
   )
+  @ApiErrorResponse(
+    MeetingErrorCode.courseInputNotEditable,
+    '코스 생성을 시작한 상태여서 추천 장소를 추가할 수 없음',
+  )
   addRecommendation(
     @Param('meetingId') meetingId: string,
     @Query('accessToken') accessToken: string,
@@ -213,7 +285,11 @@ export class MeetingController {
   }
 
   @Get(':meetingId/recommendations')
-  @ApiOperation({ summary: '모임 추천 장소 목록 조회' })
+  @ApiOperation({
+    summary: '모임 추천 장소 목록 조회',
+    description:
+      '응답 배열 각 항목의 previewPhoto로 추천 장소 대표 사진을 반환합니다. 사진이 없으면 null입니다.',
+  })
   @ApiParam({ name: 'meetingId', description: '모임 ID', example: '1' })
   @ApiQuery({
     name: 'accessToken',
@@ -296,6 +372,10 @@ export class MeetingController {
   @ApiErrorResponse(
     MeetingErrorCode.staleCoursePlan,
     '오래된 version으로 저장을 시도함',
+  )
+  @ApiErrorResponse(
+    MeetingErrorCode.courseInputNotEditable,
+    '코스 생성을 시작한 상태여서 코스 계획을 변경할 수 없음',
   )
   updateCoursePlan(
     @Param('meetingId') meetingId: string,
@@ -668,7 +748,8 @@ export class MeetingController {
     summary: '비슷한 장소 추천',
     description:
       '기준 장소와 같은 카테고리이면서 일정 반경 이내에 있는 장소를 무작위로 추천합니다. ' +
-      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있습니다.',
+      '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있습니다. ' +
+      '신규 클라이언트는 previewPhoto를 사용하며, Google 사진은 source, attributions, googleMapsUri에 따라 표시해야 합니다.',
   })
   @ApiOkResponse({ type: SimilarPlaceResponseDto, isArray: true })
   @ApiErrorResponse(

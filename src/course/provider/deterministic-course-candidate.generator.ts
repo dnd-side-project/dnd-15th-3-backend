@@ -27,11 +27,13 @@ export class DeterministicCourseCandidateGenerator
     const preferenceRoute = this.buildRoute(
       input,
       prefersDiscovery ? 'DISCOVERY' : 'PREFERENCE',
+      1,
     )
-    const distanceRoute = this.buildRoute(input, 'DISTANCE')
+    const distanceRoute = this.buildRoute(input, 'DISTANCE', 0)
     const alternativeRoute = this.buildRoute(
       input,
       prefersDiscovery ? 'PREFERENCE' : 'DISCOVERY',
+      2,
     )
     const candidates = [
       {
@@ -73,9 +75,16 @@ export class DeterministicCourseCandidateGenerator
     )
   }
 
+  /**
+   * tieRank: 같은 카테고리 단계에서 1순위 점수가 완전히 동일한 후보가
+   * 여럿일 때(예: 좋아요/싫어요가 전혀 없어 모두 0점일 때), 코스마다
+   * 서로 다른 순위를 뽑기 위한 인덱스. 점수로 구분되는 정상적인 경우엔
+   * 동점 그룹의 크기가 1이라 결과에 영향을 주지 않는다.
+   */
   private buildRoute(
     input: CourseGenerationRuntimeInput,
     strategy: 'PREFERENCE' | 'DISCOVERY' | 'DISTANCE',
+    tieRank: number,
   ): Recommendation[] {
     const used = new Set<string>()
     const route: Recommendation[] = []
@@ -113,11 +122,34 @@ export class DeterministicCourseCandidateGenerator
         )
       })
 
-      const selected = candidates[0]
+      const topPrimaryValue = this.primaryValue(strategy, origin, candidates[0])
+      let tieGroupSize = 1
+      while (
+        tieGroupSize < candidates.length &&
+        this.primaryValue(strategy, origin, candidates[tieGroupSize]) ===
+          topPrimaryValue
+      ) {
+        tieGroupSize += 1
+      }
+
+      const selected = candidates[tieRank % tieGroupSize]
       used.add(selected.recommendationId)
       route.push(selected)
     }
     return route
+  }
+
+  private primaryValue(
+    strategy: 'PREFERENCE' | 'DISCOVERY' | 'DISTANCE',
+    origin: { latitude: number; longitude: number },
+    candidate: Recommendation,
+  ): number {
+    if (strategy === 'DISTANCE') {
+      return this.distanceFrom(origin, candidate)
+    }
+    return strategy === 'DISCOVERY'
+      ? this.discoveryScore(candidate)
+      : this.preferenceScore(candidate)
   }
 
   private preferenceScore(recommendation: Recommendation): number {

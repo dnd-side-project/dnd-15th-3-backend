@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { CommonException } from 'src/common/exception/common.exception'
-import { CommonErrorCode } from 'src/common/exception/common-error-code'
-import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
+import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { Meeting } from 'src/meeting/entities/meeting.entity'
-import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
 import { MeetingStatus } from 'src/meeting/enums/meeting-status.enum'
-import { ParticipantRole } from 'src/meeting/enums/participant-role.enum'
 import { MeetingException } from 'src/meeting/exception/meeting.exception'
 import { MeetingErrorCode } from 'src/meeting/exception/meeting-error-code'
 import type { EntityManager } from 'typeorm'
@@ -55,37 +51,59 @@ export type ResolvedQuestionnaireAnswers = {
 
 @Injectable()
 export class QuestionnaireService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly meetingAccessService: MeetingAccessService,
+  ) {}
+
+  async restartAfterMeetingInputChange(
+    manager: EntityManager,
+    meetingId: string,
+  ): Promise<void> {
+    const questionnaireRepository = manager.getRepository(MeetingQuestionnaire)
+    const questionnaire = await questionnaireRepository
+      .createQueryBuilder('questionnaire')
+      .where('questionnaire.meeting_id = :meetingId', { meetingId })
+      .orderBy('questionnaire.version', 'DESC')
+      .setLock('pessimistic_write')
+      .getOne()
+    if (!questionnaire) return
+
+    await manager
+      .getRepository(MeetingQuestion)
+      .createQueryBuilder()
+      .delete()
+      .from(MeetingQuestion)
+      .where('questionnaire_id = :questionnaireId', {
+        questionnaireId: questionnaire.id,
+      })
+      .andWhere('"order" > 1')
+      .execute()
+
+    questionnaire.version += 1
+    questionnaire.generationStatus = QuestionnaireGenerationStatus.Generating
+    questionnaire.source = null
+    questionnaire.provider = 'pending'
+    questionnaire.model = 'pending'
+    questionnaire.generationError = null
+    questionnaire.generationAttemptCount += 1
+    questionnaire.generationStartedAt = null
+    questionnaire.generatedAt = null
+    await questionnaireRepository.save(questionnaire)
+  }
 
   async createQuestionnaire(
     meetingId: string,
     accessToken: string,
   ): Promise<QuestionnaireResponseDto> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-
     const questionnaireId = await this.dataSource.transaction(
       async (manager) => {
-        const participant = await manager
-          .getRepository(MeetingParticipant)
-          .findOne({
-            where: {
-              meeting: { id: meetingId },
-              accessToken: normalizedAccessToken,
-            },
-          })
-        if (!participant) {
-          const meetingExists = await manager
-            .getRepository(Meeting)
-            .exists({ where: { id: meetingId } })
-          if (!meetingExists) {
-            throw new MeetingException(MeetingErrorCode.notFound)
-          }
-          throw new CommonException(CommonErrorCode.authenticationFailed)
-        }
-        if (participant.role !== ParticipantRole.Host) {
-          throw new MeetingException(MeetingErrorCode.hostOnly)
-        }
+        const participant = await this.meetingAccessService.findParticipant(
+          meetingId,
+          accessToken,
+          manager,
+        )
+        participant.assertHost(MeetingErrorCode.hostOnly)
 
         const meeting = await manager
           .getRepository(Meeting)
@@ -158,27 +176,11 @@ export class QuestionnaireService {
     meetingId: string,
     accessToken: string,
   ): Promise<QuestionnaireResponseDto> {
-    assertAccessToken(accessToken)
-    const participant = await this.dataSource
-      .getRepository(MeetingParticipant)
-      .findOne({
-        where: {
-          meeting: { id: meetingId },
-          accessToken: accessToken.trim(),
-        },
-      })
-    if (!participant) {
-      const meetingExists = await this.dataSource
-        .getRepository(Meeting)
-        .exists({ where: { id: meetingId } })
-      if (!meetingExists) {
-        throw new MeetingException(MeetingErrorCode.notFound)
-      }
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
-    if (participant.role !== ParticipantRole.Host) {
-      throw new MeetingException(MeetingErrorCode.hostOnly)
-    }
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    participant.assertHost(MeetingErrorCode.hostOnly)
 
     const questionnaire = await this.dataSource
       .getRepository(MeetingQuestionnaire)

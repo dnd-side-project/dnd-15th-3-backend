@@ -36,6 +36,7 @@ describe('validateEnv', () => {
       expect(env.MEDIA_PUBLIC_BASE_URL).toContain('/momo-media-test/o/')
       expect(env.KAKAO_REST_API_KEY).toBe('')
       expect(env.GOOGLE_PLACES_API_KEY).toBe('')
+      expect(env.PLACE_PHOTO_PREVIEW_CONCURRENCY).toBe(10)
       expect(env.OPENAI_API_KEY).toBe('')
       expect(env.OPENAI_MODEL).toBe('')
       expect(env.OPENAI_BASE_URL).toBe('https://api.openai.com/v1')
@@ -76,7 +77,14 @@ describe('validateEnv', () => {
   })
 
   describe('requiredInProduction', () => {
+    const originalNodeEnv = process.env.NODE_ENV
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv
+    })
+
     it('allows empty OCI values when NODE_ENV is not production', () => {
+      process.env.NODE_ENV = 'development'
       const env = validateEnv({
         ...baseConfig,
         // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
@@ -92,6 +100,7 @@ describe('validateEnv', () => {
     })
 
     it('rejects missing OCI values when NODE_ENV is production', () => {
+      process.env.NODE_ENV = 'production'
       const config = {
         ...baseConfig,
         // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
@@ -100,6 +109,32 @@ describe('validateEnv', () => {
         OCI_NAMESPACE: undefined,
       }
       expect(() => validateEnv(config)).toThrow('Invalid environment variables')
+    })
+
+    it.each([
+      'OCI_NAMESPACE',
+      'OCI_S3_ACCESS_KEY',
+      'OCI_S3_SECRET_KEY',
+    ] as const)('rejects an empty %s when NODE_ENV is production', (key) => {
+      process.env.NODE_ENV = 'production'
+      const config = {
+        ...baseConfig,
+        // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+        NODE_ENV: 'production',
+        [key]: '',
+      }
+      expect(() => validateEnv(config)).toThrow('Invalid environment variables')
+    })
+
+    it('allows non-empty OCI values when NODE_ENV is production', () => {
+      process.env.NODE_ENV = 'production'
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          NODE_ENV: 'production',
+        }),
+      ).not.toThrow()
     })
   })
 
@@ -121,6 +156,23 @@ describe('validateEnv', () => {
       expect(() => validateEnv({ ...baseConfig, DB_PORT: 'abc' })).toThrow(
         'Invalid environment variables',
       )
+    })
+
+    it('사진 동시 조회 수를 안전한 범위로 제한한다', () => {
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          PLACE_PHOTO_PREVIEW_CONCURRENCY: 0,
+        }),
+      ).toThrow('Invalid environment variables')
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          PLACE_PHOTO_PREVIEW_CONCURRENCY: 21,
+        }),
+      ).toThrow('Invalid environment variables')
     })
 
     it('does not require OCI_S3_ENDPOINT', () => {

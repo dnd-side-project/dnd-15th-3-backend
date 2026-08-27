@@ -41,15 +41,16 @@ export class CourseGenerationService {
     accessToken: string,
     request: GenerateCourseRequest,
   ): Promise<MeetingStatusResponseDto> {
-    const participant = await this.meetingAccessService.findParticipant(
-      meetingId,
-      accessToken,
-    )
-    participant.assertHost(MeetingErrorCode.hostOnly)
-
     const preparation =
       await this.dataSource.transaction<CourseGenerationPreparation>(
         async (manager) => {
+          const participant = await this.meetingAccessService.findParticipant(
+            meetingId,
+            accessToken,
+            manager,
+          )
+          participant.assertHost(MeetingErrorCode.hostOnly)
+
           const meeting = await this.courseRepository.lockMeeting(
             manager,
             meetingId,

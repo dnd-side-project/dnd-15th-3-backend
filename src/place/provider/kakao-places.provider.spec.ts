@@ -278,6 +278,178 @@ describe('KakaoPlacesProvider', () => {
     expect(createProvider().supportsCategory(CategorySlug.Bar)).toBe(true)
   })
 
+  it('targetTotal을 주면 스펙 수로 나눈 페이지 수만큼만 요청한다', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        createResponse([createDocument()], {
+          total_count: 1000,
+          pageable_count: 1000,
+          is_end: false,
+        }),
+      ),
+    )
+
+    await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 750,
+      categorySlug: CategorySlug.Cafe, // 스펙 1개
+      targetTotal: 30, // ceil(30 / (15 × 1)) = 2페이지
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(
+      fetchMock.mock.calls
+        .map(([input]) => new URL(String(input)).searchParams.get('page'))
+        .sort(),
+    ).toEqual(['1', '2'])
+  })
+
+  it('targetTotal이 매우 크면 스펙당 페이지 수가 KAKAO_MAX_PAGE(45)를 넘지 않는다', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        createResponse([createDocument()], {
+          total_count: 100000,
+          pageable_count: 100000,
+          is_end: false,
+        }),
+      ),
+    )
+
+    await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 750,
+      categorySlug: CategorySlug.Cafe, // 스펙 1개
+      targetTotal: 100000, // ceil(100000 / 15) = 6667페이지로 계산되지만 45로 잘려야 함
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(45)
+    const pages = fetchMock.mock.calls.map(([input]) =>
+      Number(new URL(String(input)).searchParams.get('page')),
+    )
+    expect(Math.max(...pages)).toBe(45)
+  })
+
+  it('targetTotal은 스펙이 여러 개면 스펙별로 나눠서 페이지를 계산한다', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        createResponse([createDocument()], {
+          total_count: 1000,
+          pageable_count: 1000,
+          is_end: false,
+        }),
+      ),
+    )
+
+    await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 750,
+      categorySlug: CategorySlug.Bar, // 스펙 5개
+      targetTotal: 300, // ceil(300 / (15 × 5)) = 4페이지 × 5스펙 = 20회
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(20)
+  })
+
+  it('targetTotal이 있어도 배치 안에서 is_end가 나오면 다음 배치는 건너뛴다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() =>
+        Promise.resolve(createResponse([createDocument()], { is_end: true })),
+      )
+
+    await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 750,
+      categorySlug: CategorySlug.Cafe, // 스펙 1개
+      targetTotal: 300, // ceil(300 / 15) = 20페이지로 계산되지만
+    })
+
+    // 첫 배치(5개)에서 이미 is_end가 나와서, 이후 배치(6~20페이지)는 요청하지 않는다.
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+  })
+
+  it('targetTotal이 있어도 스펙끼리 장소 ID로 중복 제거한다', async () => {
+    const shared = createDocument({ id: 'shared' })
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() =>
+        Promise.resolve(createResponse([shared], { is_end: true })),
+      )
+
+    const result = await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 750,
+      categorySlug: CategorySlug.Culture, // 스펙 2개(CT1 카테고리 + '전시회' 키워드)
+      targetTotal: 30,
+    })
+
+    expect(result.places.map((place) => place.providerPlaceId)).toEqual([
+      'shared',
+    ])
+  })
+
+  it('targetTotal이 있을 때 한 스펙이 일찍 끝나도 다른 스펙은 영향받지 않는다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) => {
+        const url = new URL(String(input))
+        // CT1 카테고리 스펙은 첫 페이지부터 is_end, '전시회' 키워드 스펙은 계속 더 있음.
+        const isCategorySpec =
+          url.searchParams.get('category_group_code') === 'CT1'
+        return Promise.resolve(
+          createResponse([createDocument({ id: url.toString() })], {
+            is_end: isCategorySpec,
+          }),
+        )
+      })
+
+    await createProvider().searchNearby({
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 750,
+      categorySlug: CategorySlug.Culture, // 스펙 2개
+      targetTotal: 150, // ceil(150 / (15 × 2)) = 5페이지 × 2스펙 = 10회 예정
+    })
+
+    const calls = fetchMock.mock.calls.map(([input]) => {
+      const url = new URL(String(input))
+      return url.searchParams.get('category_group_code') === 'CT1'
+        ? 'category'
+        : 'keyword'
+    })
+    // CT1(카테고리) 스펙은 5페이지가 담긴 첫 배치에서 이미 is_end라 5번만 호출되고,
+    // '전시회'(키워드) 스펙은 CT1과 무관하게 필요한 5페이지를 그대로 다 호출한다.
+    expect(calls.filter((type) => type === 'category')).toHaveLength(5)
+    expect(calls.filter((type) => type === 'keyword')).toHaveLength(5)
+  })
+
+  it('targetTotal이 있어도 Kakao 노출 가능 범위를 넘으면 불완전으로 표시한다', async () => {
+    jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        createResponse([createDocument()], {
+          total_count: 46,
+          pageable_count: 45,
+          is_end: true,
+        }),
+      ),
+    )
+
+    await expect(
+      createProvider().searchNearby({
+        latitude: 37.5,
+        longitude: 127,
+        radiusMeters: 750,
+        categorySlug: CategorySlug.Restaurant, // 스펙 1개
+        targetTotal: 30,
+      }),
+    ).resolves.toMatchObject({ isComplete: false })
+  })
+
   it('API 키가 없으면 외부 API를 호출하지 않는다', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch')
 
@@ -292,7 +464,7 @@ describe('KakaoPlacesProvider', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('외부 API 호출 실패와 오류 상태를 Provider 요청 오류로 변환한다', async () => {
+  it('외부 API 호출 실패를 Provider 요청 오류로 변환한다', async () => {
     const request = {
       latitude: 37.5,
       longitude: 127,
@@ -304,11 +476,66 @@ describe('KakaoPlacesProvider', () => {
     await expect(createProvider().searchNearby(request)).rejects.toMatchObject({
       errorCode: PlaceErrorCode.providerRequestFailed,
     })
+  })
 
-    fetchMock.mockResolvedValueOnce(new Response(null, { status: 429 }))
-    await expect(createProvider().searchNearby(request)).rejects.toMatchObject({
+  it('429는 재시도하다가 계속 실패하면 Provider 요청 오류로 변환한다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 429 }))
+
+    await expect(
+      createProvider().searchNearby({
+        latitude: 37.5,
+        longitude: 127,
+        radiusMeters: 750,
+        categorySlug: CategorySlug.Cafe,
+      }),
+    ).rejects.toMatchObject({
       errorCode: PlaceErrorCode.providerRequestFailed,
     })
+    // 최초 시도 + 재시도 2번 = 총 3번 호출하고서야 포기한다.
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('429가 재시도 중 회복되면 정상 결과를 반환한다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(createResponse([createDocument()]))
+
+    await expect(
+      createProvider().searchNearby({
+        latitude: 37.5,
+        longitude: 127,
+        radiusMeters: 750,
+        categorySlug: CategorySlug.Cafe,
+      }),
+    ).resolves.toMatchObject({
+      places: [expect.objectContaining({ providerPlaceId: '12345' })],
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('targetTotal 배치 경로에서도 429는 재시도한다', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(
+        createResponse([createDocument()], { is_end: true }),
+      )
+
+    await expect(
+      createProvider().searchNearby({
+        latitude: 37.5,
+        longitude: 127,
+        radiusMeters: 750,
+        categorySlug: CategorySlug.Cafe, // 스펙 1개
+        targetTotal: 15, // ceil(15 / 15) = 1페이지 → 배치 1개(요청 1건)로 시작
+      }),
+    ).resolves.toMatchObject({
+      places: [expect.objectContaining({ providerPlaceId: '12345' })],
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it.each([

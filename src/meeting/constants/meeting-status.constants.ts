@@ -1,5 +1,9 @@
 import { MeetingStatus } from '../enums/meeting-status.enum'
 
+export const MEETING_DETAILS_EDITABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.RecommendationCollecting,
+]
+
 export const MAP_PINS_VISIBLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.RecommendationCollecting,
   MeetingStatus.CourseGenerating,

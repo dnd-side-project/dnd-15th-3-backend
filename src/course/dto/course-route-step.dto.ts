@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
+import { PlacePhotoDto } from 'src/place/dto/place-photo.dto'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
 
 export class CourseRouteStepDto {
@@ -39,12 +40,22 @@ export class CourseRouteStepDto {
   address!: string
 
   @ApiProperty({
-    description: '대표 사진 URL. 없으면 카테고리별 기본 이미지를 사용',
+    description:
+      '기존 클라이언트 호환용 대표 사진 URL. 신규 클라이언트는 previewPhoto를 사용합니다.',
     type: 'string',
     example: 'https://...',
     nullable: true,
+    deprecated: true,
   })
   primaryImageUrl!: string | null
+
+  @ApiProperty({
+    description:
+      '코스 장소 대표 사진. source가 GOOGLE이면 attributions를 사진과 연결된 위치에 표시합니다.',
+    type: PlacePhotoDto,
+    nullable: true,
+  })
+  previewPhoto!: PlacePhotoDto | null
 
   @ApiProperty({ description: '경도', example: 128.7514 })
   longitude!: number

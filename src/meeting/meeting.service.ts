@@ -10,6 +10,7 @@ import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { type Env } from 'src/config/env'
 import { CourseCandidate } from 'src/course/entities/course-candidate.entity'
+import { CourseCandidatePlace } from 'src/course/entities/course-candidate-place.entity'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
 import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
 import { PreferenceType } from 'src/course/enums/preference-type.enum'
@@ -21,8 +22,13 @@ import { Place } from 'src/place/entities/place.entity'
 import { PlaceSyncJob } from 'src/place/entities/place-sync-job.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
 import { PlaceSyncJobStatus } from 'src/place/enums/place-sync-job-status.enum'
-import { PlaceRepository } from 'src/place/place.repository'
-import { PlaceImageService } from 'src/place/place-image.service'
+import { PlacePhotoService } from 'src/place/photo/place-photo.service'
+import type { PlacePhoto } from 'src/place/photo/place-photo.types'
+import {
+  PlaceRepository,
+  SIMILAR_PLACE_CANDIDATE_POOL_SIZE,
+  shuffle,
+} from 'src/place/place.repository'
 import {
   PlaceLiveDataService,
   type ResolvedPlace,
@@ -31,23 +37,28 @@ import {
   haversineDistanceMeters,
   PLACE_SYNC_RADIUS_METERS,
 } from 'src/place/sync/place-sync.constants'
+import { QuestionnaireService } from 'src/questionnaire/questionnaire.service'
 import { User } from 'src/user/entities/user.entity'
 import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
 import { assertAccessToken } from './access/meeting-access.utils'
 import {
+  COURSE_GENERATABLE_STATUSES,
   MAP_PINS_VISIBLE_STATUSES,
+  MEETING_DETAILS_EDITABLE_STATUSES,
   PLACE_PREFERENCE_EDITABLE_STATUSES,
   SIMILAR_PLACES_RECOMMENDABLE_STATUSES,
 } from './constants/meeting-status.constants'
 import { CourseImageResponseDto } from './dto/course-image-response.dto'
 import { CoursePlanResponseDto } from './dto/course-plan-response.dto'
+import { MeetingDetailsResponseDto } from './dto/meeting-details-response.dto'
 import { MeetingInvitationResponseDto } from './dto/meeting-invitation-response.dto'
 import { MeetingLocationResponseDto } from './dto/meeting-location.dto'
 import { MeetingScreenResponseDto } from './dto/meeting-screen-response.dto'
 import { MeetingStatusResponseDto } from './dto/meeting-status-response.dto'
 import { PlacePreferenceResponseDto } from './dto/place-preference-response.dto'
 import { RecommendationPreviewDto } from './dto/recommendation-preview.dto'
+import { SelectedCourseResponseDto } from './dto/selected-course-response.dto'
 import { Meeting } from './entities/meeting.entity'
 import { MeetingLocation } from './entities/meeting-location.entity'
 import { MeetingParticipant } from './entities/meeting-participant.entity'
@@ -62,11 +73,17 @@ import type {
   JoinMeetingRequest,
   MeetingLocationInput,
   UpdateCoursePlanRequest,
+  UpdateMeetingDetailsRequest,
 } from './schema/meeting-request.schema'
 import type { AddRecommendationRequest } from './schema/recommendation-request.schema'
 
 const INVITATION_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const MAX_SIMILAR_PLACES_SIZE = 100
+// 셔플 전 후보 풀(SIMILAR_PLACE_CANDIDATE_POOL_SIZE=200)보다 조금 넉넉하게
+// 잡은, 카카오에 실제로 요청할 목표 후보 수. 이 값 이상을 요청하는 건
+// 어차피 다 잘려나가 낭비이므로 KakaoPlacesProvider가 스펙 수로 나눠
+// 필요한 만큼만 병렬로 가져오는 데 쓴다.
+const SIMILAR_PLACE_KAKAO_TARGET_TOTAL = 250
 
 export type CourseImageFile = {
   buffer: Buffer
@@ -91,11 +108,14 @@ export class MeetingService {
     private readonly meetingRepository: Repository<Meeting>,
     @InjectRepository(CourseCandidate)
     private readonly courseCandidateRepository: Repository<CourseCandidate>,
+    @InjectRepository(CourseCandidatePlace)
+    private readonly courseCandidatePlaceRepository: Repository<CourseCandidatePlace>,
     private readonly voteRepository: MeetingPlaceRecommendationVoteRepository,
     private readonly meetingAccessService: MeetingAccessService,
     private readonly placeSearchRepository: PlaceRepository,
-    private readonly placeImageService: PlaceImageService,
+    private readonly placePhotoService: PlacePhotoService,
     private readonly placeLiveDataService: PlaceLiveDataService,
+    private readonly questionnaireService: QuestionnaireService,
   ) {}
 
   async createMeeting(
@@ -111,6 +131,77 @@ export class MeetingService {
     }
 
     throw new MeetingException(MeetingErrorCode.invitationCodeIssuanceFailed)
+  }
+
+  updateMeetingDetails(
+    meetingId: string,
+    accessToken: string,
+    request: UpdateMeetingDetailsRequest,
+  ): Promise<MeetingDetailsResponseDto> {
+    assertAccessToken(accessToken)
+
+    return this.dataSource.transaction(async (manager) => {
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
+      participant.assertHost(MeetingErrorCode.hostOnly)
+
+      const meetingRepository = manager.getRepository(Meeting)
+      const meeting = await meetingRepository
+        .createQueryBuilder('meeting')
+        .innerJoinAndSelect('meeting.meetingType', 'meetingType')
+        .where('meeting.id = :meetingId', { meetingId })
+        .setLock('pessimistic_write', undefined, ['meeting'])
+        .getOne()
+      if (!meeting) {
+        throw new MeetingException(MeetingErrorCode.notFound)
+      }
+      meeting.assertStatus(
+        MEETING_DETAILS_EDITABLE_STATUSES,
+        MeetingErrorCode.meetingDetailsNotEditable,
+      )
+
+      let changed = false
+      if (request.name !== undefined && meeting.name !== request.name) {
+        meeting.name = request.name
+        changed = true
+      }
+      if (request.date !== undefined && meeting.date !== request.date) {
+        meeting.date = request.date
+        changed = true
+      }
+      if (
+        request.time !== undefined &&
+        this.normalizeMeetingTime(meeting.time) !== request.time
+      ) {
+        meeting.time = request.time
+        changed = true
+      }
+      if (request.meetingTypeCode !== undefined) {
+        const meetingType = await manager.getRepository(MeetingType).findOne({
+          where: { code: request.meetingTypeCode },
+        })
+        if (!meetingType) {
+          throw new MeetingException(MeetingErrorCode.meetingTypeNotFound)
+        }
+        if (meeting.meetingType.id !== meetingType.id) {
+          meeting.meetingType = meetingType
+          changed = true
+        }
+      }
+
+      if (changed) {
+        await meetingRepository.save(meeting)
+        await this.questionnaireService.restartAfterMeetingInputChange(
+          manager,
+          meetingId,
+        )
+      }
+
+      return this.toMeetingDetailsResponse(meeting)
+    })
   }
 
   private createMeetingInTransaction(request: CreateMeetingRequest): Promise<{
@@ -315,10 +406,11 @@ export class MeetingService {
     accessToken: string,
     file: CourseImageFile,
   ): Promise<CourseImageResponseDto> {
-    const participant = await this.findParticipant(meetingId, accessToken)
-    if (participant.role !== ParticipantRole.Host) {
-      throw new MeetingException(MeetingErrorCode.hostOnly)
-    }
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
+    participant.assertHost(MeetingErrorCode.hostOnly)
 
     const meetingRepository = this.dataSource.getRepository(Meeting)
     const meeting = await meetingRepository.findOne({
@@ -327,7 +419,10 @@ export class MeetingService {
     if (!meeting) {
       throw new MeetingException(MeetingErrorCode.notFound)
     }
-    this.assertCourseImageState(meeting)
+    meeting.assertStatus(
+      [MeetingStatus.CourseConfirmed],
+      MeetingErrorCode.courseImageStateInvalid,
+    )
 
     if (meeting.courseImageKey) {
       return this.toCourseImageResponse(meeting)
@@ -371,12 +466,15 @@ export class MeetingService {
     if (!winner) {
       throw new MeetingException(MeetingErrorCode.notFound)
     }
-    this.assertCourseImageState(winner)
+    winner.assertStatus(
+      [MeetingStatus.CourseConfirmed],
+      MeetingErrorCode.courseImageStateInvalid,
+    )
     return this.toCourseImageResponse(winner)
   }
 
   async downloadCourseImage(meetingId: string, accessToken: string) {
-    await this.findParticipant(meetingId, accessToken)
+    await this.meetingAccessService.findParticipant(meetingId, accessToken)
 
     const meeting = await this.dataSource.getRepository(Meeting).findOne({
       where: { id: meetingId },
@@ -420,22 +518,14 @@ export class MeetingService {
     request: UpdateCoursePlanRequest,
   ): Promise<CoursePlanResponseDto> {
     assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const participantRepository = manager.getRepository(MeetingParticipant)
-      const participant = await participantRepository.findOne({
-        where: {
-          meeting: { id: meetingId },
-          accessToken: normalizedAccessToken,
-        },
-      })
-      if (!participant) {
-        throw new CommonException(CommonErrorCode.authenticationFailed)
-      }
-      if (participant.role !== ParticipantRole.Host) {
-        throw new MeetingException(MeetingErrorCode.hostOnly)
-      }
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
+      participant.assertHost(MeetingErrorCode.hostOnly)
 
       const categoryRepository = manager.getRepository(Category)
       const categories = await categoryRepository.find({
@@ -445,15 +535,11 @@ export class MeetingService {
         throw new MeetingException(MeetingErrorCode.invalidCourseCategory)
       }
 
+      const meeting = await this.lockEditableCourseInputMeeting(
+        manager,
+        meetingId,
+      )
       const meetingRepository = manager.getRepository(Meeting)
-      const meeting = await meetingRepository
-        .createQueryBuilder('meeting')
-        .where('meeting.id = :meetingId', { meetingId })
-        .setLock('pessimistic_write')
-        .getOne()
-      if (!meeting) {
-        throw new MeetingException(MeetingErrorCode.notFound)
-      }
       if (meeting.courseVersion !== request.version) {
         throw new MeetingException(MeetingErrorCode.staleCoursePlan)
       }
@@ -481,6 +567,10 @@ export class MeetingService {
 
       meeting.courseVersion += 1
       const updatedMeeting = await meetingRepository.save(meeting)
+      await this.questionnaireService.restartAfterMeetingInputChange(
+        manager,
+        meetingId,
+      )
       return { meeting: updatedMeeting, steps }
     })
 
@@ -493,27 +583,20 @@ export class MeetingService {
     input: MeetingLocationInput,
   ): Promise<MeetingLocationResponseDto> {
     assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
 
     return this.dataSource.transaction(async (manager) => {
-      const participantRepository = manager.getRepository(MeetingParticipant)
-      const participant = await participantRepository.findOne({
-        where: {
-          meeting: { id: meetingId },
-          accessToken: normalizedAccessToken,
-        },
-      })
-      if (!participant) {
-        throw new CommonException(CommonErrorCode.authenticationFailed)
-      }
-      if (participant.role !== ParticipantRole.Host) {
-        throw new MeetingException(MeetingErrorCode.hostOnly)
-      }
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
+      participant.assertHost(MeetingErrorCode.hostOnly)
+
+      await this.lockEditableCourseInputMeeting(manager, meetingId)
 
       const locationRepository = manager.getRepository(MeetingLocation)
       const location = await locationRepository
         .createQueryBuilder('location')
-        .leftJoinAndSelect('location.meeting', 'meeting')
         .where('location.meeting_id = :meetingId', { meetingId })
         .setLock('pessimistic_write')
         .getOne()
@@ -560,96 +643,141 @@ export class MeetingService {
     request: AddRecommendationRequest,
   ): Promise<RecommendationPreviewDto> {
     assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-    const participant = await this.participantRepository.findOne({
-      where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
-    })
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
 
-    const [location, place] = await Promise.all([
-      this.dataSource.getRepository(MeetingLocation).findOne({
-        where: { meeting: { id: meetingId } },
-      }),
-      this.placeRepository.findOne({
-        where: { id: request.placeId },
-        relations: { category: true },
-      }),
-    ])
-    if (!location) {
-      throw new MeetingException(MeetingErrorCode.locationNotFound)
-    }
-    if (!place) {
-      throw new MeetingException(MeetingErrorCode.placeNotFound)
-    }
+    const { recommendation, resolvedPlace } = await this.dataSource.transaction(
+      async (manager) => {
+        const participant = await this.meetingAccessService.findParticipant(
+          meetingId,
+          accessToken,
+          manager,
+        )
+        await this.lockEditableCourseInputMeeting(manager, meetingId)
 
-    const resolvedPlace = await this.placeLiveDataService.resolvePlace(place, {
-      latitude: location.latitude,
-      longitude: location.longitude,
-    })
+        const [location, place] = await Promise.all([
+          manager.getRepository(MeetingLocation).findOne({
+            where: { meeting: { id: meetingId } },
+          }),
+          manager.getRepository(Place).findOne({
+            where: { id: request.placeId },
+            relations: { category: true },
+          }),
+        ])
+        if (!location) {
+          throw new MeetingException(MeetingErrorCode.locationNotFound)
+        }
+        if (!place) {
+          throw new MeetingException(MeetingErrorCode.placeNotFound)
+        }
 
-    const categoryStep = await this.dataSource
-      .getRepository(CourseCategoryStep)
-      .findOne({
-        where: {
-          meeting: { id: meetingId },
-          category: { id: place.category.id },
-        },
-      })
-    if (!categoryStep) {
-      throw new MeetingException(MeetingErrorCode.placeCategoryMismatch)
-    }
-
-    if (
-      haversineDistanceMeters(
-        location.latitude,
-        location.longitude,
-        resolvedPlace.latitude,
-        resolvedPlace.longitude,
-      ) > PLACE_SYNC_RADIUS_METERS
-    ) {
-      throw new MeetingException(MeetingErrorCode.placeOutsideRange)
-    }
-
-    const existing = await this.recommendationRepository.findOne({
-      where: { meeting: { id: meetingId }, place: { id: request.placeId } },
-    })
-    if (existing) {
-      throw new MeetingException(MeetingErrorCode.recommendationAlreadyExists)
-    }
-
-    let recommendation: MeetingPlaceRecommendation
-    try {
-      recommendation = await this.recommendationRepository.save(
-        this.recommendationRepository.create({
-          meeting: { id: meetingId } as Meeting,
+        // ponytail: 모임 잠금 중 실시간 장소를 조회한다. 지연이 문제가 되면 위치 버전 기반 prepare/commit 재시도로 분리한다.
+        const resolvedPlace = await this.placeLiveDataService.resolvePlace(
           place,
-          recommendedBy: participant,
-        }),
-      )
-    } catch (error) {
-      if (this.isUniqueViolation(error)) {
-        throw new MeetingException(MeetingErrorCode.recommendationAlreadyExists)
-      }
-      throw error
-    }
+          {
+            latitude: location.latitude,
+            longitude: location.longitude,
+          },
+        )
 
-    return this.toRecommendationResponse(recommendation, resolvedPlace)
+        const categoryStep = await manager
+          .getRepository(CourseCategoryStep)
+          .findOne({
+            where: {
+              meeting: { id: meetingId },
+              category: { id: place.category.id },
+            },
+          })
+        if (!categoryStep) {
+          throw new MeetingException(MeetingErrorCode.placeCategoryMismatch)
+        }
+
+        if (
+          haversineDistanceMeters(
+            location.latitude,
+            location.longitude,
+            resolvedPlace.latitude,
+            resolvedPlace.longitude,
+          ) > PLACE_SYNC_RADIUS_METERS
+        ) {
+          throw new MeetingException(MeetingErrorCode.placeOutsideRange)
+        }
+
+        const recommendationRepository = manager.getRepository(
+          MeetingPlaceRecommendation,
+        )
+        const existing = await recommendationRepository.findOne({
+          where: { meeting: { id: meetingId }, place: { id: request.placeId } },
+        })
+        if (existing) {
+          throw new MeetingException(
+            MeetingErrorCode.recommendationAlreadyExists,
+          )
+        }
+
+        let recommendation: MeetingPlaceRecommendation
+        try {
+          recommendation = await recommendationRepository.save(
+            recommendationRepository.create({
+              meeting: { id: meetingId } as Meeting,
+              place,
+              recommendedBy: participant,
+            }),
+          )
+        } catch (error) {
+          if (this.isUniqueViolation(error)) {
+            throw new MeetingException(
+              MeetingErrorCode.recommendationAlreadyExists,
+            )
+          }
+          throw error
+        }
+
+        await this.questionnaireService.restartAfterMeetingInputChange(
+          manager,
+          meetingId,
+        )
+        return { recommendation, resolvedPlace }
+      },
+    )
+
+    const previewPhotos = await this.placePhotoService.findPreviewPhotos([
+      resolvedPlace,
+    ])
+
+    return this.toRecommendationResponse(
+      recommendation,
+      resolvedPlace,
+      previewPhotos.get(resolvedPlace.id) ?? null,
+    )
+  }
+
+  private async lockEditableCourseInputMeeting(
+    manager: EntityManager,
+    meetingId: string,
+  ): Promise<Meeting> {
+    const meeting = await manager
+      .getRepository(Meeting)
+      .createQueryBuilder('meeting')
+      .where('meeting.id = :meetingId', { meetingId })
+      .setLock('pessimistic_write')
+      .getOne()
+    if (!meeting) {
+      throw new MeetingException(MeetingErrorCode.notFound)
+    }
+    meeting.assertStatus(
+      COURSE_GENERATABLE_STATUSES,
+      MeetingErrorCode.courseInputNotEditable,
+    )
+    return meeting
   }
 
   async getRecommendations(
     meetingId: string,
     accessToken: string,
   ): Promise<RecommendationPreviewDto[]> {
-    assertAccessToken(accessToken)
-    const normalizedAccessToken = accessToken.trim()
-    const participant = await this.participantRepository.findOne({
-      where: { meeting: { id: meetingId }, accessToken: normalizedAccessToken },
-    })
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
+    const participant = await this.meetingAccessService.findParticipant(
+      meetingId,
+      accessToken,
+    )
 
     const [recommendations, location] = await Promise.all([
       this.recommendationRepository.find({
@@ -664,25 +792,11 @@ export class MeetingService {
     if (!location) {
       throw new MeetingException(MeetingErrorCode.locationNotFound)
     }
-    const [resolved, preferences] = await Promise.all([
-      this.placeLiveDataService.resolvePlaces(
-        recommendations.map((recommendation) => recommendation.place),
-        location,
-      ),
-      this.voteRepository.getPreferenceSummaries(
-        recommendations.map((recommendation) => recommendation.id),
-        participant.id,
-      ),
-    ])
-
-    return recommendations.map((recommendation) => {
-      const summary = preferences.get(recommendation.id)
-      return this.toRecommendationResponse(
-        recommendation,
-        resolved.get(recommendation.place.id)!,
-        summary,
-      )
-    })
+    return this.toRecommendationResponses(
+      recommendations,
+      location,
+      participant.id,
+    )
   }
 
   async getMeetingStatus(
@@ -713,6 +827,24 @@ export class MeetingService {
       )
     }
     return confirmed.id
+  }
+
+  private async buildSelectedCourseResponse(
+    meetingId: string,
+  ): Promise<SelectedCourseResponseDto> {
+    const candidateId = await this.findConfirmedCourseCandidateId(meetingId)
+    const steps = await this.courseCandidatePlaceRepository.find({
+      where: { courseCandidate: { id: candidateId } },
+      relations: { meetingPlaceRecommendation: true },
+      order: { order: 'ASC' },
+    })
+
+    return {
+      id: candidateId,
+      recommendationIds: steps.map(
+        (step) => step.meetingPlaceRecommendation.id,
+      ),
+    }
   }
 
   private async getMeetingScreen(
@@ -764,7 +896,7 @@ export class MeetingService {
       invitationUrl: `${this.config.get('INVITATION_BASE_URL', { infer: true })}/${meeting.accessToken}`,
       name: meeting.name,
       date: meeting.date,
-      time: meeting.time,
+      time: this.normalizeMeetingTime(meeting.time),
       courseImageUrl: meeting.courseImageKey
         ? this.mediaService.getPublicUrl(meeting.courseImageKey)
         : null,
@@ -805,7 +937,7 @@ export class MeetingService {
         profileAvatarId: participant.profileAvatarId,
       })),
       categorySteps: steps.map((step) => ({
-        id: step.id,
+        id: step.category.id,
         name: step.category.name,
         slug: step.category
           .slug as MeetingScreenResponseDto['categorySlugs'][number],
@@ -816,7 +948,9 @@ export class MeetingService {
         meeting.meetingLocation,
         viewer.id,
       ),
-      selectedCourse: null,
+      selectedCourse: meeting.isConfirmed()
+        ? await this.buildSelectedCourseResponse(meetingId)
+        : null,
     }
   }
 
@@ -838,6 +972,29 @@ export class MeetingService {
     }
   }
 
+  private toMeetingDetailsResponse(
+    meeting: Meeting,
+  ): MeetingDetailsResponseDto {
+    const meetingTypeCode = meeting.meetingType
+      .code as MeetingDetailsResponseDto['meetingTypeCode']
+    return {
+      meetingId: meeting.id,
+      name: meeting.name,
+      date: meeting.date,
+      time: this.normalizeMeetingTime(meeting.time),
+      meetingTypeCode,
+      meetingType: {
+        id: meeting.meetingType.id,
+        code: meetingTypeCode,
+        name: meeting.meetingType.name,
+      },
+    }
+  }
+
+  private normalizeMeetingTime(time: string): string {
+    return time.slice(0, 5)
+  }
+
   private toInvitationResponse(meeting: Meeting): MeetingInvitationResponseDto {
     return {
       meetingId: meeting.id,
@@ -845,7 +1002,7 @@ export class MeetingService {
       invitationUrl: `${this.config.get('INVITATION_BASE_URL', { infer: true })}/${meeting.accessToken}`,
       name: meeting.name,
       date: meeting.date,
-      time: meeting.time,
+      time: this.normalizeMeetingTime(meeting.time),
       locationName: meeting.meetingLocation!.displayName,
     }
   }
@@ -905,12 +1062,6 @@ export class MeetingService {
     )
   }
 
-  private assertCourseImageState(meeting: Meeting): void {
-    if (meeting.status !== MeetingStatus.CourseConfirmed) {
-      throw new MeetingException(MeetingErrorCode.courseImageStateInvalid)
-    }
-  }
-
   private toCourseImageResponse(meeting: Meeting): CourseImageResponseDto {
     if (!meeting.courseImageKey || !meeting.courseImageUploadedAt) {
       throw new CommonException(CommonErrorCode.internalServerError)
@@ -935,30 +1086,6 @@ export class MeetingService {
     }
   }
 
-  private async findParticipant(
-    meetingId: string,
-    accessToken: string,
-  ): Promise<MeetingParticipant> {
-    this.assertAccessToken(accessToken)
-    const participant = await this.participantRepository.findOne({
-      where: {
-        meeting: { id: meetingId },
-        accessToken: accessToken.trim(),
-      },
-      relations: { user: true },
-    })
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
-    return participant
-  }
-
-  private assertAccessToken(accessToken: string): void {
-    if (!accessToken?.trim()) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
-  }
-
   private toMeetingLocationResponse(
     location: MeetingLocation,
   ): MeetingLocationResponseDto {
@@ -976,6 +1103,7 @@ export class MeetingService {
   private toRecommendationResponse(
     recommendation: MeetingPlaceRecommendation,
     place: ResolvedPlace,
+    previewPhoto: PlacePhoto | null,
     preference: {
       likeCount: number
       dislikeCount: number
@@ -995,6 +1123,7 @@ export class MeetingService {
         providerPlaceId: place.providerPlaceId,
         placeUrl: place.placeUrl,
       },
+      previewPhoto,
       recommendedByParticipantId: recommendation.recommendedBy.id,
       likeCount: preference.likeCount,
       dislikeCount: preference.dislikeCount,
@@ -1012,16 +1141,33 @@ export class MeetingService {
       this.placeLiveDataService.resolvePlaces(
         recommendations.map((recommendation) => recommendation.place),
         location,
+        { allowPartial: true },
       ),
       this.voteRepository.getPreferenceSummaries(
         recommendations.map((recommendation) => recommendation.id),
         viewerId,
       ),
     ])
-    return recommendations.map((recommendation) =>
+    const resolvableRecommendations = recommendations.filter(
+      (recommendation) => {
+        if (resolved.has(recommendation.place.id)) return true
+        this.logger.warn(
+          `카카오 장소 조회에 실패해 해당 추천을 목록에서 제외합니다. recommendationId=${recommendation.id}`,
+        )
+        return false
+      },
+    )
+    const resolvedPlaces = resolvableRecommendations.map(
+      (recommendation) => resolved.get(recommendation.place.id)!,
+    )
+    const previewPhotos =
+      await this.placePhotoService.findPreviewPhotos(resolvedPlaces)
+
+    return resolvableRecommendations.map((recommendation) =>
       this.toRecommendationResponse(
         recommendation,
         resolved.get(recommendation.place.id)!,
+        previewPhotos.get(recommendation.place.id) ?? null,
         preferences.get(recommendation.id),
       ),
     )
@@ -1082,7 +1228,7 @@ export class MeetingService {
         },
       ],
       categorySteps: created.steps.map((step) => ({
-        id: step.id,
+        id: step.category.id,
         name: step.category.name,
         slug: step.category
           .slug as MeetingScreenResponseDto['categorySlugs'][number],
@@ -1124,13 +1270,21 @@ export class MeetingService {
     const resolved = await this.placeLiveDataService.resolvePlaces(
       recommendations.map((recommendation) => recommendation.place),
       meetingWithLocation.meetingLocation,
+      { allowPartial: true },
     )
 
     return {
       startPlace: this.toStartPlacePin(meetingWithLocation.meetingLocation),
-      sharedPlaces: recommendations.map((recommendation) =>
-        this.toPlacePin(resolved.get(recommendation.place.id)!),
-      ),
+      sharedPlaces: recommendations.flatMap((recommendation) => {
+        const place = resolved.get(recommendation.place.id)
+        if (!place) {
+          this.logger.warn(
+            `카카오 장소 조회에 실패해 해당 추천을 지도 핀에서 제외합니다. recommendationId=${recommendation.id}`,
+          )
+          return []
+        }
+        return [this.toPlacePin(place)]
+      }),
     }
   }
 
@@ -1153,36 +1307,51 @@ export class MeetingService {
     }
   }
 
-  async updatePlacePreference(
+  updatePlacePreference(
     meetingId: string,
     recommendationId: string,
     accessToken: string,
     preference: PreferenceType | null,
   ): Promise<PlacePreferenceResponseDto> {
-    const participant = await this.meetingAccessService.findParticipant(
-      meetingId,
-      accessToken,
-    )
-    participant.meeting.assertStatus(
-      PLACE_PREFERENCE_EDITABLE_STATUSES,
-      MeetingErrorCode.placePreferenceNotEditable,
-    )
-
-    const recommendationExists = await this.recommendationRepository.exists({
-      where: { id: recommendationId, meeting: { id: meetingId } },
-    })
-    if (!recommendationExists) {
-      throw new MeetingException(MeetingErrorCode.recommendationNotFound)
-    }
-
-    const { likeCount, dislikeCount } =
-      await this.voteRepository.applyPreference(
-        recommendationId,
-        participant.id,
-        preference,
+    return this.dataSource.transaction(async (manager) => {
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
+      const meeting = await manager
+        .getRepository(Meeting)
+        .createQueryBuilder('meeting')
+        .where('meeting.id = :meetingId', { meetingId })
+        .setLock('pessimistic_write')
+        .getOne()
+      if (!meeting) {
+        throw new MeetingException(MeetingErrorCode.notFound)
+      }
+      meeting.assertStatus(
+        PLACE_PREFERENCE_EDITABLE_STATUSES,
+        MeetingErrorCode.placePreferenceNotEditable,
       )
 
-    return { likeCount, dislikeCount, myPreference: preference }
+      const recommendationExists = await manager
+        .getRepository(MeetingPlaceRecommendation)
+        .exists({
+          where: { id: recommendationId, meeting: { id: meetingId } },
+        })
+      if (!recommendationExists) {
+        throw new MeetingException(MeetingErrorCode.recommendationNotFound)
+      }
+
+      const { likeCount, dislikeCount } =
+        await this.voteRepository.applyPreference(
+          manager,
+          recommendationId,
+          participant.id,
+          preference,
+        )
+
+      return { likeCount, dislikeCount, myPreference: preference }
+    })
   }
 
   async getSimilarPlaces(
@@ -1228,28 +1397,38 @@ export class MeetingService {
       if (!location) {
         throw new MeetingException(MeetingErrorCode.locationNotFound)
       }
-      const liveResult = await this.placeLiveDataService.searchKakao(location, [
-        place.category,
-      ])
+      const liveResult = await this.placeLiveDataService.searchKakao(
+        location,
+        [place.category],
+        undefined,
+        { targetTotal: SIMILAR_PLACE_KAKAO_TARGET_TOTAL },
+      )
       const excluded = new Set([
         placeId,
         ...displayedIds,
         ...recommendedPlaceIds,
       ])
-      return liveResult.places
+      const nearbyCandidates = liveResult.places
         .filter((candidate) => !excluded.has(candidate.id))
-        .slice(0, limit)
-        .map((candidate) => ({
+        .slice(0, SIMILAR_PLACE_CANDIDATE_POOL_SIZE)
+      const candidates = shuffle(nearbyCandidates).slice(0, limit)
+      const previewPhotos =
+        await this.placePhotoService.findPreviewPhotos(candidates)
+      return candidates.map((candidate) => {
+        const previewPhoto = previewPhotos.get(candidate.id) ?? null
+        return {
           id: candidate.id,
           categoryId: candidate.category.id,
           name: candidate.name,
           address: candidate.address,
           latitude: candidate.latitude,
           longitude: candidate.longitude,
-          primaryImageUrl: null,
-          previewUrl: null,
-          placeUrl: candidate.placeUrl,
-        }))
+          primaryImageUrl: previewPhoto?.url ?? null,
+          previewUrl: previewPhoto?.url ?? null,
+          previewPhoto,
+          placeUrl: candidate.placeUrl ?? null,
+        }
+      })
     }
 
     const similar = await this.placeSearchRepository.findSimilar(
@@ -1272,25 +1451,33 @@ export class MeetingService {
               address: true,
               latitude: true,
               longitude: true,
-              previewUrl: true,
+              source: true,
+              providerPlaceId: true,
+              roadAddress: true,
+              phone: true,
+              placeUrl: true,
             },
           })
         : []
 
     const candidates = [...similar, ...padding]
-    const primaryImageUrls = await this.placeImageService.getPrimaryImageUrls(
-      candidates.map((candidate) => candidate.id),
-    )
+    const previewPhotos =
+      await this.placePhotoService.findPreviewPhotos(candidates)
 
-    return candidates.map((candidate) => ({
-      id: candidate.id,
-      categoryId: place.category.id,
-      name: candidate.name,
-      address: candidate.address,
-      latitude: candidate.latitude,
-      longitude: candidate.longitude,
-      primaryImageUrl: primaryImageUrls.get(candidate.id) ?? null,
-      previewUrl: candidate.previewUrl,
-    }))
+    return candidates.map((candidate) => {
+      const previewPhoto = previewPhotos.get(candidate.id) ?? null
+      return {
+        id: candidate.id,
+        categoryId: place.category.id,
+        name: candidate.name,
+        address: candidate.address,
+        latitude: candidate.latitude,
+        longitude: candidate.longitude,
+        primaryImageUrl: previewPhoto?.url ?? null,
+        previewUrl: previewPhoto?.url ?? null,
+        previewPhoto,
+        placeUrl: candidate.placeUrl ?? null,
+      }
+    })
   }
 }

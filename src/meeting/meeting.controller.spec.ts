@@ -13,9 +13,16 @@ import {
 } from './meeting.controller'
 import { MeetingService } from './meeting.service'
 
+function tomorrowDateString() {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return tomorrow.toISOString().slice(0, 10)
+}
+
 function createController() {
   const meetingService = {
     createMeeting: jest.fn().mockResolvedValue({}),
+    updateMeetingDetails: jest.fn().mockResolvedValue({}),
     updateLocation: jest.fn().mockResolvedValue({}),
     addRecommendation: jest.fn().mockResolvedValue({}),
     getRecommendations: jest.fn().mockResolvedValue([]),
@@ -119,6 +126,8 @@ describe('MeetingController', () => {
         longitude: 127.0557,
         primaryImageUrl: null,
         previewUrl: null,
+        previewPhoto: null,
+        placeUrl: null,
       },
     ]
     ;(meetingService.getSimilarPlaces as jest.Mock).mockResolvedValue(expected)
@@ -241,7 +250,7 @@ describe('MeetingController', () => {
 
     type SchemaWithProperties = { properties?: Record<string, unknown> }
     type SchemaWithNullableProperties = {
-      properties?: Record<string, { nullable?: boolean }>
+      properties?: Record<string, { nullable?: boolean; deprecated?: boolean }>
     }
 
     const statusSchema = document.components?.schemas
@@ -318,13 +327,46 @@ describe('MeetingController', () => {
       'longitude',
       'primaryImageUrl',
       'previewUrl',
+      'previewPhoto',
       'placeUrl',
     ])
     expect(
       similarPlaceResponseSchema?.properties?.primaryImageUrl?.nullable,
     ).toBe(true)
+    expect(
+      similarPlaceResponseSchema?.properties?.primaryImageUrl?.deprecated,
+    ).toBe(true)
     expect(similarPlaceResponseSchema?.properties?.previewUrl?.nullable).toBe(
       true,
+    )
+    expect(similarPlaceResponseSchema?.properties?.previewUrl?.deprecated).toBe(
+      true,
+    )
+    expect(similarPlaceResponseSchema?.properties?.previewPhoto?.nullable).toBe(
+      true,
+    )
+
+    const recommendationPreviewSchema = document.components?.schemas
+      ?.RecommendationPreviewDto as
+      | (SchemaWithProperties & SchemaWithNullableProperties)
+      | undefined
+    expect(Object.keys(recommendationPreviewSchema?.properties ?? {})).toEqual([
+      'id',
+      'categoryId',
+      'place',
+      'previewPhoto',
+      'recommendedByParticipantId',
+      'likeCount',
+      'dislikeCount',
+      'viewerPreference',
+    ])
+    expect(
+      recommendationPreviewSchema?.properties?.previewPhoto?.nullable,
+    ).toBe(true)
+    expect(recommendationPreviewSchema?.properties?.previewPhoto).toMatchObject(
+      {
+        allOf: [{ $ref: '#/components/schemas/PlacePhotoDto' }],
+      },
     )
 
     await app.close()
@@ -389,7 +431,7 @@ describe('MeetingController', () => {
     const request = {
       meetingTypeCode: MeetingTypeCode.Social,
       name: '성수 모임',
-      date: '2026-08-23',
+      date: tomorrowDateString(),
       time: '12:00',
       firstMeetingLocation: {
         displayName: '강남역',
@@ -411,6 +453,32 @@ describe('MeetingController', () => {
     expect(meetingService.createMeeting).toHaveBeenCalledWith(request)
   })
 
+  it('모임 기본 정보 수정 요청을 검증하고 서비스에 전달한다', async () => {
+    const { controller, meetingService } = createController()
+    const request = {
+      meetingTypeCode: MeetingTypeCode.DatingHobby,
+      name: '저녁 모임',
+      date: tomorrowDateString(),
+      time: '18:30',
+    }
+
+    await controller.updateMeetingDetails('1', 'host-token', request)
+
+    expect(meetingService.updateMeetingDetails).toHaveBeenCalledWith(
+      '1',
+      'host-token',
+      request,
+    )
+  })
+
+  it('모임 기본 정보 수정 요청이 비어 있으면 거부한다', () => {
+    const { controller } = createController()
+
+    expect(() =>
+      controller.updateMeetingDetails('1', 'host-token', {}),
+    ).toThrow(CommonException)
+  })
+
   it('documents meeting type codes and request shapes for frontend mocking', async () => {
     const moduleFixture = await Test.createTestingModule({
       controllers: [MeetingController, MeetingDetailController],
@@ -419,6 +487,7 @@ describe('MeetingController', () => {
           provide: MeetingService,
           useValue: {
             createMeeting: jest.fn(),
+            updateMeetingDetails: jest.fn(),
             updateLocation: jest.fn(),
             addRecommendation: jest.fn(),
             getRecommendations: jest.fn(),
@@ -477,6 +546,20 @@ describe('MeetingController', () => {
           required?: string[]
         }
       | undefined
+    const updateMeetingDetailsSchema = document.components?.schemas
+      ?.UpdateMeetingDetailsDto as
+      | {
+          properties?: Record<string, unknown>
+          required?: string[]
+        }
+      | undefined
+    const meetingDetailsResponseSchema = document.components?.schemas
+      ?.MeetingDetailsResponseDto as
+      | {
+          properties?: Record<string, unknown>
+          required?: string[]
+        }
+      | undefined
 
     expect(enumSchema?.enum).toEqual(Object.values(MeetingTypeCode))
     expect(schema?.properties?.meetingTypeCode).toMatchObject({
@@ -517,11 +600,57 @@ describe('MeetingController', () => {
     expect(meetingScreenSchema?.properties?.selectedCourse).toMatchObject({
       nullable: true,
     })
+    expect(Object.keys(updateMeetingDetailsSchema?.properties ?? {})).toEqual([
+      'meetingTypeCode',
+      'name',
+      'date',
+      'time',
+    ])
+    expect(updateMeetingDetailsSchema?.required ?? []).toEqual([])
+    expect(meetingDetailsResponseSchema?.required).toEqual(
+      expect.arrayContaining([
+        'meetingId',
+        'name',
+        'date',
+        'time',
+        'meetingTypeCode',
+        'meetingType',
+      ]),
+    )
 
     const meetingsPath = document.paths?.['/meetings'] as
       | { post?: { responses?: Record<string, unknown> } }
       | undefined
     expect(meetingsPath?.post?.responses).toHaveProperty('201')
+    const meetingPath = document.paths?.['/meetings/{meetingId}'] as
+      | {
+          patch?: {
+            requestBody?: {
+              content?: {
+                'application/json'?: {
+                  schema?: {
+                    allOf?: Array<{ $ref?: string }>
+                    minProperties?: number
+                  }
+                }
+              }
+            }
+            responses?: Record<string, unknown>
+          }
+        }
+      | undefined
+    expect(
+      meetingPath?.patch?.requestBody?.content?.['application/json']?.schema,
+    ).toMatchObject({
+      allOf: [{ $ref: '#/components/schemas/UpdateMeetingDetailsDto' }],
+      minProperties: 1,
+    })
+    expect(meetingPath?.patch?.responses).toHaveProperty('200')
+    expect(meetingPath?.patch?.responses).toHaveProperty('400')
+    expect(meetingPath?.patch?.responses).toHaveProperty('401')
+    expect(meetingPath?.patch?.responses).toHaveProperty('403')
+    expect(meetingPath?.patch?.responses).toHaveProperty('404')
+    expect(meetingPath?.patch?.responses).toHaveProperty('409')
 
     await app.close()
   })

@@ -5,7 +5,8 @@ import type { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { CommonException } from 'src/common/exception/common.exception'
 import { CommonErrorCode } from 'src/common/exception/common-error-code'
 import { CourseCategoryStep } from 'src/course/entities/course-category-step.entity'
-import { KakaoImageSearchService } from 'src/kakao/kakao-image-search.service'
+import { MeetingPlaceRecommendation } from 'src/course/entities/meeting-place-recommendation.entity'
+import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
 import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import { MeetingLocation } from 'src/meeting/entities/meeting-location.entity'
 import { MeetingParticipant } from 'src/meeting/entities/meeting-participant.entity'
@@ -15,21 +16,13 @@ import { Place } from './entities/place.entity'
 import { PlaceSource } from './enums/place-source.enum'
 import { PlaceException } from './exception/place.exception'
 import { PlaceErrorCode } from './exception/place-error-code'
-import { PlaceImageService } from './place-image.service'
-import {
-  PlaceLiveDataService,
-  type ResolvedPlace,
-} from './place-live-data.service'
+import { PlacePhotoService } from './photo/place-photo.service'
+import { PlaceLiveDataService } from './place-live-data.service'
 import type { PlaceSearchRequest } from './schema/place-search-request.schema'
 import {
   type PlaceSearchResponse,
   placeSearchResponseSchema,
 } from './schema/place-search-response.schema'
-
-type ResolvedImageUrls = {
-  imageUrls: string[]
-  previewUrl: string | null
-}
 
 @Injectable()
 export class PlaceService {
@@ -44,24 +37,20 @@ export class PlaceService {
     private readonly categoryRepository: Repository<Category>,
     @InjectRepository(CourseCategoryStep)
     private readonly courseCategoryStepRepository: Repository<CourseCategoryStep>,
+    @InjectRepository(MeetingPlaceRecommendation)
+    private readonly meetingPlaceRecommendationRepository: Repository<MeetingPlaceRecommendation>,
     private readonly placeLiveDataService: PlaceLiveDataService,
-    private readonly placeImageService: PlaceImageService,
-    private readonly kakaoImageSearchService: KakaoImageSearchService,
+    private readonly placePhotoService: PlacePhotoService,
+    private readonly meetingAccessService: MeetingAccessService,
   ) {}
 
   async searchPlaces(
     request: PlaceSearchRequest,
   ): Promise<PlaceSearchResponse> {
-    const participant = await this.participantRepository.findOne({
-      where: {
-        meeting: { id: request.meetingId },
-        accessToken: request.accessToken,
-      },
-    })
-
-    if (!participant) {
-      throw new CommonException(CommonErrorCode.authenticationFailed)
-    }
+    await this.meetingAccessService.findParticipant(
+      request.meetingId,
+      request.accessToken,
+    )
 
     const meetingLocation = await this.meetingLocationRepository.findOne({
       where: { meeting: { id: request.meetingId } },
@@ -72,45 +61,53 @@ export class PlaceService {
     }
 
     const categories = await this.findSearchCategories(request)
-    const result = await this.placeLiveDataService.searchKakao(
-      {
-        latitude: meetingLocation.latitude,
-        longitude: meetingLocation.longitude,
-      },
-      categories,
-      request.q,
+    const [result, recommendations] = await Promise.all([
+      this.placeLiveDataService.searchKakao(
+        {
+          latitude: meetingLocation.latitude,
+          longitude: meetingLocation.longitude,
+        },
+        categories,
+        request.q,
+      ),
+      this.meetingPlaceRecommendationRepository.find({
+        where: { meeting: { id: request.meetingId } },
+        relations: { place: true },
+      }),
+    ])
+    const recommendedPlaceIds = new Set(
+      recommendations.map((recommendation) => recommendation.place.id),
     )
     const offset = (request.page - 1) * request.size
     const pageItems = result.places.slice(offset, offset + request.size)
-    const previewUrls = await this.kakaoImageSearchService.findPreviewUrls(
-      pageItems.map((place) => ({
-        id: place.id,
-        name: place.name,
-        address: place.address,
-        roadAddress: place.roadAddress,
-      })),
-    )
+    const previewPhotos =
+      await this.placePhotoService.findPreviewPhotos(pageItems)
 
     const response = {
-      items: pageItems.map((place) => ({
-        id: place.id,
-        name: place.name,
-        address: place.address,
-        category: {
-          id: place.category.id,
-          name: place.category.name,
-          slug: place.category.slug,
-        },
-        latitude: place.latitude,
-        longitude: place.longitude,
-        distanceMeters: place.distanceMeters,
-        previewUrl: previewUrls.get(place.id) ?? place.previewUrl,
-        source: place.source,
-        providerPlaceId: place.providerPlaceId,
-        roadAddress: place.roadAddress,
-        phone: place.phone,
-        placeUrl: place.placeUrl,
-      })),
+      items: pageItems.map((place) => {
+        const previewPhoto = previewPhotos.get(place.id) ?? null
+        return {
+          id: place.id,
+          name: place.name,
+          address: place.address,
+          category: {
+            id: place.category.id,
+            name: place.category.name,
+            slug: place.category.slug,
+          },
+          latitude: place.latitude,
+          longitude: place.longitude,
+          distanceMeters: place.distanceMeters,
+          previewUrl: previewPhoto?.url ?? null,
+          previewPhoto,
+          source: place.source,
+          providerPlaceId: place.providerPlaceId,
+          roadAddress: place.roadAddress,
+          phone: place.phone,
+          placeUrl: place.placeUrl,
+          isRecommended: recommendedPlaceIds.has(place.id),
+        }
+      }),
       page: request.page,
       size: request.size,
       total: result.places.length,
@@ -157,15 +154,21 @@ export class PlaceService {
     if (!meetingLocation) {
       throw new PlaceException(PlaceErrorCode.meetingLocationNotFound)
     }
-    const resolved = await this.placeLiveDataService.resolvePlace(place, {
-      latitude: meetingLocation.latitude,
-      longitude: meetingLocation.longitude,
-    })
+    const [resolved, recommendation] = await Promise.all([
+      this.placeLiveDataService.resolvePlace(place, {
+        latitude: meetingLocation.latitude,
+        longitude: meetingLocation.longitude,
+      }),
+      this.meetingPlaceRecommendationRepository.findOne({
+        where: {
+          meeting: { id: participant.meeting.id },
+          place: { id: placeId },
+        },
+      }),
+    ])
 
-    const { imageUrls, previewUrl } = await this.resolveImageUrls(
-      place,
-      resolved,
-    )
+    const photos = await this.placePhotoService.findPhotos(resolved)
+    const previewPhoto = photos[0] ?? null
 
     return {
       placeId: place.id,
@@ -173,8 +176,10 @@ export class PlaceService {
       categorySlug: place.category.slug as CategorySlug,
       name: resolved.name,
       address: resolved.address,
-      imageUrls,
-      previewUrl,
+      imageUrls: photos.map((photo) => photo.url),
+      photos,
+      previewUrl: previewPhoto?.url ?? null,
+      previewPhoto,
       source: resolved.source,
       providerPlaceId: resolved.providerPlaceId,
       roadAddress: resolved.roadAddress,
@@ -182,28 +187,7 @@ export class PlaceService {
       placeUrl: resolved.placeUrl,
       latitude: resolved.latitude,
       longitude: resolved.longitude,
-    }
-  }
-
-  private async resolveImageUrls(
-    place: Place,
-    resolved: ResolvedPlace,
-  ): Promise<ResolvedImageUrls> {
-    if (place.source === PlaceSource.Kakao) {
-      const images = await this.kakaoImageSearchService.findImages({
-        name: resolved.name,
-        address: resolved.address,
-        roadAddress: resolved.roadAddress,
-      })
-      return {
-        imageUrls: images.map((image) => image.url),
-        previewUrl: images[0]?.thumbnailUrl ?? resolved.previewUrl,
-      }
-    }
-
-    return {
-      imageUrls: await this.placeImageService.getImageUrls(place.id),
-      previewUrl: resolved.previewUrl,
+      isRecommended: recommendation !== null,
     }
   }
 

@@ -32,11 +32,12 @@ function createRepository(
 
 describe('MeetingPlaceRecommendationVoteRepository', () => {
   it('좋아요/싫어요를 설정하면 upsert로 저장하고 삭제는 호출하지 않는다', async () => {
-    const { repository, voteRepository } = createRepository([
+    const { repository, manager, voteRepository } = createRepository([
       { preference: PreferenceType.Like, count: '3' },
     ])
 
     const result = await repository.applyPreference(
+      manager as never,
       '1',
       '1',
       PreferenceType.Like,
@@ -56,9 +57,14 @@ describe('MeetingPlaceRecommendationVoteRepository', () => {
   })
 
   it('preference가 null이면 삭제하고 upsert는 호출하지 않는다', async () => {
-    const { repository, voteRepository } = createRepository([])
+    const { repository, manager, voteRepository } = createRepository([])
 
-    const result = await repository.applyPreference('1', '1', null)
+    const result = await repository.applyPreference(
+      manager as never,
+      '1',
+      '1',
+      null,
+    )
 
     expect(voteRepository.delete).toHaveBeenCalledWith({
       recommendation: { id: '1' },
@@ -69,12 +75,13 @@ describe('MeetingPlaceRecommendationVoteRepository', () => {
   })
 
   it('좋아요와 싫어요 개수를 모두 집계해서 반환한다', async () => {
-    const { repository, queryBuilder } = createRepository([
+    const { repository, manager, queryBuilder } = createRepository([
       { preference: PreferenceType.Like, count: '5' },
       { preference: PreferenceType.Dislike, count: '2' },
     ])
 
     const result = await repository.applyPreference(
+      manager as never,
       '1',
       '1',
       PreferenceType.Dislike,

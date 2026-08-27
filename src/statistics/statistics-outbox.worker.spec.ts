@@ -54,6 +54,8 @@ describe('StatisticsOutboxWorker', () => {
       expect.objectContaining({ id: '50', eventType: 'COURSE_CONFIRMED' }),
     )
     expect(queryRunner.query.mock.calls[3][0]).toContain("'PROCESSED'")
+    expect(queryRunner.query.mock.calls[3][0]).toContain('"attempt_count" = $2')
+    expect(queryRunner.query.mock.calls[3][1]).toEqual(['50', 1])
     expect(queryRunner.query.mock.calls[4][0]).toContain(
       'pg_advisory_unlock_shared',
     )
@@ -74,11 +76,13 @@ describe('StatisticsOutboxWorker', () => {
     await expect(worker.runOnce()).resolves.toBe(true)
 
     expect(queryRunner.query.mock.calls[3][0]).toContain('"status" = $2')
+    expect(queryRunner.query.mock.calls[3][0]).toContain('"attempt_count" = $5')
     expect(queryRunner.query.mock.calls[3][1]).toEqual([
       '51',
       'FAILED',
       5_000,
       'stats unavailable',
+      2,
     ])
   })
 
@@ -99,6 +103,7 @@ describe('StatisticsOutboxWorker', () => {
       'DEAD_LETTER',
       0,
       'invalid payload',
+      5,
     ])
   })
 

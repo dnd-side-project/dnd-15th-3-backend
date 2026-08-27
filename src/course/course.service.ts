@@ -7,6 +7,7 @@ import type { ErrorCode } from 'src/common/exception/error-code.type'
 import { KakaoWalkingCourseService } from 'src/kakao/kakao-walking-course.service'
 import type { KakaoWalkingCourseResponse } from 'src/kakao/schema/walking-course-response.schema'
 import { MeetingAccessService } from 'src/meeting/access/meeting-access.service'
+import { assertAccessToken } from 'src/meeting/access/meeting-access.utils'
 import {
   COURSE_CANDIDATES_VISIBLE_STATUSES,
   COURSE_COMMENT_CREATABLE_STATUSES,
@@ -31,7 +32,7 @@ import {
 } from 'src/outbox/schemas/course-confirmed-payload.schema'
 import type { Place } from 'src/place/entities/place.entity'
 import { PlaceSource } from 'src/place/enums/place-source.enum'
-import { PlaceImageService } from 'src/place/place-image.service'
+import { PlacePhotoService } from 'src/place/photo/place-photo.service'
 import {
   PlaceLiveDataService,
   type ResolvedPlace,
@@ -75,7 +76,7 @@ export class CourseService {
     private readonly commentRepository: Repository<CourseCandidateComment>,
     @InjectRepository(CourseCandidatePlace)
     private readonly courseCandidatePlaceRepository: Repository<CourseCandidatePlace>,
-    private readonly placeImageService: PlaceImageService,
+    private readonly placePhotoService: PlacePhotoService,
     private readonly placeLiveDataService: PlaceLiveDataService,
     private readonly kakaoWalkingCourseService: KakaoWalkingCourseService,
     private readonly courseRepository: CourseRepository,
@@ -215,13 +216,16 @@ export class CourseService {
     courseCandidateId: string,
     accessToken: string,
   ): Promise<MeetingStatusResponseDto> {
-    await this.assertHostParticipant(
-      meetingId,
-      accessToken,
-      MeetingErrorCode.courseConfirmHostOnly,
-    )
+    assertAccessToken(accessToken)
 
     return await this.dataSource.transaction(async (manager) => {
+      const participant = await this.meetingAccessService.findParticipant(
+        meetingId,
+        accessToken,
+        manager,
+      )
+      participant.assertHost(MeetingErrorCode.courseConfirmHostOnly)
+
       const meeting = await this.courseRepository.lockMeeting(
         manager,
         meetingId,
@@ -383,33 +387,32 @@ export class CourseService {
       (recommendation) => recommendation.id,
     )
 
-    const [preferenceSummaries, primaryImageUrls, resolved] = await Promise.all(
-      [
-        this.voteRepository.getPreferenceSummaries(
-          recommendationIds,
-          viewer.id,
-        ),
-        this.placeImageService.getPrimaryImageUrls(
-          recommendations.map((recommendation) => recommendation.place.id),
-        ),
-        this.resolvePlacesForMeeting(
-          meetingId,
-          recommendations.map((recommendation) => recommendation.place),
-        ),
-      ],
+    const [preferenceSummaries, resolved] = await Promise.all([
+      this.voteRepository.getPreferenceSummaries(recommendationIds, viewer.id),
+      this.resolvePlacesForMeeting(
+        meetingId,
+        recommendations.map((recommendation) => recommendation.place),
+      ),
+    ])
+    const resolvedPlaces = recommendations.map(
+      (recommendation) => resolved.get(recommendation.place.id)!,
     )
+    const previewPhotos =
+      await this.placePhotoService.findPreviewPhotos(resolvedPlaces)
 
     const items: MeetingPlaceRecommendationDto[] = recommendations.map(
       (recommendation) => {
         const summary = preferenceSummaries.get(recommendation.id)
         const place = resolved.get(recommendation.place.id)!
+        const previewPhoto = previewPhotos.get(place.id) ?? null
         return {
           recommendationId: recommendation.id,
           category: place.category.name,
           categorySlug: place.category.slug as CategorySlug,
           name: place.name,
           address: place.address,
-          primaryImageUrl: primaryImageUrls.get(recommendation.place.id),
+          primaryImageUrl: previewPhoto?.url,
+          previewPhoto,
           likeCount: summary?.likeCount ?? 0,
           dislikeCount: summary?.dislikeCount ?? 0,
           myPreference: summary?.myPreference ?? null,
@@ -430,14 +433,11 @@ export class CourseService {
     accessToken: string,
     request: AddCoursePlaceRequestDto,
   ): Promise<CourseDetailResponseDto> {
-    await this.assertHostParticipant(
-      meetingId,
-      accessToken,
-      MeetingErrorCode.courseEditHostOnly,
-    )
+    assertAccessToken(accessToken)
 
     const { candidate, steps } = await this.dataSource.transaction(
       async (manager) => {
+        await this.assertHostParticipant(manager, meetingId, accessToken)
         const meeting = await this.lockMeetingOrThrow(
           manager,
           meetingId,
@@ -481,14 +481,11 @@ export class CourseService {
     accessToken: string,
     request: UpdateCoursePlacesRequestDto,
   ): Promise<CourseDetailResponseDto> {
-    await this.assertHostParticipant(
-      meetingId,
-      accessToken,
-      MeetingErrorCode.courseEditHostOnly,
-    )
+    assertAccessToken(accessToken)
 
     const { candidate, steps } = await this.dataSource.transaction(
       async (manager) => {
+        await this.assertHostParticipant(manager, meetingId, accessToken)
         const meeting = await this.lockMeetingOrThrow(
           manager,
           meetingId,
@@ -521,16 +518,16 @@ export class CourseService {
   }
 
   private async assertHostParticipant(
+    manager: EntityManager,
     meetingId: string,
     accessToken: string,
-    errorCode: ErrorCode,
-  ): Promise<MeetingParticipant> {
+  ): Promise<void> {
     const participant = await this.meetingAccessService.findParticipant(
       meetingId,
       accessToken,
+      manager,
     )
-    participant.assertHost(errorCode)
-    return participant
+    participant.assertHost(MeetingErrorCode.courseEditHostOnly)
   }
 
   private async lockMeetingOrThrow(
@@ -844,12 +841,10 @@ export class CourseService {
     steps: CourseCandidatePlace[],
   ): Promise<CourseDetailResponseDto> {
     const places = steps.map((step) => step.meetingPlaceRecommendation.place)
-    const [primaryImageUrls, resolved] = await Promise.all([
-      this.placeImageService.getPrimaryImageUrls(
-        places.map((place) => place.id),
-      ),
-      this.resolvePlacesForMeeting(meetingId, places),
-    ])
+    const resolved = await this.resolvePlacesForMeeting(meetingId, places)
+    const resolvedPlaces = places.map((place) => resolved.get(place.id)!)
+    const previewPhotos =
+      await this.placePhotoService.findPreviewPhotos(resolvedPlaces)
 
     const totalDistanceMeters = steps.reduce(
       (sum, step) => sum + (step.distanceToNextMeters ?? 0),
@@ -863,6 +858,7 @@ export class CourseService {
       route: steps.map((step) => {
         const reference = step.meetingPlaceRecommendation.place
         const place = resolved.get(reference.id)!
+        const previewPhoto = previewPhotos.get(place.id) ?? null
         return {
           recommendationId: step.meetingPlaceRecommendation.id,
           placeId: place.id,
@@ -871,7 +867,8 @@ export class CourseService {
           category: place.category.name,
           categorySlug: place.category.slug as CategorySlug,
           address: place.address,
-          primaryImageUrl: primaryImageUrls.get(reference.id) ?? null,
+          primaryImageUrl: previewPhoto?.url ?? null,
+          previewPhoto,
           longitude: place.longitude,
           latitude: place.latitude,
           walkDurationToNextMin: secondsToMinutes(step.travelTimeToNext),

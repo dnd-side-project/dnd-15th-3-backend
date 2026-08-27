@@ -52,7 +52,7 @@ export class StatisticsOutboxWorker {
 
       const processEvent = async () => {
         await this.processor.process(event)
-        await this.markProcessed(queryRunner, event.id)
+        await this.markProcessed(queryRunner, event.id, event.attemptCount)
       }
 
       try {
@@ -165,9 +165,14 @@ export class StatisticsOutboxWorker {
     return rows[0] ?? null
   }
 
+  // attempt_count는 claimNextEvent가 매번 원자적으로 1씩 증가시키는 값이라,
+  // 이 이벤트를 선점한 시도를 식별하는 펜싱 토큰으로 쓸 수 있다.
+  // stale 복구 후 다른 워커가 재선점하면 attempt_count가 달라지므로,
+  // 뒤늦게 끝난 이전 시도가 재선점된 결과를 덮어쓰지 않는다.
   private async markProcessed(
     queryRunner: QueryRunner,
     eventId: string,
+    attemptCount: number,
   ): Promise<void> {
     await queryRunner.query(
       `UPDATE "outbox_event"
@@ -177,8 +182,9 @@ export class StatisticsOutboxWorker {
            "error_message" = NULL,
            "updated_at" = CURRENT_TIMESTAMP
        WHERE "id" = $1
-         AND "status" = 'PROCESSING'`,
-      [eventId],
+         AND "status" = 'PROCESSING'
+         AND "attempt_count" = $2`,
+      [eventId, attemptCount],
     )
   }
 
@@ -202,8 +208,15 @@ export class StatisticsOutboxWorker {
            "error_message" = $4,
            "updated_at" = CURRENT_TIMESTAMP
        WHERE "id" = $1
-         AND "status" = 'PROCESSING'`,
-      [event.id, isDeadLetter ? 'DEAD_LETTER' : 'FAILED', retryDelay, message],
+         AND "status" = 'PROCESSING'
+         AND "attempt_count" = $5`,
+      [
+        event.id,
+        isDeadLetter ? 'DEAD_LETTER' : 'FAILED',
+        retryDelay,
+        message,
+        event.attemptCount,
+      ],
     )
 
     if (isDeadLetter) {

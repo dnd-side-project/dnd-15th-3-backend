@@ -12,17 +12,14 @@ export const coerceBoolean = z
   })
   .default(false)
 
-function requiredInProduction<T extends z.ZodTypeAny>(schema: T) {
-  return z.union([
-    schema,
-    z.string().refine(
-      (val) => {
-        const nodeEnv = process.env.NODE_ENV
-        return nodeEnv !== 'production' || val.length > 0
-      },
-      { message: 'Required in production' },
-    ),
-  ])
+function requiredInProduction<T extends z.ZodString>(schema: T) {
+  return schema.refine(
+    (val) => {
+      const nodeEnv = process.env.NODE_ENV
+      return nodeEnv !== 'production' || val.length > 0
+    },
+    { message: 'Required in production' },
+  )
 }
 
 const envSchemaBase = z.object({
@@ -50,6 +47,13 @@ const envSchemaBase = z.object({
   KAKAO_REST_API_KEY: z.string().trim().default(''),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   GOOGLE_PLACES_API_KEY: z.string().trim().default(''),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  PLACE_PHOTO_PREVIEW_CONCURRENCY: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .default(10),
   // Optional OpenAI questionnaire generation. Both key and model must be set
   // to enable it; otherwise the curated fallback generator is used.
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지

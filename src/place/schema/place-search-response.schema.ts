@@ -1,5 +1,6 @@
 import { CategorySlug } from 'src/category/enums/category-slug.enum'
 import { z } from 'zod'
+import { PlacePhotoSource } from '../enums/place-photo-source.enum'
 import { PlaceSource } from '../enums/place-source.enum'
 
 const placeSearchCategorySchema = z.object({
@@ -16,6 +17,23 @@ const collectionStatusSchema = z.enum([
   'FAILED',
 ])
 
+const placePhotoAttributionSchema = z.object({
+  displayName: z.string(),
+  uri: z.string().nullable(),
+  photoUri: z.string().nullable(),
+})
+
+const placePhotoSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  source: z.enum(PlacePhotoSource),
+  attributions: z.array(placePhotoAttributionSchema),
+  googleMapsUri: z.string().nullable(),
+  flagContentUri: z.string().nullable(),
+})
+
 export const placeSearchItemSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -25,11 +43,13 @@ export const placeSearchItemSchema = z.object({
   longitude: z.number(),
   distanceMeters: z.number().nonnegative(),
   previewUrl: z.string().nullable(),
+  previewPhoto: placePhotoSchema.nullable(),
   source: z.enum(PlaceSource),
   providerPlaceId: z.string().nullable(),
   roadAddress: z.string().nullable(),
   phone: z.string().nullable(),
   placeUrl: z.string().nullable(),
+  isRecommended: z.boolean(),
 })
 
 export const placeSearchResponseSchema = z.object({
