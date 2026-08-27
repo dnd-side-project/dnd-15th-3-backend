@@ -16,3 +16,19 @@ patches:
   - path: environment.yaml
   - path: worker-environment.yaml
   - path: statistics-worker-environment.yaml
+  - target:
+      kind: Role
+      name: db-reader
+    patch: |-
+      - op: add
+        path: /rules/-
+        value:
+          apiGroups: [""]
+          resources: ["pods"]
+          verbs: ["get", "list"]
+      - op: add
+        path: /rules/-
+        value:
+          apiGroups: [""]
+          resources: ["pods/log"]
+          verbs: ["get"]
