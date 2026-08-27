@@ -243,9 +243,15 @@ export class CourseService {
       if (!candidate) {
         throw new CourseException(CourseErrorCode.candidateNotFound)
       }
+      const steps = await this.loadCourseStepsOrThrow(manager, candidate.id)
       candidate.select()
 
       await candidateRepository.save(candidate)
+      await this.replaceCourseCategorySteps(
+        manager,
+        meetingId,
+        steps.map((step) => step.meetingPlaceRecommendation.place.category),
+      )
       await manager.getRepository(Meeting).save(meeting)
 
       await this.recordCourseConfirmedEvent(
@@ -253,6 +259,7 @@ export class CourseService {
         meeting,
         meetingId,
         candidate,
+        steps,
       )
 
       return {
@@ -267,8 +274,8 @@ export class CourseService {
     meeting: Meeting,
     meetingId: string,
     courseCandidate: CourseCandidate,
+    steps: CourseCandidatePlace[],
   ): Promise<void> {
-    const steps = await this.loadCourseStepsOrThrow(manager, courseCandidate.id)
     const recommendationIds = steps.map(
       (step) => step.meetingPlaceRecommendation.id,
     )
@@ -650,32 +657,10 @@ export class CourseService {
     const [, newStep] = await placeRepository.save([lastStep, newStepEntity])
     newStep.meetingPlaceRecommendation = recommendation
 
-    await this.appendCategoryStep(manager, meetingId, newPlace.category)
-
     meeting.bumpCourseVersion()
     await manager.getRepository(Meeting).save(meeting)
 
     return [...steps.slice(0, -1), lastStep, newStep]
-  }
-
-  private async appendCategoryStep(
-    manager: EntityManager,
-    meetingId: string,
-    category: Category,
-  ): Promise<void> {
-    const categoryStepRepository = manager.getRepository(CourseCategoryStep)
-    const existingCategorySteps = await categoryStepRepository.find({
-      where: { meeting: { id: meetingId } },
-      order: { order: 'DESC' },
-      take: 1,
-    })
-    await categoryStepRepository.save(
-      categoryStepRepository.create({
-        meeting: { id: meetingId } as Meeting,
-        category,
-        order: (existingCategorySteps[0]?.order ?? 0) + 1,
-      }),
-    )
   }
 
   private async loadRecommendationsInOrderOrThrow(
@@ -772,12 +757,6 @@ export class CourseService {
     newSteps.forEach((step, index) => {
       step.meetingPlaceRecommendation = recommendations[index]
     })
-
-    await this.replaceCourseCategorySteps(
-      manager,
-      meetingId,
-      recommendations.map((recommendation) => recommendation.place.category),
-    )
 
     meeting.bumpCourseVersion()
     await manager.getRepository(Meeting).save(meeting)

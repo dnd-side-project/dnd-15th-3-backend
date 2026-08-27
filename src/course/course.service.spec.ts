@@ -124,11 +124,16 @@ function createConfirmTransactionMocks() {
     save: jest.fn().mockImplementation((value) => value),
   }
   const placeRepository = { find: jest.fn() }
+  const categoryStepRepository = {
+    save: jest.fn().mockImplementation((value) => value),
+    create: jest.fn().mockImplementation((value) => value),
+  }
   const repositories = new Map<unknown, unknown>([
     [MeetingParticipant, participantRepository],
     [Meeting, meetingRepository],
     [CourseCandidate, candidateRepository],
     [CourseCandidatePlace, placeRepository],
+    [CourseCategoryStep, categoryStepRepository],
   ])
   const manager = {
     getRepository: jest.fn((entity: unknown) => repositories.get(entity)),
@@ -140,6 +145,7 @@ function createConfirmTransactionMocks() {
     meetingRepository,
     candidateRepository,
     placeRepository,
+    categoryStepRepository,
   }
 }
 
@@ -1188,6 +1194,7 @@ describe('CourseService', () => {
         meetingRepository,
         candidateRepository,
         placeRepository,
+        categoryStepRepository,
       } = createConfirmTransactionMocks()
       dataSource.transaction.mockImplementation((callback: never) =>
         (callback as (manager: unknown) => unknown)(manager),
@@ -1268,6 +1275,14 @@ describe('CourseService', () => {
       })
       expect(candidate.isSelected).toBe(true)
       expect(candidateRepository.save).toHaveBeenCalledWith(candidate)
+      expect(courseRepository.deleteCourseCategorySteps).toHaveBeenCalledWith(
+        manager,
+        '1',
+      )
+      expect(categoryStepRepository.save).toHaveBeenCalledWith([
+        expect.objectContaining({ order: 1, category: { id: '201' } }),
+        expect.objectContaining({ order: 2, category: { id: '202' } }),
+      ])
       expect(meeting.status).toBe(MeetingStatus.CourseConfirmed)
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
       expect(voteRepository.getVoteCountsByRecommendation).toHaveBeenCalledWith(
@@ -1880,7 +1895,7 @@ describe('CourseService', () => {
       errorSpy.mockRestore()
     })
 
-    it('검증을 통과하면 마지막 장소의 이동 시간·거리를 갱신하고 새 장소를 코스 맨 뒤에 추가하며 카테고리 스텝과 코스 버전을 갱신한다', async () => {
+    it('검증을 통과하면 새 장소와 코스 버전만 갱신하고 카테고리 순서는 유지한다', async () => {
       const {
         service,
         dataSource,
@@ -1927,7 +1942,6 @@ describe('CourseService', () => {
         }),
       }
       placeRepository.find.mockResolvedValue([lastStep])
-      categoryStepRepository.find.mockResolvedValue([{ order: 2 }])
       kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue(
         createWalkingCourseResponse(300, 450),
       )
@@ -1972,13 +1986,8 @@ describe('CourseService', () => {
           distanceToNextMeters: null,
         }),
       ])
-      expect(categoryStepRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          meeting: { id: '1' },
-          category: newRecommendation.place.category,
-          order: 3,
-        }),
-      )
+      expect(courseRepository.deleteCourseCategorySteps).not.toHaveBeenCalled()
+      expect(categoryStepRepository.save).not.toHaveBeenCalled()
       expect(meeting.courseVersion).toBe(4)
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
       expect(result).toEqual({
@@ -2016,62 +2025,6 @@ describe('CourseService', () => {
           },
         ],
       })
-    })
-
-    it('기존 카테고리 스텝이 없으면 1번부터 시작한다', async () => {
-      const {
-        service,
-        dataSource,
-        kakaoWalkingCourseService,
-        courseRepository,
-        meetingAccessService,
-      } = createService()
-      const {
-        manager,
-        candidateRepository,
-        recommendationRepository,
-        placeRepository,
-        categoryStepRepository,
-      } = createAddPlaceTransactionMocks()
-      dataSource.transaction.mockImplementation((callback: never) =>
-        (callback as (manager: unknown) => unknown)(manager),
-      )
-      meetingAccessService.findParticipant.mockResolvedValue(
-        createParticipant({ role: ParticipantRole.Host }),
-      )
-      courseRepository.lockMeeting.mockResolvedValue(
-        createMeetingWithStatus(MeetingStatus.CourseGenerated),
-      )
-      candidateRepository.findOne.mockResolvedValue(
-        createCandidate({ id: '2', name: '뚜벅이 코스' }),
-      )
-      recommendationRepository.findOne.mockResolvedValue(
-        createRecommendation({ id: '20', longitude: 127.1, latitude: 37.51 }),
-      )
-      placeRepository.find.mockResolvedValue([
-        {
-          order: 1,
-          travelTimeToNext: null,
-          distanceToNextMeters: null,
-          meetingPlaceRecommendation: createRecommendation({
-            id: '10',
-            longitude: 127.0,
-            latitude: 37.5,
-          }),
-        },
-      ])
-      categoryStepRepository.find.mockResolvedValue([])
-      kakaoWalkingCourseService.getWalkingCourse.mockResolvedValue(
-        createWalkingCourseResponse(300, 450),
-      )
-
-      await service.addCoursePlace('1', '2', 'token', {
-        recommendationId: '20',
-      })
-
-      expect(categoryStepRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ order: 1 }),
-      )
     })
   })
 
@@ -2334,7 +2287,7 @@ describe('CourseService', () => {
       errorSpy.mockRestore()
     })
 
-    it('검증을 통과하면 기존 장소·카테고리 스텝을 전부 삭제하고 요청 순서대로 다시 채우며 코스 버전을 한 번만 올린다', async () => {
+    it('검증을 통과하면 후보 장소만 교체하고 카테고리 순서는 유지한다', async () => {
       const {
         service,
         dataSource,
@@ -2405,10 +2358,7 @@ describe('CourseService', () => {
         manager,
         '2',
       )
-      expect(courseRepository.deleteCourseCategorySteps).toHaveBeenCalledWith(
-        manager,
-        '1',
-      )
+      expect(courseRepository.deleteCourseCategorySteps).not.toHaveBeenCalled()
       expect(placeRepository.save).toHaveBeenCalledWith([
         expect.objectContaining({
           order: 1,
@@ -2421,16 +2371,7 @@ describe('CourseService', () => {
           distanceToNextMeters: null,
         }),
       ])
-      expect(categoryStepRepository.save).toHaveBeenCalledWith([
-        expect.objectContaining({
-          order: 1,
-          category: recommendation10.place.category,
-        }),
-        expect.objectContaining({
-          order: 2,
-          category: recommendation20.place.category,
-        }),
-      ])
+      expect(categoryStepRepository.save).not.toHaveBeenCalled()
       expect(meeting.courseVersion).toBe(6)
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
       expect(result).toEqual({
@@ -2517,12 +2458,7 @@ describe('CourseService', () => {
           distanceToNextMeters: null,
         }),
       ])
-      expect(categoryStepRepository.save).toHaveBeenCalledWith([
-        expect.objectContaining({
-          order: 1,
-          category: recommendation10.place.category,
-        }),
-      ])
+      expect(categoryStepRepository.save).not.toHaveBeenCalled()
       expect(meeting.courseVersion).toBe(2)
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting)
       expect(result).toEqual({
