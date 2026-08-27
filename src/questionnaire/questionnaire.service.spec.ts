@@ -154,7 +154,7 @@ describe('QuestionnaireService.resolveAnswers', () => {
   })
 })
 
-describe('QuestionnaireService.restartAfterMeetingDetailsChange', () => {
+describe('QuestionnaireService.restartAfterMeetingInputChange', () => {
   it.each([
     QuestionnaireGenerationStatus.Ready,
     QuestionnaireGenerationStatus.Generating,
@@ -204,7 +204,7 @@ describe('QuestionnaireService.restartAfterMeetingDetailsChange', () => {
       }
       const service = new QuestionnaireService({} as never, {} as never)
 
-      await service.restartAfterMeetingDetailsChange(manager as never, '10')
+      await service.restartAfterMeetingInputChange(manager as never, '10')
 
       expect(questionnaireQueryBuilder.where).toHaveBeenCalledWith(
         'questionnaire.meeting_id = :meetingId',
@@ -258,7 +258,7 @@ describe('QuestionnaireService.restartAfterMeetingDetailsChange', () => {
     const service = new QuestionnaireService({} as never, {} as never)
 
     await expect(
-      service.restartAfterMeetingDetailsChange(manager as never, '10'),
+      service.restartAfterMeetingInputChange(manager as never, '10'),
     ).resolves.toBeUndefined()
     expect(questionnaireRepository.save).not.toHaveBeenCalled()
     expect(manager.getRepository).toHaveBeenCalledTimes(1)

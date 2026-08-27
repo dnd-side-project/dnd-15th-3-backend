@@ -43,6 +43,7 @@ import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
 import { assertAccessToken } from './access/meeting-access.utils'
 import {
+  COURSE_GENERATABLE_STATUSES,
   MAP_PINS_VISIBLE_STATUSES,
   MEETING_DETAILS_EDITABLE_STATUSES,
   PLACE_PREFERENCE_EDITABLE_STATUSES,
@@ -193,7 +194,7 @@ export class MeetingService {
 
       if (changed) {
         await meetingRepository.save(meeting)
-        await this.questionnaireService.restartAfterMeetingDetailsChange(
+        await this.questionnaireService.restartAfterMeetingInputChange(
           manager,
           meetingId,
         )
@@ -534,15 +535,11 @@ export class MeetingService {
         throw new MeetingException(MeetingErrorCode.invalidCourseCategory)
       }
 
+      const meeting = await this.lockEditableCourseInputMeeting(
+        manager,
+        meetingId,
+      )
       const meetingRepository = manager.getRepository(Meeting)
-      const meeting = await meetingRepository
-        .createQueryBuilder('meeting')
-        .where('meeting.id = :meetingId', { meetingId })
-        .setLock('pessimistic_write')
-        .getOne()
-      if (!meeting) {
-        throw new MeetingException(MeetingErrorCode.notFound)
-      }
       if (meeting.courseVersion !== request.version) {
         throw new MeetingException(MeetingErrorCode.staleCoursePlan)
       }
@@ -570,6 +567,10 @@ export class MeetingService {
 
       meeting.courseVersion += 1
       const updatedMeeting = await meetingRepository.save(meeting)
+      await this.questionnaireService.restartAfterMeetingInputChange(
+        manager,
+        meetingId,
+      )
       return { meeting: updatedMeeting, steps }
     })
 
@@ -590,6 +591,8 @@ export class MeetingService {
         manager,
       )
       participant.assertHost(MeetingErrorCode.hostOnly)
+
+      await this.lockEditableCourseInputMeeting(manager, meetingId)
 
       const locationRepository = manager.getRepository(MeetingLocation)
       const location = await locationRepository
@@ -639,77 +642,102 @@ export class MeetingService {
     accessToken: string,
     request: AddRecommendationRequest,
   ): Promise<RecommendationPreviewDto> {
-    const participant = await this.meetingAccessService.findParticipant(
-      meetingId,
-      accessToken,
-    )
+    assertAccessToken(accessToken)
 
-    const [location, place] = await Promise.all([
-      this.dataSource.getRepository(MeetingLocation).findOne({
-        where: { meeting: { id: meetingId } },
-      }),
-      this.placeRepository.findOne({
-        where: { id: request.placeId },
-        relations: { category: true },
-      }),
-    ])
-    if (!location) {
-      throw new MeetingException(MeetingErrorCode.locationNotFound)
-    }
-    if (!place) {
-      throw new MeetingException(MeetingErrorCode.placeNotFound)
-    }
+    const { recommendation, resolvedPlace } = await this.dataSource.transaction(
+      async (manager) => {
+        const participant = await this.meetingAccessService.findParticipant(
+          meetingId,
+          accessToken,
+          manager,
+        )
+        await this.lockEditableCourseInputMeeting(manager, meetingId)
 
-    const resolvedPlace = await this.placeLiveDataService.resolvePlace(place, {
-      latitude: location.latitude,
-      longitude: location.longitude,
-    })
+        const [location, place] = await Promise.all([
+          manager.getRepository(MeetingLocation).findOne({
+            where: { meeting: { id: meetingId } },
+          }),
+          manager.getRepository(Place).findOne({
+            where: { id: request.placeId },
+            relations: { category: true },
+          }),
+        ])
+        if (!location) {
+          throw new MeetingException(MeetingErrorCode.locationNotFound)
+        }
+        if (!place) {
+          throw new MeetingException(MeetingErrorCode.placeNotFound)
+        }
 
-    const categoryStep = await this.dataSource
-      .getRepository(CourseCategoryStep)
-      .findOne({
-        where: {
-          meeting: { id: meetingId },
-          category: { id: place.category.id },
-        },
-      })
-    if (!categoryStep) {
-      throw new MeetingException(MeetingErrorCode.placeCategoryMismatch)
-    }
-
-    if (
-      haversineDistanceMeters(
-        location.latitude,
-        location.longitude,
-        resolvedPlace.latitude,
-        resolvedPlace.longitude,
-      ) > PLACE_SYNC_RADIUS_METERS
-    ) {
-      throw new MeetingException(MeetingErrorCode.placeOutsideRange)
-    }
-
-    const existing = await this.recommendationRepository.findOne({
-      where: { meeting: { id: meetingId }, place: { id: request.placeId } },
-    })
-    if (existing) {
-      throw new MeetingException(MeetingErrorCode.recommendationAlreadyExists)
-    }
-
-    let recommendation: MeetingPlaceRecommendation
-    try {
-      recommendation = await this.recommendationRepository.save(
-        this.recommendationRepository.create({
-          meeting: { id: meetingId } as Meeting,
+        // ponytail: 모임 잠금 중 실시간 장소를 조회한다. 지연이 문제가 되면 위치 버전 기반 prepare/commit 재시도로 분리한다.
+        const resolvedPlace = await this.placeLiveDataService.resolvePlace(
           place,
-          recommendedBy: participant,
-        }),
-      )
-    } catch (error) {
-      if (this.isUniqueViolation(error)) {
-        throw new MeetingException(MeetingErrorCode.recommendationAlreadyExists)
-      }
-      throw error
-    }
+          {
+            latitude: location.latitude,
+            longitude: location.longitude,
+          },
+        )
+
+        const categoryStep = await manager
+          .getRepository(CourseCategoryStep)
+          .findOne({
+            where: {
+              meeting: { id: meetingId },
+              category: { id: place.category.id },
+            },
+          })
+        if (!categoryStep) {
+          throw new MeetingException(MeetingErrorCode.placeCategoryMismatch)
+        }
+
+        if (
+          haversineDistanceMeters(
+            location.latitude,
+            location.longitude,
+            resolvedPlace.latitude,
+            resolvedPlace.longitude,
+          ) > PLACE_SYNC_RADIUS_METERS
+        ) {
+          throw new MeetingException(MeetingErrorCode.placeOutsideRange)
+        }
+
+        const recommendationRepository = manager.getRepository(
+          MeetingPlaceRecommendation,
+        )
+        const existing = await recommendationRepository.findOne({
+          where: { meeting: { id: meetingId }, place: { id: request.placeId } },
+        })
+        if (existing) {
+          throw new MeetingException(
+            MeetingErrorCode.recommendationAlreadyExists,
+          )
+        }
+
+        let recommendation: MeetingPlaceRecommendation
+        try {
+          recommendation = await recommendationRepository.save(
+            recommendationRepository.create({
+              meeting: { id: meetingId } as Meeting,
+              place,
+              recommendedBy: participant,
+            }),
+          )
+        } catch (error) {
+          if (this.isUniqueViolation(error)) {
+            throw new MeetingException(
+              MeetingErrorCode.recommendationAlreadyExists,
+            )
+          }
+          throw error
+        }
+
+        await this.questionnaireService.restartAfterMeetingInputChange(
+          manager,
+          meetingId,
+        )
+        return { recommendation, resolvedPlace }
+      },
+    )
 
     const previewPhotos = await this.placePhotoService.findPreviewPhotos([
       resolvedPlace,
@@ -720,6 +748,26 @@ export class MeetingService {
       resolvedPlace,
       previewPhotos.get(resolvedPlace.id) ?? null,
     )
+  }
+
+  private async lockEditableCourseInputMeeting(
+    manager: EntityManager,
+    meetingId: string,
+  ): Promise<Meeting> {
+    const meeting = await manager
+      .getRepository(Meeting)
+      .createQueryBuilder('meeting')
+      .where('meeting.id = :meetingId', { meetingId })
+      .setLock('pessimistic_write')
+      .getOne()
+    if (!meeting) {
+      throw new MeetingException(MeetingErrorCode.notFound)
+    }
+    meeting.assertStatus(
+      COURSE_GENERATABLE_STATUSES,
+      MeetingErrorCode.courseInputNotEditable,
+    )
+    return meeting
   }
 
   async getRecommendations(
