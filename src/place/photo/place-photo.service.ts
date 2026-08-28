@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { Env } from 'src/config/env'
-import { PlacePhotoSource } from '../enums/place-photo-source.enum'
 import { PlaceImageService } from '../place-image.service'
 import { KakaoImagePhotoProvider } from './kakao-image-photo.provider'
 import type { PlacePhoto, PlacePhotoTarget } from './place-photo.types'
@@ -26,13 +25,13 @@ export class PlacePhotoService {
     const uniqueTargets = [
       ...new Map(targets.map((target) => [target.id, target])).values(),
     ]
-    const ownedUrls = await this.placeImageService.getPrimaryImageUrls(
+    const storedPhotos = await this.placeImageService.getPrimaryPhotos(
       uniqueTargets.map((target) => target.id),
     )
     const result = new Map<string, PlacePhoto>()
     for (const target of uniqueTargets) {
-      const url = ownedUrls.get(target.id)
-      if (url) result.set(target.id, this.ownedPhoto(target.id, url, 0))
+      const photo = storedPhotos.get(target.id)
+      if (photo) result.set(target.id, photo)
     }
 
     await this.forEachConcurrent(
@@ -47,12 +46,8 @@ export class PlacePhotoService {
   }
 
   async findPhotos(target: PlacePhotoTarget): Promise<PlacePhoto[]> {
-    const ownedUrls = await this.placeImageService.getImageUrls(target.id)
-    if (ownedUrls.length > 0) {
-      return ownedUrls.map((url, index) =>
-        this.ownedPhoto(target.id, url, index),
-      )
-    }
+    const storedPhotos = await this.placeImageService.getPhotos(target.id)
+    if (storedPhotos.length > 0) return storedPhotos
     return await this.findExternalPhotos(target, MAX_DETAIL_PHOTOS)
   }
 
@@ -63,7 +58,17 @@ export class PlacePhotoService {
     if (this.tourPhotoProvider.isConfigured()) {
       try {
         const photos = await this.tourPhotoProvider.findPhotos(target, limit)
-        if (photos.length > 0) return photos
+        if (photos.length > 0) {
+          try {
+            return await this.placeImageService.cacheTourPhotos(
+              target.id,
+              photos,
+            )
+          } catch {
+            // ponytail: 최초 캐시의 동시 경합은 원본 URL로 복구한다. 병목이 확인되면 place별 lock을 추가한다.
+            return photos
+          }
+        }
       } catch {
         // 무료 제공자 장애는 다음 사진 제공자로 넘긴다.
       }
@@ -76,19 +81,6 @@ export class PlacePhotoService {
       }
     }
     return []
-  }
-
-  private ownedPhoto(placeId: string, url: string, index: number): PlacePhoto {
-    return {
-      id: `owned:${placeId}:${index + 1}`,
-      url,
-      width: null,
-      height: null,
-      source: PlacePhotoSource.Owned,
-      attributions: [],
-      googleMapsUri: null,
-      flagContentUri: null,
-    }
   }
 
   private async forEachConcurrent<T>(

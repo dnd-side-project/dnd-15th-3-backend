@@ -1,6 +1,8 @@
 import { BaseEntity } from 'src/common/entities/base.entity'
 import { MediaAsset } from 'src/common/entities/media-asset.entity'
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm'
+import { PlacePhotoSource } from '../enums/place-photo-source.enum'
+import type { PlacePhotoAttribution } from '../photo/place-photo.types'
 import { Place } from './place.entity'
 
 @Entity()
@@ -20,4 +22,14 @@ export class PlaceImage extends BaseEntity {
 
   @Column({ default: false })
   isPrimary: boolean
+
+  @Column({
+    type: 'enum',
+    enum: PlacePhotoSource,
+    default: PlacePhotoSource.Owned,
+  })
+  source: PlacePhotoSource
+
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  attributions: PlacePhotoAttribution[]
 }
