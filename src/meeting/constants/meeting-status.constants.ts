@@ -41,6 +41,25 @@ export const COURSE_GENERATABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.RecommendationCollecting,
 ]
 
+export const MEETING_LOCATION_EDITABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.RecommendationCollecting,
+  MeetingStatus.CourseGenerated,
+  MeetingStatus.CourseGenerationFailed,
+  MeetingStatus.CourseConfirmed,
+]
+
+export const RECOMMENDATION_ADDABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.RecommendationCollecting,
+  MeetingStatus.CourseGenerated,
+  MeetingStatus.CourseGenerationFailed,
+]
+
+export const COURSE_PLAN_EDITABLE_STATUSES: readonly MeetingStatus[] = [
+  MeetingStatus.RecommendationCollecting,
+  MeetingStatus.CourseGenerated,
+  MeetingStatus.CourseGenerationFailed,
+]
+
 export const COURSE_PLACE_ADDABLE_STATUSES: readonly MeetingStatus[] = [
   MeetingStatus.CourseGenerated,
 ]
