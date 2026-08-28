@@ -29,22 +29,3 @@ export type PlacePhotoTarget = {
   longitude: number
   phone: string | null
 }
-
-export type GooglePhotoReference = {
-  name: string
-  width: number
-  height: number
-  authorAttributions: PlacePhotoAttribution[]
-  googleMapsUri: string | null
-  flagContentUri: string | null
-}
-
-export type GooglePlacePhotoCandidate = {
-  id: string
-  name: string
-  address: string
-  latitude: number
-  longitude: number
-  phone: string | null
-  photos: GooglePhotoReference[]
-}

@@ -181,7 +181,7 @@ export class CourseController {
       'AI가 생성한 코스 후보의 상세 경로와 ' +
       '총 이동 거리를 조회합니다. ' +
       '모임이 코스 생성 완료 상태이거나 코스가 확정된 상태일 때 호출할 수 있습니다. ' +
-      '신규 클라이언트는 route[].previewPhoto를 사용하며, Google 사진은 previewPhoto의 source, attributions, googleMapsUri에 따라 표시해야 합니다.',
+      '신규 클라이언트는 route[].previewPhoto의 source와 attributions를 함께 사용해야 합니다.',
   })
   @ApiOkResponse({ type: CourseDetailResponseDto })
   @ApiErrorResponse(
@@ -353,7 +353,7 @@ export class CourseController {
     description:
       '이 코스에 선택되지 못한 장소 목록을 카테고리별로 조회합니다. ' +
       '모임이 코스 생성 완료 상태일 때만 호출할 수 있습니다. ' +
-      '신규 클라이언트는 items[].previewPhoto를 사용하며, Google 사진은 previewPhoto의 source, attributions, googleMapsUri에 따라 표시해야 합니다.',
+      '신규 클라이언트는 items[].previewPhoto의 source와 attributions를 함께 사용해야 합니다.',
   })
   @ApiOkResponse({ type: ExcludedPlaceListResponseDto })
   @ApiErrorResponse(

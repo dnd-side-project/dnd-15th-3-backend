@@ -35,7 +35,7 @@ describe('validateEnv', () => {
       expect(env.MEDIA_BUCKET_NAME).toBe('momo-media-test')
       expect(env.MEDIA_PUBLIC_BASE_URL).toContain('/momo-media-test/o/')
       expect(env.KAKAO_REST_API_KEY).toBe('')
-      expect(env.GOOGLE_PLACES_API_KEY).toBe('')
+      expect(env.TOUR_API_SERVICE_KEY).toBe('')
       expect(env.PLACE_PHOTO_PREVIEW_CONCURRENCY).toBe(10)
       expect(env.OPENAI_API_KEY).toBe('')
       expect(env.OPENAI_MODEL).toBe('')

@@ -1,9 +1,6 @@
 import { haversineDistanceMeters } from 'src/common/geo/haversine-distance'
 import { PlacePhotoMatchStatus } from '../enums/place-photo-match-status.enum'
-import type {
-  GooglePlacePhotoCandidate,
-  PlacePhotoTarget,
-} from './place-photo.types'
+import type { PlacePhotoTarget } from './place-photo.types'
 
 const MAX_MATCH_DISTANCE_METERS = 75
 const CLOSE_MATCH_DISTANCE_METERS = 25
@@ -11,21 +8,30 @@ const MIN_CONTAINED_NAME_LENGTH = 4
 const MIN_MATCH_CONFIDENCE = 0.8
 const MIN_WINNER_MARGIN = 0.1
 
-export type GooglePlaceMatchSelection = {
+export type PlacePhotoMatchCandidate = {
+  id: string
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  phone: string | null
+}
+
+export type PlacePhotoMatchSelection = {
   status: PlacePhotoMatchStatus
-  candidate: GooglePlacePhotoCandidate | null
+  candidate: PlacePhotoMatchCandidate | null
   confidence: number | null
 }
 
 type ScoredCandidate = {
-  candidate: GooglePlacePhotoCandidate
+  candidate: PlacePhotoMatchCandidate
   confidence: number
 }
 
-export function selectGooglePlacePhotoMatch(
+export function selectPlacePhotoMatch(
   target: PlacePhotoTarget,
-  candidates: GooglePlacePhotoCandidate[],
-): GooglePlaceMatchSelection {
+  candidates: PlacePhotoMatchCandidate[],
+): PlacePhotoMatchSelection {
   if (candidates.length === 0) {
     return {
       status: PlacePhotoMatchStatus.NotFound,
@@ -72,7 +78,7 @@ export function selectGooglePlacePhotoMatch(
 
 function scoreCandidate(
   target: PlacePhotoTarget,
-  candidate: GooglePlacePhotoCandidate,
+  candidate: PlacePhotoMatchCandidate,
 ): ScoredCandidate | null {
   const targetName = normalizeText(target.name)
   const candidateName = normalizeText(candidate.name)

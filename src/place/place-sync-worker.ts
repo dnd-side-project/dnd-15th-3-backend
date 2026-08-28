@@ -5,7 +5,6 @@ import { createApplicationLogger } from 'src/common/observability/application-lo
 import type { Env } from 'src/config/env'
 import { MediaCleanupWorker } from 'src/media/media-cleanup.worker'
 import { QuestionnaireGenerationWorker } from 'src/questionnaire/questionnaire-generation.worker'
-import { PlaceSyncWorker } from './sync/place-sync.worker'
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule, {
@@ -19,12 +18,10 @@ async function bootstrap() {
       level: config.get('LOG_LEVEL', { infer: true }),
     }),
   )
-  const placeSyncWorker = app.get(PlaceSyncWorker)
   const mediaCleanupWorker = app.get(MediaCleanupWorker)
   const questionnaireGenerationWorker = app.get(QuestionnaireGenerationWorker)
 
   const shutdown = async () => {
-    placeSyncWorker.stop()
     mediaCleanupWorker.stop()
     questionnaireGenerationWorker.stop()
     await app.close()
@@ -33,7 +30,6 @@ async function bootstrap() {
   process.once('SIGTERM', shutdown)
   process.once('SIGINT', shutdown)
   await Promise.all([
-    placeSyncWorker.run(),
     mediaCleanupWorker.run(),
     questionnaireGenerationWorker.run(),
   ])

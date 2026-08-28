@@ -749,7 +749,7 @@ export class MeetingController {
     description:
       '기준 장소와 같은 카테고리이면서 일정 반경 이내에 있는 장소를 무작위로 추천합니다. ' +
       '모임이 장소 추천 수집 중, 코스 생성 중, 코스 생성 완료, 코스 생성 실패 상태일 때만 호출할 수 있습니다. ' +
-      '신규 클라이언트는 previewPhoto를 사용하며, Google 사진은 source, attributions, googleMapsUri에 따라 표시해야 합니다.',
+      '신규 클라이언트는 previewPhoto의 source와 attributions를 함께 사용해야 합니다.',
   })
   @ApiOkResponse({ type: SimilarPlaceResponseDto, isArray: true })
   @ApiErrorResponse(
