@@ -5,7 +5,7 @@ import { PlaceSource } from '../enums/place-source.enum'
 import type { PlaceImageService } from '../place-image.service'
 import type { KakaoImagePhotoProvider } from './kakao-image-photo.provider'
 import { PlacePhotoService } from './place-photo.service'
-import type { PlacePhotoTarget } from './place-photo.types'
+import type { PlacePhoto, PlacePhotoTarget } from './place-photo.types'
 import type { TourPlacePhotoProvider } from './tour-place-photo.provider'
 
 const target: PlacePhotoTarget = {
@@ -37,6 +37,17 @@ const tourPhoto = {
   flagContentUri: null,
 }
 
+const ownedPhoto: PlacePhoto = {
+  id: 'owned:1:1',
+  url: 'https://media.example.com/place-1.jpg',
+  width: null,
+  height: null,
+  source: PlacePhotoSource.Owned,
+  attributions: [],
+  googleMapsUri: null,
+  flagContentUri: null,
+}
+
 const kakaoPhoto = {
   id: 'kakao-image:1:1',
   url: 'https://example.com/photo.jpg',
@@ -56,8 +67,11 @@ const kakaoPhoto = {
 
 function createService() {
   const placeImageService = {
-    getPrimaryImageUrls: jest.fn().mockResolvedValue(new Map()),
-    getImageUrls: jest.fn().mockResolvedValue([]),
+    getPrimaryPhotos: jest.fn().mockResolvedValue(new Map()),
+    getPhotos: jest.fn().mockResolvedValue([]),
+    cacheTourPhotos: jest
+      .fn()
+      .mockImplementation((_placeId: string, photos: PlacePhoto[]) => photos),
   }
   const tourPhotoProvider = {
     isConfigured: jest.fn().mockReturnValue(true),
@@ -91,8 +105,8 @@ describe('PlacePhotoService', () => {
       tourPhotoProvider,
       kakaoImagePhotoProvider,
     } = createService()
-    placeImageService.getPrimaryImageUrls.mockResolvedValue(
-      new Map([['1', 'https://media.example.com/place-1.jpg']]),
+    placeImageService.getPrimaryPhotos.mockResolvedValue(
+      new Map([['1', ownedPhoto]]),
     )
 
     const result = await service.findPreviewPhotos([target])
@@ -106,12 +120,27 @@ describe('PlacePhotoService', () => {
   })
 
   it('TourAPI 사진을 Kakao보다 우선한다', async () => {
-    const { service, tourPhotoProvider, kakaoImagePhotoProvider } =
-      createService()
+    const {
+      service,
+      placeImageService,
+      tourPhotoProvider,
+      kakaoImagePhotoProvider,
+    } = createService()
     tourPhotoProvider.findPhotos.mockResolvedValue([tourPhoto])
 
     await expect(service.findPhotos(target)).resolves.toEqual([tourPhoto])
+    expect(placeImageService.cacheTourPhotos).toHaveBeenCalledWith('1', [
+      tourPhoto,
+    ])
     expect(kakaoImagePhotoProvider.findPhotos).not.toHaveBeenCalled()
+  })
+
+  it('TourAPI 사진 캐시에 실패하면 원본 URL을 반환한다', async () => {
+    const { service, placeImageService, tourPhotoProvider } = createService()
+    tourPhotoProvider.findPhotos.mockResolvedValue([tourPhoto])
+    placeImageService.cacheTourPhotos.mockRejectedValue(new Error('conflict'))
+
+    await expect(service.findPhotos(target)).resolves.toEqual([tourPhoto])
   })
 
   it('TourAPI 사진이 없으면 Kakao 이미지 검색을 사용한다', async () => {
