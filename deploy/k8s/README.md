@@ -1,12 +1,12 @@
 # Kubernetes runtime configuration
 
-The API and place-sync worker load their general application configuration from
+The API and workers load their general application configuration from
 `momo-api-env` and public media configuration from `momo-media-storage`.
-`momo-api-env` must include `GOOGLE_PLACES_API_KEY` to enable verified Google
-place photos and Google place synchronization. Restrict this server-side key to
-the Places API and the deployment's outbound addresses. When the key is absent
-or Google is unavailable, place endpoints remain available and return empty
-photo fields instead of falling back to unverified web-image search.
+
+`momo-api-env` may include `TOUR_API_SERVICE_KEY` to use the free Korea Tourism
+Organization photo fallback before Kakao image search. Use the
+encoding or decoding key issued by the public data portal. If it is absent or
+unavailable, the next configured photo provider is used.
 
 Create `momo-media-storage` in each application namespace with these keys:
 

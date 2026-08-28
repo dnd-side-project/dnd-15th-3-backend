@@ -1,4 +1,5 @@
 export enum PlacePhotoSource {
   Owned = 'OWNED',
-  Google = 'GOOGLE',
+  Tour = 'TOUR',
+  Kakao = 'KAKAO',
 }

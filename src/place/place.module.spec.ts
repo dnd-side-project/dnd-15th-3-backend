@@ -1,20 +1,18 @@
 import { MODULE_METADATA } from '@nestjs/common/constants'
+import { KakaoImagePhotoProvider } from './photo/kakao-image-photo.provider'
+import { TourPlacePhotoProvider } from './photo/tour-place-photo.provider'
 import { PlaceModule } from './place.module'
-import { GooglePlacesProvider } from './provider/google-places.provider'
 import { KakaoPlacesProvider } from './provider/kakao-places.provider'
-import { PLACE_PROVIDER } from './sync/place-sync.tokens'
 
 describe('PlaceModule Provider wiring', () => {
-  it('Kakao Provider를 등록하되 장소 수집에는 Google Provider를 유지한다', () => {
+  it('무료 장소·사진 Provider만 등록한다', () => {
     const providers = Reflect.getMetadata(
       MODULE_METADATA.PROVIDERS,
       PlaceModule,
     ) as unknown[]
 
     expect(providers).toContain(KakaoPlacesProvider)
-    expect(providers).toContainEqual({
-      provide: PLACE_PROVIDER,
-      useExisting: GooglePlacesProvider,
-    })
+    expect(providers).toContain(TourPlacePhotoProvider)
+    expect(providers).toContain(KakaoImagePhotoProvider)
   })
 })

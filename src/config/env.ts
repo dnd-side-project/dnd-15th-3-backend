@@ -46,7 +46,7 @@ const envSchemaBase = z.object({
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   KAKAO_REST_API_KEY: z.string().trim().default(''),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
-  GOOGLE_PLACES_API_KEY: z.string().trim().default(''),
+  TOUR_API_SERVICE_KEY: z.string().trim().default(''),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   PLACE_PHOTO_PREVIEW_CONCURRENCY: z.coerce
     .number()

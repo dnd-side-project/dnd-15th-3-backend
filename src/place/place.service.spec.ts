@@ -265,13 +265,13 @@ describe('PlaceService', () => {
       })
       const previewUrl = 'https://search.example.com/place-thumbnail.jpg'
       const previewPhoto = {
-        id: 'google:10:1',
+        id: 'kakao-image:10:1',
         url: previewUrl,
         width: 800,
         height: 600,
-        source: PlacePhotoSource.Google,
+        source: PlacePhotoSource.Kakao,
         attributions: [{ displayName: '사진가', uri: null, photoUri: null }],
-        googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+        googleMapsUri: null,
         flagContentUri: null,
       }
       placePhotoService.findPreviewPhotos.mockResolvedValue(
@@ -626,7 +626,7 @@ describe('PlaceService', () => {
       })
     })
 
-    it('Kakao 장소도 업체가 검증된 Google 사진만 응답한다', async () => {
+    it('Kakao 장소도 선택된 외부 사진과 출처를 응답한다', async () => {
       const {
         service,
         participantRepository,
@@ -662,13 +662,13 @@ describe('PlaceService', () => {
         distanceMeters: 100,
       })
       const image = {
-        id: 'google:1:1',
+        id: 'tour:1:1',
         url: 'https://images.example.com/place.jpg',
         width: 1200,
         height: 900,
-        source: PlacePhotoSource.Google,
+        source: PlacePhotoSource.Tour,
         attributions: [{ displayName: '사진가', uri: null, photoUri: null }],
-        googleMapsUri: 'https://www.google.com/maps/place/photo-1',
+        googleMapsUri: null,
         flagContentUri: null,
       }
       placePhotoService.findPhotos.mockResolvedValue([image])

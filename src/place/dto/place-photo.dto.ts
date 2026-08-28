@@ -42,7 +42,7 @@ export class PlacePhotoDto {
 
   @ApiProperty({
     description:
-      '사진 출처. GOOGLE이면 Google Maps 및 사진 제공자 표시 규칙을 적용합니다.',
+      '사진 출처. TOUR·KAKAO 사진은 attributions의 출처 표시 규칙을 적용합니다.',
     enum: PlacePhotoSource,
   })
   source!: PlacePhotoSource
@@ -57,7 +57,7 @@ export class PlacePhotoDto {
 
   @ApiProperty({
     description:
-      'Google Maps에서 개별 원본 사진을 볼 수 있는 URL. GOOGLE 사진은 HTTPS URL이고 OWNED 사진은 null입니다.',
+      '이전 Google 사진 응답과의 호환 필드. 현재 제공자에서는 null입니다.',
     type: String,
     format: 'uri',
     nullable: true,
@@ -66,7 +66,7 @@ export class PlacePhotoDto {
 
   @ApiProperty({
     description:
-      'Google Maps에 사진 문제를 신고할 수 있는 URL. 제공되지 않거나 OWNED 사진이면 null입니다.',
+      '이전 Google 사진 응답과의 호환 필드. 현재 제공자에서는 null입니다.',
     type: String,
     format: 'uri',
     nullable: true,
