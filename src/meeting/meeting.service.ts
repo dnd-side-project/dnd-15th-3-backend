@@ -43,10 +43,12 @@ import { DataSource, type EntityManager, In, Repository } from 'typeorm'
 import { MeetingAccessService } from './access/meeting-access.service'
 import { assertAccessToken } from './access/meeting-access.utils'
 import {
-  COURSE_GENERATABLE_STATUSES,
+  COURSE_PLAN_EDITABLE_STATUSES,
   MAP_PINS_VISIBLE_STATUSES,
   MEETING_DETAILS_EDITABLE_STATUSES,
+  MEETING_LOCATION_EDITABLE_STATUSES,
   PLACE_PREFERENCE_EDITABLE_STATUSES,
+  RECOMMENDATION_ADDABLE_STATUSES,
   SIMILAR_PLACES_RECOMMENDABLE_STATUSES,
 } from './constants/meeting-status.constants'
 import { CourseImageResponseDto } from './dto/course-image-response.dto'
@@ -538,6 +540,7 @@ export class MeetingService {
       const meeting = await this.lockEditableCourseInputMeeting(
         manager,
         meetingId,
+        COURSE_PLAN_EDITABLE_STATUSES,
       )
       const meetingRepository = manager.getRepository(Meeting)
       if (meeting.courseVersion !== request.version) {
@@ -592,7 +595,11 @@ export class MeetingService {
       )
       participant.assertHost(MeetingErrorCode.hostOnly)
 
-      await this.lockEditableCourseInputMeeting(manager, meetingId)
+      await this.lockEditableCourseInputMeeting(
+        manager,
+        meetingId,
+        MEETING_LOCATION_EDITABLE_STATUSES,
+      )
 
       const locationRepository = manager.getRepository(MeetingLocation)
       const location = await locationRepository
@@ -651,7 +658,11 @@ export class MeetingService {
           accessToken,
           manager,
         )
-        await this.lockEditableCourseInputMeeting(manager, meetingId)
+        await this.lockEditableCourseInputMeeting(
+          manager,
+          meetingId,
+          RECOMMENDATION_ADDABLE_STATUSES,
+        )
 
         const [location, place] = await Promise.all([
           manager.getRepository(MeetingLocation).findOne({
@@ -753,6 +764,7 @@ export class MeetingService {
   private async lockEditableCourseInputMeeting(
     manager: EntityManager,
     meetingId: string,
+    allowedStatuses: readonly MeetingStatus[],
   ): Promise<Meeting> {
     const meeting = await manager
       .getRepository(Meeting)
@@ -764,7 +776,7 @@ export class MeetingService {
       throw new MeetingException(MeetingErrorCode.notFound)
     }
     meeting.assertStatus(
-      COURSE_GENERATABLE_STATUSES,
+      allowedStatuses,
       MeetingErrorCode.courseInputNotEditable,
     )
     return meeting
