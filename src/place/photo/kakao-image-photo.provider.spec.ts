@@ -20,9 +20,13 @@ const target: PlacePhotoTarget = {
   phone: null,
 }
 
-function createProvider(apiKey = 'kakao-key') {
+function createProvider(apiKey = 'kakao-key', redisUrl = '') {
   const config = {
-    get: jest.fn().mockReturnValue(apiKey),
+    get: jest.fn((key: keyof Env) => {
+      if (key === 'KAKAO_REST_API_KEY') return apiKey
+      if (key === 'REDIS_URL') return redisUrl
+      return undefined
+    }),
   } as unknown as ConfigService<Env, true>
   return new KakaoImagePhotoProvider(config)
 }
@@ -88,5 +92,48 @@ describe('KakaoImagePhotoProvider', () => {
       KakaoImagePhotoProviderError,
     )
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('검색 결과를 Redis에 1일 캐시하고 다음 요청에서 재사용한다', async () => {
+    let cached: string | null = null
+    const get = jest.fn().mockImplementation(() => Promise.resolve(cached))
+    const set = jest.fn().mockImplementation((_key: string, value: string) => {
+      cached = value
+      return Promise.resolve('OK')
+    })
+    const provider = createProvider()
+    Object.assign(provider, {
+      cacheClient: { isReady: true, isOpen: true, get, set },
+    })
+    const responseBody = {
+      documents: [
+        {
+          // biome-ignore lint/style/useNamingConvention: Kakao API response field.
+          image_url: 'https://images.example.com/place.jpg',
+          // biome-ignore lint/style/useNamingConvention: Kakao API response field.
+          thumbnail_url: 'https://search.kakaocdn.net/thumb.jpg',
+          width: 1200,
+          height: 900,
+          // biome-ignore lint/style/useNamingConvention: Kakao API response field.
+          display_sitename: '출처 사이트',
+          // biome-ignore lint/style/useNamingConvention: Kakao API response field.
+          doc_url: 'https://example.com/post',
+        },
+      ],
+    }
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify(responseBody)))
+
+    await provider.findPhotos(target, 1)
+    await provider.findPhotos(target, 1)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(set).toHaveBeenCalledWith(
+      expect.stringContaining('momo:kakao-image:v1:'),
+      JSON.stringify(responseBody),
+      { expiration: { type: 'EX', value: 86_400 } },
+    )
+    expect(get).toHaveBeenCalledTimes(2)
   })
 })

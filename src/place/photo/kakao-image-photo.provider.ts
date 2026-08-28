@@ -1,5 +1,6 @@
-import { Injectable, Optional } from '@nestjs/common'
+import { Injectable, type OnModuleDestroy, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { createClient, type RedisClientType } from 'redis'
 import { MetricsService } from 'src/common/observability/metrics.service'
 import type { Env } from 'src/config/env'
 import { z } from 'zod'
@@ -8,6 +9,9 @@ import type { PlacePhoto, PlacePhotoTarget } from './place-photo.types'
 
 const KAKAO_IMAGE_SEARCH_URL = 'https://dapi.kakao.com/v2/search/image'
 const KAKAO_REQUEST_TIMEOUT_MS = 4_000
+const KAKAO_IMAGE_CACHE_TTL_SECONDS = 24 * 60 * 60
+const REDIS_CONNECT_TIMEOUT_MS = 500
+const KAKAO_IMAGE_CACHE_KEY_PREFIX = 'momo:kakao-image:v1'
 
 const kakaoImageDocumentSchema = z.object({
   // biome-ignore lint/style/useNamingConvention: Kakao API response field.
@@ -29,13 +33,31 @@ const kakaoImageResponseSchema = z.object({
 export class KakaoImagePhotoProviderError extends Error {}
 
 @Injectable()
-export class KakaoImagePhotoProvider {
+export class KakaoImagePhotoProvider implements OnModuleDestroy {
   private readonly inFlight = new Map<string, Promise<PlacePhoto[]>>()
+  private readonly cacheClient: RedisClientType | null
+  private cacheConnection: Promise<boolean> | undefined
 
   constructor(
     private readonly config: ConfigService<Env, true>,
     @Optional() private readonly metrics?: MetricsService,
-  ) {}
+  ) {
+    const redisUrl = this.config.get('REDIS_URL', { infer: true })
+    this.cacheClient = redisUrl
+      ? createClient({
+          url: redisUrl,
+          socket: {
+            connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+            reconnectStrategy: false,
+          },
+        })
+      : null
+    this.cacheClient?.on('error', () => undefined)
+  }
+
+  onModuleDestroy(): void {
+    if (this.cacheClient?.isOpen) this.cacheClient.destroy()
+  }
 
   isConfigured(): boolean {
     return this.apiKey().length > 0
@@ -46,11 +68,9 @@ export class KakaoImagePhotoProvider {
     const pending = this.inFlight.get(key)
     if (pending) return pending
 
-    const request = this.observe(() => this.loadPhotos(target, limit)).finally(
-      () => {
-        if (this.inFlight.get(key) === request) this.inFlight.delete(key)
-      },
-    )
+    const request = this.loadPhotos(target, limit).finally(() => {
+      if (this.inFlight.get(key) === request) this.inFlight.delete(key)
+    })
     this.inFlight.set(key, request)
     return request
   }
@@ -75,13 +95,18 @@ export class KakaoImagePhotoProvider {
       sort: 'accuracy',
       size: String(Math.min(80, Math.max(limit * 3, 10))),
     }).toString()
+    const cacheKey = `${KAKAO_IMAGE_CACHE_KEY_PREFIX}:${url.searchParams.toString()}`
+    const cached = await this.readCache(cacheKey)
+    if (cached) return this.toPhotos(target, cached.documents, limit)
 
     let response: Response
     try {
-      response = await fetch(url, {
-        headers: { authorization: `KakaoAK ${apiKey}` },
-        signal: AbortSignal.timeout(KAKAO_REQUEST_TIMEOUT_MS),
-      })
+      response = await this.observe(() =>
+        fetch(url, {
+          headers: { authorization: `KakaoAK ${apiKey}` },
+          signal: AbortSignal.timeout(KAKAO_REQUEST_TIMEOUT_MS),
+        }),
+      )
     } catch (error) {
       throw new KakaoImagePhotoProviderError(
         'Kakao image search request failed',
@@ -110,8 +135,17 @@ export class KakaoImagePhotoProvider {
       )
     }
 
+    await this.writeCache(cacheKey, parsed.data)
+    return this.toPhotos(target, parsed.data.documents, limit)
+  }
+
+  private toPhotos(
+    target: PlacePhotoTarget,
+    documents: z.infer<typeof kakaoImageDocumentSchema>[],
+    limit: number,
+  ): PlacePhoto[] {
     const seen = new Set<string>()
-    return parsed.data.documents
+    return documents
       .map((document) => ({
         document,
         imageUrl:
@@ -141,6 +175,49 @@ export class KakaoImagePhotoProvider {
         googleMapsUri: null,
         flagContentUri: null,
       }))
+  }
+
+  private async readCache(
+    key: string,
+  ): Promise<z.infer<typeof kakaoImageResponseSchema> | null> {
+    if (!(await this.ensureCacheReady())) return null
+    try {
+      const value = await this.cacheClient?.get(key)
+      if (!value) return null
+      const parsed = kakaoImageResponseSchema.safeParse(JSON.parse(value))
+      return parsed.success ? parsed.data : null
+    } catch {
+      return null
+    }
+  }
+
+  private async writeCache(
+    key: string,
+    value: z.infer<typeof kakaoImageResponseSchema>,
+  ): Promise<void> {
+    if (!(await this.ensureCacheReady())) return
+    try {
+      await this.cacheClient?.set(key, JSON.stringify(value), {
+        expiration: { type: 'EX', value: KAKAO_IMAGE_CACHE_TTL_SECONDS },
+      })
+    } catch {
+      // 캐시는 선택 기능이므로 Kakao 응답을 그대로 반환한다.
+    }
+  }
+
+  private async ensureCacheReady(): Promise<boolean> {
+    if (!this.cacheClient) return false
+    if (this.cacheClient.isReady) return true
+    if (this.cacheConnection) return await this.cacheConnection
+    if (this.cacheClient.isOpen) return false
+
+    this.cacheConnection = this.cacheClient.connect().then(
+      () => true,
+      () => false,
+    )
+    const connected = await this.cacheConnection
+    this.cacheConnection = undefined
+    return connected
   }
 
   private httpsUrl(value: string): string | null {

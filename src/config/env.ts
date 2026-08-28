@@ -22,6 +22,19 @@ function requiredInProduction<T extends z.ZodString>(schema: T) {
   )
 }
 
+const optionalRedisUrl = z
+  .string()
+  .trim()
+  .refine((value) => {
+    if (!value) return true
+    try {
+      return ['redis:', 'rediss:'].includes(new URL(value).protocol)
+    } catch {
+      return false
+    }
+  }, 'Must be a redis:// or rediss:// URL')
+  .default('')
+
 const envSchemaBase = z.object({
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   NODE_ENV: z
@@ -41,6 +54,8 @@ const envSchemaBase = z.object({
   METRICS_ENABLED: coerceBoolean,
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+  // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+  REDIS_URL: optionalRedisUrl,
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
   CORS_ORIGINS: z.string().trim().min(1),
   // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
