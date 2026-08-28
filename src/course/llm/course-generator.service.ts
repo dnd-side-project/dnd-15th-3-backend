@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
   buildCourseRoutePlan,
   CoursePlanningError,
@@ -35,7 +35,14 @@ export class CourseGeneratorError extends Error {
   }
 }
 
-const MAX_ATTEMPTS = 3
+const MAX_ATTEMPTS = 2
+const LOGGED_CONTENT_MAX_LENGTH = 300
+
+function truncateForLog(content: string): string {
+  return content.length > LOGGED_CONTENT_MAX_LENGTH
+    ? `${content.slice(0, LOGGED_CONTENT_MAX_LENGTH)}... (총 ${content.length}자)`
+    : content
+}
 
 type CourseRoute = CourseGeneratorOutput['routes'][number]
 
@@ -94,6 +101,8 @@ function assertRegenerationStrategy(
 
 @Injectable()
 export class CourseGeneratorService {
+  private readonly logger = new Logger(CourseGeneratorService.name)
+
   constructor(@Inject(LLM_CLIENT) private readonly client: LlmClientPort) {}
 
   async generate(
@@ -131,12 +140,19 @@ export class CourseGeneratorService {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : '알 수 없는 호출 오류'
+        this.logger.warn(
+          `LLM 호출에 실패했습니다 (attempt ${attempt}/${MAX_ATTEMPTS}): ${message}`,
+          error instanceof Error ? error.stack : undefined,
+        )
         feedbackMessages.push(`- AI 호출에 실패했습니다: ${message}`)
         continue
       }
 
       const parsed = parseJson(content)
       if (parsed === undefined) {
+        this.logger.warn(
+          `LLM 출력이 유효한 JSON이 아닙니다 (attempt ${attempt}/${MAX_ATTEMPTS}): ${truncateForLog(content)}`,
+        )
         feedbackMessages.push(
           '- 출력이 유효한 JSON이 아닙니다. JSON만 반환하세요.',
         )
@@ -146,11 +162,17 @@ export class CourseGeneratorService {
       const result = schema.safeParse(parsed)
       if (result.success) return result.data
 
+      this.logger.warn(
+        `LLM 출력이 스키마 검증에 실패했습니다 (attempt ${attempt}/${MAX_ATTEMPTS}): ${result.error.issues.map((issue) => issue.message).join('; ')}`,
+      )
       feedbackMessages.push(
         ...result.error.issues.map((issue) => `- ${issue.message}`),
       )
     }
 
+    this.logger.error(
+      `LLM이 ${MAX_ATTEMPTS}회 시도 모두 실패해 서버 폴백 코스를 사용합니다.`,
+    )
     return buildFallbackOutput(input, plan)
   }
 
