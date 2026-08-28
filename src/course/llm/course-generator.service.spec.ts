@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { Logger } from '@nestjs/common'
 import {
   buildCourseRoutePlan,
   getRouteCompositionKey,
@@ -167,7 +168,7 @@ describe('CourseGeneratorService', () => {
         '7',
         '10',
       ])
-      expect(mockChat).toHaveBeenCalledTimes(3)
+      expect(mockChat).toHaveBeenCalledTimes(2)
     })
 
     it('falls back to server routes when the AI call fails', async () => {
@@ -179,7 +180,7 @@ describe('CourseGeneratorService', () => {
       const output = await service.generate(input)
 
       expect(output.routes).toHaveLength(3)
-      expect(mockChat).toHaveBeenCalledTimes(3)
+      expect(mockChat).toHaveBeenCalledTimes(2)
     })
 
     it('regenerates one course without comments using a different candidate', async () => {
@@ -247,7 +248,7 @@ describe('CourseGeneratorService', () => {
           }),
           model: 'test-model',
         })
-        .mockResolvedValue('not json')
+        .mockResolvedValue({ content: 'not json', model: 'test-model' })
 
       const service = new CourseGeneratorService(client as unknown as LlmClient)
       const output = await service.regenerateOne(input, {
@@ -257,8 +258,66 @@ describe('CourseGeneratorService', () => {
       })
 
       expect(output.places.map((place) => place.placeId)).not.toContain('10')
-      expect(mockChat).toHaveBeenCalledTimes(4)
+      expect(mockChat).toHaveBeenCalledTimes(3)
       expect(mockChat.mock.calls[0][1]).toContain('comment-1')
+    })
+  })
+
+  describe('logging', () => {
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
+    it('logs a warning when the LLM call itself fails', async () => {
+      const input = loadInputFixture('input-normal')
+      const { client, mockChat } = createMockClient()
+      mockChat.mockRejectedValue(new Error('provider unavailable'))
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation()
+
+      const service = new CourseGeneratorService(client as unknown as LlmClient)
+      await service.generate(input)
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('provider unavailable'),
+        expect.any(String),
+      )
+    })
+
+    it('logs a warning per failed attempt and an error when it falls back', async () => {
+      const input = loadInputFixture('input-normal')
+      const { client, mockChat } = createMockClient()
+      mockChat.mockResolvedValue({
+        content: 'not json',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b',
+      })
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation()
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation()
+
+      const service = new CourseGeneratorService(client as unknown as LlmClient)
+      await service.generate(input)
+
+      expect(warnSpy).toHaveBeenCalledTimes(2)
+      expect(errorSpy).toHaveBeenCalledWith(expect.any(String))
+    })
+
+    it('truncates a long invalid JSON response in the log message', async () => {
+      const input = loadInputFixture('input-normal')
+      const { client, mockChat } = createMockClient()
+      const longInvalidContent = 'x'.repeat(1000)
+      mockChat.mockResolvedValue({
+        content: longInvalidContent,
+        model: 'nvidia/nemotron-3-ultra-550b-a55b',
+      })
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation()
+
+      const service = new CourseGeneratorService(client as unknown as LlmClient)
+      await service.generate(input)
+
+      const [message] = warnSpy.mock.calls[0]
+      expect(message).toContain('(총 1000자)')
+      expect(message.length).toBeLessThan(longInvalidContent.length)
     })
   })
 })
