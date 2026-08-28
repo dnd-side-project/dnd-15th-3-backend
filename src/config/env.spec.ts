@@ -32,6 +32,7 @@ describe('validateEnv', () => {
       expect(env.STATS_DB_USERNAME).toBe('postgres')
       expect(env.STATS_DB_DATABASE).toBe('postgres')
       expect(env.OCI_REGION).toBe('ap-hyderabad-1')
+      expect(env.REDIS_URL).toBe('')
       expect(env.MEDIA_BUCKET_NAME).toBe('momo-media-test')
       expect(env.MEDIA_PUBLIC_BASE_URL).toContain('/momo-media-test/o/')
       expect(env.KAKAO_REST_API_KEY).toBe('')
@@ -156,6 +157,23 @@ describe('validateEnv', () => {
       expect(() => validateEnv({ ...baseConfig, DB_PORT: 'abc' })).toThrow(
         'Invalid environment variables',
       )
+    })
+
+    it('Redis URL은 redis 또는 rediss 프로토콜만 허용한다', () => {
+      expect(
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          REDIS_URL: 'redis://localhost:6379',
+        }).REDIS_URL,
+      ).toBe('redis://localhost:6379')
+      expect(() =>
+        validateEnv({
+          ...baseConfig,
+          // biome-ignore lint/style/useNamingConvention: 환경 변수 이름과 동일하게 유지
+          REDIS_URL: 'https://localhost:6379',
+        }),
+      ).toThrow('REDIS_URL')
     })
 
     it('사진 동시 조회 수를 안전한 범위로 제한한다', () => {

@@ -12,6 +12,8 @@ spec:
               value: development
             - name: CORS_ORIGINS
               value: "http://localhost:5173,http://localhost:6006,https://dnd-15th-3-frontend.pages.dev,https://*.dnd-15th-3-frontend.pages.dev"
+            - name: REDIS_URL
+              value: redis://momo-redis:6379
             - name: DB_HOST
               value: momo-postgres
             - name: DB_PORT
