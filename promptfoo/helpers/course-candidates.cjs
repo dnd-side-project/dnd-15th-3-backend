@@ -172,10 +172,137 @@ function buildStrategyDefaults(selectionPools) {
   return defaults
 }
 
+const DEFAULT_DIVERSITY_WEIGHTS = { positional: 0.7, tag: 0.3 }
+
+function buildPlaceTagIndex(places) {
+  const index = new Map()
+  for (const place of places ?? []) {
+    index.set(place.id, new Set(place.tags ?? []))
+  }
+  return index
+}
+
+function routeTagSet(placeIds, placeTagIndex) {
+  const tags = new Set()
+  for (const placeId of placeIds) {
+    for (const tag of placeTagIndex.get(placeId) ?? []) {
+      tags.add(tag)
+    }
+  }
+  return tags
+}
+
+// 두 후보가 같은 슬롯(방문 순서 위치)에서 얼마나 다른 장소를 썼는지 비율로 나타낸다.
+function positionalDiff(placeIdsA, placeIdsB) {
+  let diffCount = 0
+  for (let index = 0; index < placeIdsA.length; index += 1) {
+    if (placeIdsA[index] !== placeIdsB[index]) diffCount += 1
+  }
+  return diffCount / placeIdsA.length
+}
+
+function tagDiff(tagSetA, tagSetB) {
+  if (tagSetA.size === 0 && tagSetB.size === 0) return null
+
+  let intersectionSize = 0
+  for (const tag of tagSetA) {
+    if (tagSetB.has(tag)) intersectionSize += 1
+  }
+  const unionSize = tagSetA.size + tagSetB.size - intersectionSize
+  if (unionSize === 0) return null
+
+  return 1 - intersectionSize / unionSize
+}
+
+function candidateDissimilarity(candidateA, candidateB, weights) {
+  const posDiff = positionalDiff(candidateA.placeIds, candidateB.placeIds)
+  const tagDifference = tagDiff(candidateA.tagSet, candidateB.tagSet)
+  if (tagDifference === null) return posDiff
+  return weights.positional * posDiff + weights.tag * tagDifference
+}
+
+/**
+ * routeCandidates를 LLM에 넘기기 직전에, 점수순이 아니라 "서로 얼마나 다른가"
+ * 기준으로 targetCount개까지 줄인다.
+ * 1) strategyDefaults(전략별 검증된 대표 후보)를 항상 시드로 포함
+ * 2) 나머지 후보 중 "이미 선택된 것들과 제일 가까운 거리"가 가장 큰 것을 하나씩 추가
+ * 3) targetCount에 도달하거나 후보가 소진되면 종료
+ */
+function reduceRouteCandidatesByDiversity(
+  candidates,
+  strategyDefaults,
+  places,
+  targetCount,
+  weights = DEFAULT_DIVERSITY_WEIGHTS,
+) {
+  if (!Number.isFinite(targetCount) || candidates.length <= targetCount) {
+    return candidates
+  }
+
+  const placeTagIndex = buildPlaceTagIndex(places)
+  const pool = candidates.map((candidate) => ({
+    ...candidate,
+    tagSet: routeTagSet(candidate.placeIds, placeTagIndex),
+  }))
+
+  const seedCompositions = new Set(
+    (strategyDefaults ?? []).map((seed) => compositionKey(seed.placeIds)),
+  )
+
+  const selected = []
+  const pending = []
+  for (const candidate of pool) {
+    if (seedCompositions.has(compositionKey(candidate.placeIds))) {
+      selected.push(candidate)
+    } else {
+      pending.push(candidate)
+    }
+  }
+  if (selected.length === 0 && pending.length > 0) {
+    selected.push(pending.shift())
+  }
+
+  const closestDistance = new Map()
+  for (const candidate of pending) {
+    let minDist = Infinity
+    for (const seed of selected) {
+      const dist = candidateDissimilarity(candidate, seed, weights)
+      if (dist < minDist) minDist = dist
+    }
+    closestDistance.set(candidate, minDist)
+  }
+
+  while (selected.length < targetCount && pending.length > 0) {
+    let bestIndex = 0
+    let bestDist = -Infinity
+    for (let index = 0; index < pending.length; index += 1) {
+      const dist = closestDistance.get(pending[index])
+      if (dist > bestDist) {
+        bestDist = dist
+        bestIndex = index
+      }
+    }
+
+    const [picked] = pending.splice(bestIndex, 1)
+    closestDistance.delete(picked)
+    selected.push(picked)
+
+    for (const candidate of pending) {
+      const dist = candidateDissimilarity(candidate, picked, weights)
+      if (dist < closestDistance.get(candidate)) {
+        closestDistance.set(candidate, dist)
+      }
+    }
+  }
+
+  return selected.map(({ tagSet, ...candidate }) => candidate)
+}
+
 module.exports = {
   buildStrategyDefaults,
   buildRouteCandidates,
   buildSelectionPools,
+  reduceRouteCandidatesByDiversity,
   compositionKey,
   enumerateRoutes,
   sequenceKey,

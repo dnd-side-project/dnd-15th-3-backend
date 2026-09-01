@@ -30,6 +30,7 @@
     "test:prompt:cloudflare": "promptfoo eval -c promptfoo/promptfooconfig.cloudflare.yaml --max-concurrency 1 --no-cache",
     "test:prompt:nim": "promptfoo eval -c promptfoo/promptfooconfig.nim.yaml --max-concurrency 1 --no-cache",
     "test:prompt:live": "promptfoo eval -c promptfoo/promptfooconfig.live.yaml --max-concurrency 1 --no-cache",
+    "test:prompt:diversity-benchmark": "promptfoo eval -c promptfoo/promptfooconfig.diversity-benchmark.yaml --max-concurrency 1 --no-cache",
     "migration:generate": "node -r ts-node/register -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts migration:generate src/database/migrations/SchemaMigration",
     "migration:run": "node -r ts-node/register -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts migration:run",
     "migration:revert": "node -r ts-node/register -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts migration:revert",

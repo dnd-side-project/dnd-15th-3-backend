@@ -1,0 +1,91 @@
+description: "routeCandidates 다양성 축소 전/후 토큰·지연시간 비교 (실제 모델 호출, API 키 필요)"
+
+prompts:
+  - file://prompts/course-generator-v1.txt
+
+providers:
+  - id: openai:chat:gpt-4o-mini
+    config:
+      apiKeyEnvar: OPENAI_API_KEY
+      max_completion_tokens: 2048
+      response_format:
+        type: json_object
+
+extensions:
+  - file://extensions/prepare-course-input.cjs:beforeEach
+
+defaultTest:
+  assert:
+    # 1) 유효한 JSON인지
+    - type: is-json
+
+    # 2) 입력은 서버가 계산한 거리 행렬과 점수만 사용해야 함
+    - type: javascript
+      value: file://assertions/input-contract.js
+
+    # 3) 서버가 생성한 유효 코스 후보와 거리·점수 검증
+    - type: javascript
+      value: file://assertions/route-candidates-contract.js
+
+    # 4) 코스 수는 1~3개
+    - type: javascript
+      value: file://assertions/routes-count.js
+
+    # 5) 환각 방지: placeId가 후보 목록 안의 id에만 존재해야 함
+    - type: javascript
+      value: file://assertions/place-id-valid.js
+
+    # 6) 방문 순서: places 개수와 카테고리 시퀀스가 visitOrder를 정확히 따라야 함
+    - type: javascript
+      value: file://assertions/visit-order.js
+
+    # 7) 한 코스 내에 중복 placeId가 없어야 함 (카테고리 반복 구간 포함)
+    - type: javascript
+      value: file://assertions/no-duplicate-place-id.js
+
+    # 8) 코스 간 차별성: 동일한 장소 조합을 중복 출력하지 않아야 함
+    - type: javascript
+      value: file://assertions/course-differentiation.js
+
+    # 9) 필드 제약: places 항목에는 placeId, order, category 외 필드가 없어야 함
+    - type: javascript
+      value: file://assertions/field-constraints.js
+
+    # 10) order는 각 코스 안에서 1부터 순차적이어야 함
+    - type: javascript
+      value: file://assertions/order-sequential.js
+
+    # 11) routeId는 1부터 순차적이어야 함
+    - type: javascript
+      value: file://assertions/route-id-sequential.js
+
+    # 12) LLM 출력이 실제로 전달된 routeCandidates(축소됐다면 축소된 목록) 안에 있는 조합이어야 함
+    - type: javascript
+      value: file://assertions/route-candidate-membership.js
+
+tests:
+  # 후보가 많은 실전 규모 스트레스 케이스(6개 카테고리, 약 18곳) 하나를 고정해두고
+  # reduceCandidatesTo 값만 다르게 줘서 같은 입력에 대한 축소 전/후를 비교한다.
+
+  # [기준선] 축소 없음 — 현재 프로덕션과 동일하게 전체 routeCandidates를 그대로 전달
+  - description: "[baseline] 축소 없음"
+    vars:
+      inputJson: file://fixtures/max-candidates-kitchen-sink.json
+
+  # [축소 150] 다양성 샘플링으로 최대 150개까지 축소
+  - description: "[reduced] targetCount=150"
+    vars:
+      inputJson: file://fixtures/max-candidates-kitchen-sink.json
+      reduceCandidatesTo: 150
+
+  # [축소 170] 다양성 샘플링으로 최대 170개까지 축소
+  - description: "[reduced] targetCount=170"
+    vars:
+      inputJson: file://fixtures/max-candidates-kitchen-sink.json
+      reduceCandidatesTo: 170
+
+  # [축소 200] 다양성 샘플링으로 최대 200개까지 축소
+  - description: "[reduced] targetCount=200"
+    vars:
+      inputJson: file://fixtures/max-candidates-kitchen-sink.json
+      reduceCandidatesTo: 200
