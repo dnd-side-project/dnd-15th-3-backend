@@ -8,17 +8,6 @@ import { MeetingPlaceRecommendation } from './entities/meeting-place-recommendat
 export class MeetingPlaceRecommendationRepository {
   constructor(private readonly dataSource: DataSource) {}
 
-  findByMeeting(meetingId: string): Promise<MeetingPlaceRecommendation[]> {
-    return this.dataSource
-      .getRepository(MeetingPlaceRecommendation)
-      .createQueryBuilder('recommendation')
-      .innerJoinAndSelect('recommendation.place', 'place')
-      .innerJoinAndSelect('place.category', 'category')
-      .where('recommendation.meeting_id = :meetingId', { meetingId })
-      .orderBy('recommendation.createdAt', 'ASC')
-      .getMany()
-  }
-
   findExcludedFromCourse(
     meetingId: string,
     courseCandidateId: string,
